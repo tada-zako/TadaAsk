@@ -6,10 +6,9 @@
 # 6. 将用户消息和 AI 回复保存到数据库
 from typing import AsyncGenerator, Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.services.thread import ChatThreadService
+from app.services.thread import ThreadService
 from app.services.rag import RAGService
 from app.providers import Model
 
@@ -17,35 +16,21 @@ from app.providers import Model
 class ChatService:
     def __init__(
         self,
-        llm_model: Model[Any] | None = None,
-        thread_service: ChatThreadService | None = None,
-        rag_service: RAGService | None = None,
+        llm_model: Model[Any],
+        thread_service: ThreadService,
+        rag_service: RAGService,
     ):
         """
         Args:
             llm_model: Model 实例，提供构造消息和流式对话接口，通过外部 IoC 反向注入
             thread_service: ChatThreadService 实例，提供获取历史消息和相关文档等功能
         """
-        if llm_model is None:
-            raise ValueError(
-                "llm_model must be provided by external dependency injection"
-            )
-        if thread_service is None:
-            raise ValueError(
-                "thread_service must be provided by external dependency injection"
-            )
-        if rag_service is None:
-            raise ValueError(
-                "rag_service must be provided by external dependency injection"
-            )
-
         self.llm_model = llm_model
         self.thread_service = thread_service
         self.rag_service = rag_service
 
     async def stream_chat_reply(
         self,
-        session: AsyncSession,
         *,
         thread_uid: str,
         user_message: str,
@@ -69,7 +54,7 @@ class ChatService:
         (
             thread_id,
             chat_history,
-        ) = await self.thread_service.resolve_thread_context_by_uid(session, thread_uid)
+        ) = await self.thread_service.resolve_thread_context_by_uid(thread_uid)
 
         # 向量库查询
         related_docs = []
@@ -78,7 +63,6 @@ class ChatService:
                 f"开始向量库查询，thread_uid={thread_uid}, collection_uid={collection_uid}, query_text='{user_message[:50]}', top_k={top_k}"
             )
             related_docs = await self.rag_service.get_related_documents(
-                session,
                 collection_uid=collection_uid,
                 query_text=user_message,
                 top_k=top_k,
@@ -86,7 +70,6 @@ class ChatService:
 
         # 用户消息入库
         await self.thread_service.save_chat_to_db(
-            session,
             thread_id=thread_id,
             role="user",
             message=user_message,
@@ -113,5 +96,5 @@ class ChatService:
 
         # 保存 AI 回复
         await self.thread_service.save_chat_to_db(
-            session, thread_id=thread_id, role="assistant", message=reply_content
+            thread_id=thread_id, role="assistant", message=reply_content
         )
