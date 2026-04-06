@@ -1,0 +1,74 @@
+# =========================
+# Python / FastAPI
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+pythonenv*/
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Testing / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Logs / local env
+*.log
+.env
+.env.*
+!.env.example
+
+# =========================
+# Vue / Node.js
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.nuxt/
+frontend/.output/
+frontend/coverage/
+frontend/.eslintcache
+frontend/*.local
+
+# If Node tooling is also used at repo root
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Optional app runtime files
+# =========================
+*.pid
+*.sqlite3

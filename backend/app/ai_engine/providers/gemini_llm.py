@@ -1,0 +1,86 @@
+from typing import AsyncGenerator
+
+import google.genai as genai
+from google.genai import types
+
+from .llm_model import LLMMessages
+from ..prompts import DEFAULT_SYSTEM_PROMPT
+from app.rag.chromadb import ChromaQueryItem
+from app.core.schemas import WorkspaceChatInternal
+from app.core.config import settings
+
+
+class GeminiLLM:
+    def __init__(self, model_perf: str | None = None):
+        if not settings.gemini_api_key:
+            raise ValueError("Gemini API key is not set in the configuration.")
+
+        self.client = genai.Client(api_key=settings.gemini_api_key)
+        self.model = (
+            model_perf or settings.gemini_model_perf or "gemini-2.5-flash"
+        ).lower()
+
+        # 模型工具配置
+        self.grounding_tool = types.Tool(google_search=types.GoogleSearch())
+
+    def construct_messages(
+        self,
+        document: list[ChromaQueryItem],
+        user_message: str,
+        chat_history: list[WorkspaceChatInternal] | None = None,
+    ) -> LLMMessages[types.ContentOrDict]:
+        """
+        构建符合 Gemini LLM 请求接口格式的消息实例
+        """
+        history_contents: list[types.ContentOrDict] | None = None
+        if chat_history:
+            history_contents = [
+                types.Content(
+                    role="model" if entry.role == "assistant" else "user",
+                    parts=[types.Part(text=entry.message)],
+                )
+                for entry in chat_history
+            ]
+
+        # NOTE: 目前只提供静态系统提示词
+        system_prompt = DEFAULT_SYSTEM_PROMPT
+
+        if document:
+            # 允许 document 为空
+            context = "\n<Context>\n"
+            for doc in document:
+                context += (
+                    f"[context{doc.id}]:\n{doc.document}\n"
+                    + f"Metadata: {doc.metadata}\n\n"
+                )
+            context += "</Context>\n"
+
+            user_message = (
+                context + "\n<user_message>\n" + user_message + "\n</user_message>\n"
+            )
+
+        return LLMMessages(
+            system_prompt=system_prompt,
+            user_message=user_message,
+            chat_history=history_contents,
+        )
+
+    async def stream_chat(
+        self, message: LLMMessages[types.ContentOrDict]
+    ) -> AsyncGenerator[str, None]:
+        """
+        Gemini LLM 流式对话接口
+        通过对 google.genai 的封装，提供简洁的流式对话接口
+        """
+        chat = self.client.aio.chats.create(
+            model=self.model,
+            config=types.GenerateContentConfig(
+                system_instruction=message.system_prompt,
+                tools=[self.grounding_tool],
+            ),
+            history=message.chat_history,
+        )
+
+        async for chunk in await chat.send_message_stream(message.user_message):
+            if chunk.text:
+                yield chunk.text
