@@ -115,6 +115,3 @@ class ChromaDB:
         """删除指定名称的集合"""
         self.client.delete_collection(name=collection_name)
         logger.debug(f"集合 '{collection_name}' 已删除")
-
-
-chromadb = ChromaDB()
