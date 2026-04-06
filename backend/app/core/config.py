@@ -1,12 +1,10 @@
 import pathlib
-from dotenv import load_dotenv
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PROJECT_ROOT = pathlib.Path(__file__).parents[2]
 
-# 加载 .env 文件
-load_dotenv(PROJECT_ROOT / ".env")
+# 后端项目根路径，指向 backend/ 目录
+PROJECT_ROOT = pathlib.Path(__file__).parents[2]
 
 
 class Settings(BaseSettings):
