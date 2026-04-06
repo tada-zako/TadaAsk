@@ -5,15 +5,10 @@ from fastapi import APIRouter, Depends, UploadFile, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.core.db import get_db
-from app.services.rag import get_rag_service, RAGService, DocumentRead
-from app.rag.file_parser import FileParser
-from app.rag.pdf_parser import PDFParser
-from app.core.schemas import (
-    VectorCollectionCreate,
-    VectorCollectionRead,
-    VectorCollectionInternal,
-)
+from app.db.config import get_db
+from app.services.rag import get_rag_service, RAGService
+from app.tools.file_parser import FileParser, PDFParser
+from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead
 
 router = APIRouter(prefix="/knowledge-base", tags=["Knowledge-Base"])
 
@@ -30,9 +25,9 @@ def parser_factory(file: UploadFile) -> FileParser:
         raise ValueError(f"Unsupported file type for parsing: {file.content_type}")
 
 
-@router.post("/collection/new", response_model=VectorCollectionRead)
+@router.post("/collection/new", response_model=SourceRead)
 async def create_collection(
-    payload: VectorCollectionCreate,
+    payload: SourceCreate,
     session: Annotated[AsyncSession, Depends(get_db)],
     rag_service: Annotated[RAGService, Depends(get_rag_service)],
 ):
@@ -46,17 +41,17 @@ async def create_collection(
 
     Returns:
     """
-    logger.info(f"创建新的向量集合，display_name={payload.display_name}")
+    logger.info(f"创建新的向量集合，display_name={payload.source_name}")
 
     # 将请求体转换为内部使用的模型
-    internal_payload = VectorCollectionInternal.model_validate(payload.model_dump())
+    internal_payload = SourceInternal.model_validate(payload.model_dump())
 
     # 调用 RAG 业务代码
     collection = await rag_service.create_collection(session, internal_payload)
     return collection
 
 
-@router.get("/collections", response_model=list[VectorCollectionRead])
+@router.get("/collections", response_model=list[SourceRead])
 async def list_collections(
     session: Annotated[AsyncSession, Depends(get_db)],
     rag_service: Annotated[RAGService, Depends(get_rag_service)],
@@ -82,7 +77,7 @@ async def list_collections(
     return collections
 
 
-@router.post("/{collection_uid}/documents/upsert", response_model=DocumentRead)
+@router.post("/{collection_uid}/documents/upsert", response_model=SourceItemRead)
 async def upsert_document(
     collection_uid: str,
     file: UploadFile,

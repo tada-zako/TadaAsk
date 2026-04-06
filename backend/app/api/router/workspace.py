@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.core.db import get_db
-from app.services.chat_thread import get_chat_thread_service, ChatThreadService
-from app.core.schemas import (
+from app.db.config import get_db
+from app.services.thread import get_chat_thread_service, ChatThreadService
+from app.db.schemas import (
     WorkspaceThreadCreate,
     WorkspaceThreadRead,
     WorkspaceChatRead,

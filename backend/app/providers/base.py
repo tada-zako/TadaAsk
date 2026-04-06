@@ -35,7 +35,7 @@ class Model(Protocol, Generic[T]):
         ...
 
     # TODO: 参考 AgentResponse 的实现，封装流式响应接口，对外提供更加安全的流式响应接口
-    def stream_chat(self, message: ModelRequestContext[T]) -> AsyncGenerator[str, None]:
+    def stream_chat(self, context: ModelRequestContext[T]) -> AsyncGenerator[str, None]:
         """
         LLM 流式对话接口
         通过对具体 LLM 的封装，提供简洁的流式对话接口

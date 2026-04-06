@@ -18,13 +18,6 @@ class FileParser(Protocol):
         ...
 
     @staticmethod
-    async def playwright_download(url: str) -> bytes:
-        """
-        Playwright 方式请求下载文件内容
-        """
-        ...
-
-    @staticmethod
     def parse(file_input: bytes, filename: str) -> list[Document]:
         """
         解析文件内容为文本块列表，每个文本块包含 page_content 和 metadata

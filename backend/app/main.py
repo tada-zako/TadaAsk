@@ -7,10 +7,8 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import HTTPException as StarletteHTTPException
 from loguru import logger
 
-from app.core.db import init_db
-from app.router.chat import router as chat_router
-from app.router.knowledge_base import router as kb_router
-from app.router.workspace import router as workspace_router
+from app.db import init_db
+from app.api.router import agent_router, chat_router, kb_router, workspace_router
 
 
 @asynccontextmanager
@@ -69,6 +67,7 @@ async def generic_error_handler(_: Request, exc: Exception) -> JSONResponse:
 app.include_router(chat_router)
 app.include_router(kb_router)
 app.include_router(workspace_router)
+# app.include_router(agent_router)    # Agent 功能尚未完全开发，暂不注册
 
 
 @app.get("/")
