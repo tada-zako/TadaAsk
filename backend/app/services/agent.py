@@ -11,8 +11,8 @@ from pydantic_ai.models import Model as AgentModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.ai_engine.agent import AgentExecutorRegistry, AgentDeps
-from app.services.chat_thread import ChatThreadService
+from app.agent import AgentExecutorRegistry, AgentDeps
+from app.services.thread import ChatThreadService
 from app.services.rag import RAGService
 
 

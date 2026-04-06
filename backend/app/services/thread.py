@@ -3,42 +3,45 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.models import (
-    WorkspaceThreads,
-    WorkspaceChats,
+from app.db.models import (
+    Threads,
+    ChatMessages,
 )
-from app.core.schemas import (
-    WorkspaceChatRead,
-    WorkspaceChatInternal,
-    WorkspaceThreadCreate,
-    WorkspaceThreadRead,
+from app.db.schemas import (
+    ChatMessageRead,
+    ChatMessageInternal,
+    ThreadCreate,
+    ThreadRead,
 )
 from app.core.config import settings
-from app.utils.context_window import build_history_context_window
+from app.tools.context_window import build_history_context_window
+
+
+# TODO: 需要完整重构，新增的 Projects 模型尚未与 Service 集成
 
 
 class ChatThreadService:
     async def create_thread(
-        self, session: AsyncSession, thread_data: WorkspaceThreadCreate
-    ) -> WorkspaceThreadRead:
+        self, session: AsyncSession, thread_data: ThreadCreate
+    ) -> ThreadRead:
         """创建新的聊天线程，并返回 thread_uid"""
-        new_thread = WorkspaceThreads(**thread_data.model_dump())
+        new_thread = Threads(**thread_data.model_dump())
         session.add(new_thread)
         await session.flush()  # 获取新线程的 UID
-        return WorkspaceThreadRead.model_validate(new_thread)
+        return ThreadRead.model_validate(new_thread)
 
     async def get_threads(
         self, session: AsyncSession, *, limit: int = 5, offset: int = 0
-    ) -> list[WorkspaceThreadRead]:
+    ) -> list[ThreadRead]:
         """获取所有聊天线程列表"""
         result = await session.execute(
-            select(WorkspaceThreads)
+            select(Threads)
             .offset(offset)
             .limit(limit)
-            .order_by(WorkspaceThreads.created_at.desc())
+            .order_by(Threads.created_at.desc())
         )
         threads = result.scalars().all()
-        return [WorkspaceThreadRead.model_validate(thread) for thread in threads]
+        return [ThreadRead.model_validate(thread) for thread in threads]
 
     async def get_thread_history(
         self,
@@ -47,26 +50,26 @@ class ChatThreadService:
         thread_uid: str,
         limit: int = 10,
         offset: int = 0,
-    ) -> list[WorkspaceChatRead]:
+    ) -> list[ChatMessageRead]:
         """
-        获取指定 thread_uid 的历史消息，并转换成 WorkspaceChatRead 模式返回
+        获取指定 thread_uid 的历史消息，并转换成 ChatMessageRead 模式返回
         """
         result = await session.execute(
-            select(WorkspaceChats)
-            .join(WorkspaceThreads)
-            .where(WorkspaceThreads.uid == thread_uid)
+            select(ChatMessages)
+            .join(Threads)
+            .where(Threads.uid == thread_uid)
             .offset(offset)
             .limit(limit)
-            .order_by(WorkspaceChats.created_at.desc(), WorkspaceChats.id.desc())
+            .order_by(ChatMessages.created_at.desc(), ChatMessages.id.desc())
         )
         chats = result.scalars().all()
 
         # 反转序列，使最新消息在最后面
-        return [WorkspaceChatRead.model_validate(chat) for chat in reversed(chats)]
+        return [ChatMessageRead.model_validate(chat) for chat in reversed(chats)]
 
     async def resolve_thread_context_by_uid(
         self, session: AsyncSession, thread_uid: str
-    ) -> tuple[int, list[WorkspaceChatInternal]]:
+    ) -> tuple[int, list[ChatMessageInternal]]:
         """统一解析 thread_uid，并返回 thread_id 与处理后的历史消息。"""
         thread_id = await self.get_thread_id_by_uid(session, thread_uid)
         chat_history = await self.get_processed_history(session, thread_id)
@@ -75,7 +78,7 @@ class ChatThreadService:
     async def get_thread_id_by_uid(self, session: AsyncSession, thread_uid: str) -> int:
         """根据 thread_uid 获取对应的 thread_id，供内部业务调用"""
         result = await session.execute(
-            select(WorkspaceThreads.id).where(WorkspaceThreads.uid == thread_uid)
+            select(Threads.id).where(Threads.uid == thread_uid)
         )
         thread_id = result.scalar_one_or_none()
         if thread_id is None:
@@ -84,16 +87,16 @@ class ChatThreadService:
 
     async def get_processed_history(
         self, session: AsyncSession, thread_id: int
-    ) -> list[WorkspaceChatInternal]:
+    ) -> list[ChatMessageInternal]:
         """
         获取指定 thread_id 的历史消息：
         并进行必要的处理（如文本裁剪、敏感信息过滤等），返回处理后的消息列表
         用于内部 LLM 历史对话重建，省略了 workspace_id 等无关字段
         """
         result = await session.execute(
-            select(WorkspaceChats)
-            .where(WorkspaceChats.thread_id == thread_id)
-            .order_by(WorkspaceChats.created_at.desc(), WorkspaceChats.id.desc())
+            select(ChatMessages)
+            .where(ChatMessages.thread_id == thread_id)
+            .order_by(ChatMessages.created_at.desc(), ChatMessages.id.desc())
             .limit(settings.sql_history_fetch_limit)
         )
         chats = result.scalars().all()
@@ -115,7 +118,7 @@ class ChatThreadService:
         message: str,
     ) -> None:
         """将聊天消息保存到数据库"""
-        chat = WorkspaceChats(thread_id=thread_id, role=role, message=message)
+        chat = ChatMessages(thread_id=thread_id, role=role, message=message)
         session.add(chat)
 
 

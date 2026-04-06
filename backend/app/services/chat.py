@@ -9,21 +9,21 @@ from typing import AsyncGenerator, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.services.chat_thread import ChatThreadService
+from app.services.thread import ChatThreadService
 from app.services.rag import RAGService
-from app.ai_engine import LLModel
+from app.providers import Model
 
 
 class ChatService:
     def __init__(
         self,
-        llm_model: LLModel[Any] | None = None,
+        llm_model: Model[Any] | None = None,
         thread_service: ChatThreadService | None = None,
         rag_service: RAGService | None = None,
     ):
         """
         Args:
-            llm_model: LLModel 实例，提供构造消息和流式对话接口，通过外部 IoC 反向注入
+            llm_model: Model 实例，提供构造消息和流式对话接口，通过外部 IoC 反向注入
             thread_service: ChatThreadService 实例，提供获取历史消息和相关文档等功能
         """
         if llm_model is None:
@@ -53,7 +53,7 @@ class ChatService:
         top_k: int = 5,
     ) -> AsyncGenerator[str, None]:
         """
-        基于 GeminiLLM 的流式对话接口，获取 AI 回复内容
+        基于 GeminiModel 的流式对话接口，获取 AI 回复内容
 
         Args:
             thread_uid: 对话线程 UID，用于获取历史消息和相关文档

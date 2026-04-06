@@ -67,7 +67,7 @@ class GeminiModel:
         )
 
     async def stream_chat(
-        self, message: ModelRequestContext[types.ContentOrDict]
+        self, context: ModelRequestContext[types.ContentOrDict]
     ) -> AsyncGenerator[str, None]:
         """
         Gemini LLM 流式对话接口
@@ -76,11 +76,11 @@ class GeminiModel:
         chat = self.client.aio.chats.create(
             model=self.model,
             config=types.GenerateContentConfig(
-                system_instruction=message.system_prompt,
+                system_instruction=context.system_prompt,
             ),
-            history=message.chat_history,
+            history=context.chat_history,
         )
 
-        async for chunk in await chat.send_message_stream(message.user_message):
+        async for chunk in await chat.send_message_stream(context.user_message):
             if chunk.text:
                 yield chunk.text

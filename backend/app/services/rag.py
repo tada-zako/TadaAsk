@@ -4,85 +4,83 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.rag.chromadb import chromadb, ChromaQueryItem
-from app.rag.file_parser import FileParser
-from app.core.models import VectorCollections, Documents
-from app.core.schemas import (
-    VectorCollectionInternal,
-    VectorCollectionRead,
-    DocumentRead,
+from app.knowledge.chromadb import chromadb, ChromaQueryItem
+from app.tools.file_parser import FileParser
+from app.db.models import Sources, SourceItems
+from app.db.schemas import (
+    SourceInternal,
+    SourceRead,
+    SourceItemRead,
 )
-from app.utils.calcu_file_hash import calculate_file_hash
+from app.tools.calcu_file_hash import calculate_file_hash
+
+# TODO: 需要完整重构，新增的 Projects 模型尚未与 Service 集成
 
 
 class RAGService:
     async def create_collection(
-        self, session: AsyncSession, collection_data: VectorCollectionInternal
-    ) -> VectorCollectionRead:
+        self, session: AsyncSession, source_data: SourceInternal
+    ) -> SourceRead:
         """创建新的 ChromaDB 集合"""
-        logger.info(f"创建 ChromaDB 集合 '{collection_data.display_name}'")
+        logger.info(f"创建 ChromaDB 集合 '{source_data.source_name}'")
 
         # 检查数据库中是否已存在同名集合记录
         result = await session.execute(
-            select(1)
-            .where(VectorCollections.display_name == collection_data.display_name)
-            .limit(1)
+            select(1).where(Sources.source_name == source_data.source_name).limit(1)
         )
         if result.scalar():
-            logger.warning(f"集合 '{collection_data.display_name}' 已存在")
+            logger.warning(f"集合 '{source_data.source_name}' 已存在")
             raise ValueError(
-                f"Collection with name '{collection_data.display_name}' already exists"
+                f"Collection with name '{source_data.source_name}' already exists"
             )
 
         try:
             # 创建向量集合
             await asyncio.to_thread(
                 chromadb.create_collection,
-                collection_name=collection_data.collection_name,  # 使用内部生成的 collection_name 字段
+                collection_name=source_data.collection_name,  # 使用内部生成的 collection_name 字段
             )
         except ValueError as e:
             # 集合可能已存在或集合名不合法
-            logger.warning(
-                f"集合 '{collection_data.display_name}' 创建失败，错误信息：{e}"
-            )
+            logger.warning(f"集合 '{source_data.source_name}' 创建失败，错误信息：{e}")
             raise
 
         try:
             # 数据库中创建集合记录
-            new_collection = VectorCollections(**collection_data.model_dump())
+            new_collection = Sources(**source_data.model_dump())
             session.add(new_collection)
             await session.flush()
 
-            logger.info(f"集合 '{collection_data.display_name}' 已创建")
-            return VectorCollectionRead.model_validate(new_collection)
+            logger.info(f"集合 '{source_data.source_name}' 已创建")
+            return SourceRead.model_validate(new_collection)
         except Exception as e:
             # 若数据库写入失败，回滚 Chroma 集合
             logger.error(
-                f"集合 '{collection_data.display_name}' 数据库写入失败，准备回滚 Chroma 集合，错误信息：{e}"
+                f"集合 '{source_data.source_name}' 数据库写入失败，准备回滚 Chroma 集合，错误信息：{e}"
             )
             try:
                 await asyncio.to_thread(
                     chromadb.delete_collection,
-                    collection_name=collection_data.collection_name,
+                    collection_name=source_data.collection_name,
                 )
             except Exception as rollback_err:
                 logger.error(
-                    f"回滚 Chroma 集合失败，collection_name={collection_data.collection_name}, 错误信息：{rollback_err}"
+                    f"回滚 Chroma 集合失败，collection_name={source_data.collection_name}, 错误信息：{rollback_err}"
                 )
             raise
 
     async def get_collections(
         self, session: AsyncSession, *, limit: int = 10, offset: int = 0
-    ) -> list[VectorCollectionRead]:
+    ) -> list[SourceRead]:
         """获取所有集合列表"""
         result = await session.execute(
-            select(VectorCollections)
+            select(Sources)
             .offset(offset)
             .limit(limit)
-            .order_by(VectorCollections.created_at.desc())
+            .order_by(Sources.created_at.desc())
         )
         collections = result.scalars().all()
-        return [VectorCollectionRead.model_validate(col) for col in collections]
+        return [SourceRead.model_validate(col) for col in collections]
 
     async def process_and_store_document(
         self,
@@ -93,7 +91,7 @@ class RAGService:
         file_content: bytes,
         filename: str,
         source: str,
-    ) -> DocumentRead:
+    ) -> SourceItemRead:
         """
         解析文档内容并存储到指定集合中
 
@@ -106,13 +104,13 @@ class RAGService:
             source: 文档来源，local_file 或 web_scrape
 
         Returns:
-            DocumentRead 模型，包含文档基本信息
+            SourceItemRead 模型，包含文档基本信息
         """
         logger.info(f"处理并存入文档 '{filename}'，来源：{source}")
 
         # 获取 collection
         collection_res = await session.execute(
-            select(VectorCollections).where(VectorCollections.uid == collection_uid)
+            select(Sources).where(Sources.uid == collection_uid)
         )
         collection = collection_res.scalar_one_or_none()
         if not collection:
@@ -126,8 +124,8 @@ class RAGService:
         is_duplicate = await session.execute(
             select(1)
             .where(
-                Documents.file_hash == file_hash,
-                Documents.vector_collection_id == collection.id,
+                SourceItems.item_hash == file_hash,
+                SourceItems.source_id == collection.id,
             )
             .limit(1)
         )
@@ -154,7 +152,7 @@ class RAGService:
         )
 
         # 写入文档数据
-        new_document = Documents(
+        new_document = SourceItems(
             filename=filename,
             source=source,
             file_hash=file_hash,
@@ -164,7 +162,7 @@ class RAGService:
         await session.flush()
 
         logger.info(f"文档 '{filename}' 已处理并存储，文本块数量：{stored_count}")
-        return DocumentRead.model_validate(new_document)
+        return SourceItemRead.model_validate(new_document)
 
     async def get_related_documents(
         self,
@@ -182,8 +180,8 @@ class RAGService:
             f"进行向量库查询，collection_uid={collection_uid}, query_text='{query_text[:50]}', top_k={top_k}"
         )
         result = await session.execute(
-            select(VectorCollections.collection_name).where(
-                VectorCollections.uid == collection_uid,
+            select(Sources.collection_name).where(
+                Sources.uid == collection_uid,
             )
         )
         collection_name = result.scalar_one_or_none()
