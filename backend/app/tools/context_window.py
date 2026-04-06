@@ -3,8 +3,8 @@ from functools import lru_cache
 
 from tiktoken import Encoding, encoding_for_model, get_encoding
 
-from app.core.models import WorkspaceChats
-from app.core.schemas import WorkspaceChatInternal
+from app.db.models import ChatMessages
+from app.db.schemas import ChatMessageInternal
 
 
 MESSAGE_OVERHEAD_TOKENS = 4  # 对话文本外的固定 token 开销（估计值）
@@ -55,12 +55,12 @@ def truncate_text_by_tokens(
 
 
 def build_history_context_window(
-    chats: Sequence[WorkspaceChats],
+    chats: Sequence[ChatMessages],
     *,
     max_context_tokens: int,
     max_single_message_tokens: int = 2048,
     model_name: str | None = None,
-) -> list[WorkspaceChatInternal]:
+) -> list[ChatMessageInternal]:
     """
     基于 token 预算，从最近消息向前构建动态窗口。
     保证返回窗口首条消息是 user（若存在）。
@@ -69,7 +69,7 @@ def build_history_context_window(
     if max_context_tokens <= 0 or not chats:
         return []
 
-    selected_message: list[WorkspaceChatInternal] = []
+    selected_message: list[ChatMessageInternal] = []
     used_tokens = 0
 
     for chat in chats:
@@ -101,7 +101,7 @@ def build_history_context_window(
                 + MESSAGE_OVERHEAD_TOKENS
             )
 
-        internal_chat = WorkspaceChatInternal.model_validate(chat)
+        internal_chat = ChatMessageInternal.model_validate(chat)
         selected_message.append(
             internal_chat.model_copy(update={"message": safe_message})
         )
