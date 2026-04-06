@@ -3,14 +3,14 @@ from typing import AsyncGenerator
 import google.genai as genai
 from google.genai import types
 
-from .llm_model import LLMMessages
-from ..prompts import DEFAULT_SYSTEM_PROMPT
-from app.rag.chromadb import ChromaQueryItem
-from app.core.schemas import WorkspaceChatInternal
+from .base import ModelRequestContext
+from app.tools.prompts import DEFAULT_SYSTEM_PROMPT
+from app.knowledge.chromadb import ChromaQueryItem
+from app.db.schemas import ChatMessageInternal
 from app.core.config import settings
 
 
-class GeminiLLM:
+class GeminiModel:
     def __init__(self, model_perf: str | None = None):
         if not settings.gemini_api_key:
             raise ValueError("Gemini API key is not set in the configuration.")
@@ -21,14 +21,15 @@ class GeminiLLM:
         ).lower()
 
         # 模型工具配置
-        self.grounding_tool = types.Tool(google_search=types.GoogleSearch())
+        # self.grounding_tool = types.Tool(google_search=types.GoogleSearch())
+        # NOTE: 目前不通过 SDK 提供 google search 工具
 
     def construct_messages(
         self,
         document: list[ChromaQueryItem],
         user_message: str,
-        chat_history: list[WorkspaceChatInternal] | None = None,
-    ) -> LLMMessages[types.ContentOrDict]:
+        chat_history: list[ChatMessageInternal] | None = None,
+    ) -> ModelRequestContext[types.ContentOrDict]:
         """
         构建符合 Gemini LLM 请求接口格式的消息实例
         """
@@ -59,14 +60,14 @@ class GeminiLLM:
                 context + "\n<user_message>\n" + user_message + "\n</user_message>\n"
             )
 
-        return LLMMessages(
+        return ModelRequestContext(
             system_prompt=system_prompt,
             user_message=user_message,
             chat_history=history_contents,
         )
 
     async def stream_chat(
-        self, message: LLMMessages[types.ContentOrDict]
+        self, message: ModelRequestContext[types.ContentOrDict]
     ) -> AsyncGenerator[str, None]:
         """
         Gemini LLM 流式对话接口
@@ -76,7 +77,6 @@ class GeminiLLM:
             model=self.model,
             config=types.GenerateContentConfig(
                 system_instruction=message.system_prompt,
-                tools=[self.grounding_tool],
             ),
             history=message.chat_history,
         )

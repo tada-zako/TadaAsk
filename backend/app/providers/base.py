@@ -1,26 +1,26 @@
 from typing import Protocol, runtime_checkable, AsyncGenerator, TypeVar, Generic
 from dataclasses import dataclass
 
-from app.core.schemas import WorkspaceChatInternal
+from app.db.schemas import ChatMessageInternal
 
 T = TypeVar("T")
 
 
 @dataclass
-class LLMMessages(Generic[T]):
+class ModelRequestContext(Generic[T]):
     system_prompt: str
     user_message: str
     chat_history: list[T] | None = None
 
 
 @runtime_checkable
-class LLModel(Protocol, Generic[T]):
+class Model(Protocol, Generic[T]):
     def construct_messages(
         self,
         document: list,
         user_message: str,
-        chat_history: list[WorkspaceChatInternal] | None = None,
-    ) -> LLMMessages[T]:
+        chat_history: list[ChatMessageInternal] | None = None,
+    ) -> ModelRequestContext[T]:
         """
         构建符合 LLM 请求接口格式的消息实例
 
@@ -34,7 +34,8 @@ class LLModel(Protocol, Generic[T]):
         """
         ...
 
-    def stream_chat(self, message: LLMMessages[T]) -> AsyncGenerator[str, None]:
+    # TODO: 参考 AgentResponse 的实现，封装流式响应接口，对外提供更加安全的流式响应接口
+    def stream_chat(self, message: ChatMessageInternal[T]) -> AsyncGenerator[str, None]:
         """
         LLM 流式对话接口
         通过对具体 LLM 的封装，提供简洁的流式对话接口
