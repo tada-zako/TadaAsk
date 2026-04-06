@@ -21,8 +21,12 @@ class Settings(BaseSettings):
     max_context_tokens: int = 12000  # LLM 输入的最大上下文 token 长度，只包含历史对话
     max_single_message_tokens: int = 2048  # 最大单条消息 token 长度，只约束历史消息
 
-    # 数据库配置
+    # 向量库配置
+    vector_store_perf: str = "chromadb"  # 向量库，默认为 "chromadb"
+
+    # ChromaDB 配置
     chromadb_path: str = ""
+    # 数据库配置
     sqlite_path: str = ""
 
     model_config = SettingsConfigDict(env_file=PROJECT_ROOT / ".env")

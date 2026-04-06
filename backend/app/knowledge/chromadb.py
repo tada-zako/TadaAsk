@@ -1,22 +1,15 @@
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 import uuid
 
 from chromadb import PersistentClient
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
-from pydantic import BaseModel, Field
 from loguru import logger
 
 from app.core.config import settings
-
-
-class ChromaQueryItem(BaseModel):
-    id: str
-    document: str
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    distance: float
+from .base import VectorQueryItem
 
 
 class ChromaDB:
@@ -85,7 +78,7 @@ class ChromaDB:
 
     def query(
         self, collection_name: str, query_text: str, top_k: int = 5
-    ) -> list[ChromaQueryItem]:
+    ) -> list[VectorQueryItem]:
         """
         查询向量库，返回匹配度最高的 top_k 条结果
 
@@ -109,7 +102,7 @@ class ChromaDB:
         distances = (results["distances"] or [[]])[0]
 
         return [
-            ChromaQueryItem(
+            VectorQueryItem(
                 id=id,
                 document=doc,
                 metadata=dict(meta),
