@@ -2,7 +2,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.core.models import Base
+from .models import Base
 from app.core.config import settings
 
 
