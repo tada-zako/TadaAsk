@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, UploadFile, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.db.config import get_db
+from app.db import get_db
 from app.services.rag import get_rag_service, RAGService
 from app.tools.file_parser import FileParser, PDFParser
 from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead

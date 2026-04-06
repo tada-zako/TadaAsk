@@ -9,7 +9,7 @@ from pydantic_ai.providers.google import GoogleProvider
 from loguru import logger
 
 from ..schemas import AgentRequest
-from app.db.config import get_db
+from app.db import get_db
 from app.core.config import settings
 from app.services.thread import get_chat_thread_service, ChatThreadService
 from app.services.rag import get_rag_service, RAGService

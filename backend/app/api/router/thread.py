@@ -4,21 +4,21 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.db.config import get_db
+from app.db import get_db
 from app.services.thread import get_chat_thread_service, ChatThreadService
 from app.db.schemas import (
-    WorkspaceThreadCreate,
-    WorkspaceThreadRead,
-    WorkspaceChatRead,
+    ThreadCreate,
+    ThreadRead,
+    ChatMessageRead,
 )
 from app.core.config import settings
 
-router = APIRouter(prefix="/workspace", tags=["workspace"])
+router = APIRouter(prefix="/project", tags=["Project-Thread"])
 
 
-@router.post("/thread/new", response_model=WorkspaceThreadRead)
+@router.post("/thread/new", response_model=ThreadRead)
 async def create_thread(
-    payload: WorkspaceThreadCreate,
+    payload: ThreadCreate,
     session: Annotated[AsyncSession, Depends(get_db)],
     thread_service: Annotated[ChatThreadService, Depends(get_chat_thread_service)],
 ):
@@ -34,11 +34,11 @@ async def create_thread(
         创建成功的线程信息
     """
     # 配置默认的 chat_model，如果用户没有指定
-    if not payload.chat_model:
-        payload.chat_model = settings.gemini_model_perf or "gemini-2.5-flash"
+    if not payload.model:
+        payload.model = settings.gemini_model_perf or "gemini-2.5-flash"
 
     logger.info(
-        f"创建新的对话，thread_name={payload.workspace_thread_name}, chat_model={payload.chat_model}"
+        f"创建新的对话，thread_name={payload.thread_name}, chat_model={payload.model}"
     )
 
     # 调用业务代码创建线程
@@ -46,7 +46,7 @@ async def create_thread(
     return thread
 
 
-@router.get("/threads", response_model=list[WorkspaceThreadRead])
+@router.get("/threads", response_model=list[ThreadRead])
 async def list_threads(
     session: Annotated[AsyncSession, Depends(get_db)],
     thread_service: Annotated[ChatThreadService, Depends(get_chat_thread_service)],
@@ -68,7 +68,7 @@ async def list_threads(
     return await thread_service.get_threads(session, limit=limit, offset=offset)
 
 
-@router.get("/thread/{thread_uid}/history", response_model=list[WorkspaceChatRead])
+@router.get("/thread/{thread_uid}/history", response_model=list[ChatMessageRead])
 async def get_thread_history(
     thread_uid: str,
     session: Annotated[AsyncSession, Depends(get_db)],

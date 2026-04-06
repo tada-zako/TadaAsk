@@ -21,6 +21,10 @@ from app.tools.context_window import build_history_context_window
 
 
 class ChatThreadService:
+    # TODO: 对于这里的新对话创建逻辑，需要重新设计
+    # 目前通过 API 直接通知后端创建，
+    # 实际应该是由前端生成 thread_uid 后传给后端，后端根据 thread_uid 创建对应的线程记录
+    # 也就是前端调用 chat/ API 时，业务层同时需要创建对应的 thread
     async def create_thread(
         self, session: AsyncSession, thread_data: ThreadCreate
     ) -> ThreadRead:

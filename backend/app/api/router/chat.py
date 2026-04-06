@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
 from ..schemas import ChatRequest
-from app.db.config import get_db
+from app.db import get_db
 from app.core.config import settings
 from app.providers import Model, GeminiModel
 from app.services.thread import get_chat_thread_service, ChatThreadService
