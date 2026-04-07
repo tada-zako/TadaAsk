@@ -4,18 +4,13 @@ from fastapi import Depends, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from app.core.config import settings
 from app.db import get_db
-from app.knowledge import VectorDatabase, ChromaDB
-from app.providers import Model, GeminiModel
-from app.services import ThreadService, RAGService, ProjectService
+from app.knowledge import VectorDatabase, vector_db_factory
+from app.providers import Model, model_factory
+from app.services import ThreadService, RAGService, ProjectService, ChatService
 
 
-# 数据库会话依赖
-SessionDeps = Annotated[AsyncSession, Depends(get_db)]
-
-
-def model_factory(
+def get_model(
     provider_name: Annotated[str | None, Body(embed=True, alias="providerName")] = None,
     model_name: Annotated[str | None, Body(embed=True, alias="modelName")] = None,
 ) -> Model[Any]:
@@ -23,18 +18,10 @@ def model_factory(
     model 工厂，根据 provider_name 返回对应的 Model 实例。
     NOTE: 目前仅支持 GeminiModel。
     """
-    p_name = (provider_name or settings.llm_provider_perf or "google").lower()
-
-    if p_name == "google":
-        return GeminiModel(model_perf=model_name)
-    raise ValueError(f"Unsupported LLM provider: {p_name}")
+    return model_factory(provider=provider_name, model=model_name)
 
 
-# LLM 模型依赖
-ModelDeps = Annotated[Model[Any], Depends(model_factory)]
-
-
-def vector_db_factory(
+def get_vector_db(
     vector_store_name: Annotated[
         str | None, Body(embed=True, alias="vectorStoreName")
     ] = None,
@@ -43,36 +30,49 @@ def vector_db_factory(
     向量库工厂函数，根据配置返回对应的 VectorDatabase 实例。
     NOTE: 目前仅支持 ChromaDB。
     """
-    v_name = (vector_store_name or settings.vector_store_perf or "chromadb").lower()
 
-    if v_name == "chromadb":
-        return ChromaDB()
-    raise ValueError(f"Unsupported vector store provider: {v_name}")
+    return vector_db_factory(vector_store=vector_store_name)
 
 
-# 向量库依赖
-VectorDBDeps = Annotated[VectorDatabase, Depends(vector_db_factory)]
-
-
-def get_chat_thread_service(session: SessionDeps) -> ThreadService:
+def get_chat_thread_service(session: "SessionDeps") -> ThreadService:
     """依赖注入接口：提供 ThreadService 实例"""
     return ThreadService(session=session)
 
 
-ThreadServiceDeps = Annotated[ThreadService, Depends(get_chat_thread_service)]
-
-
-def get_rag_service(session: SessionDeps, vector_db: VectorDBDeps) -> RAGService:
+def get_rag_service(session: "SessionDeps", vector_db: "VectorDBDeps") -> RAGService:
     """依赖注入接口：提供 RAGService 实例"""
     return RAGService(session=session, vector_db=vector_db)
 
 
-RAGServiceDeps = Annotated[RAGService, Depends(get_rag_service)]
-
-
-def get_project_service(session: SessionDeps) -> ProjectService:
+def get_project_service(session: "SessionDeps") -> ProjectService:
     """项目服务工厂函数，提供 ProjectService 实例"""
     return ProjectService(session=session)
 
 
+def get_chat_service(
+    llm_model: "ModelDeps",
+    thread_service: "ThreadServiceDeps",
+    rag_service: "RAGServiceDeps",
+) -> ChatService:
+    """聊天服务工厂函数，提供 ChatService 实例"""
+    return ChatService(
+        llm_model=llm_model,
+        thread_service=thread_service,
+        rag_service=rag_service,
+    )
+
+
+# 数据库会话依赖
+SessionDeps = Annotated[AsyncSession, Depends(get_db)]
+# LLM 模型依赖
+ModelDeps = Annotated[Model[Any], Depends(get_model)]
+# 向量库依赖
+VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]
+# 对话服务依赖
+ThreadServiceDeps = Annotated[ThreadService, Depends(get_chat_thread_service)]
+# 项目服务依赖
 ProjectServiceDeps = Annotated[ProjectService, Depends(get_project_service)]
+# RAG 服务依赖
+RAGServiceDeps = Annotated[RAGService, Depends(get_rag_service)]
+# 聊天服务依赖
+ChatServiceDeps = Annotated[ChatService, Depends(get_chat_service)]

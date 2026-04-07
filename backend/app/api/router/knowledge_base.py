@@ -1,42 +1,43 @@
 from typing import Annotated
 import uuid
 
-from fastapi import APIRouter, Depends, UploadFile, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, UploadFile, Query, Depends
 from loguru import logger
 
-from app.db import get_db
-from app.services.rag import get_rag_service, RAGService
-from app.tools.file_parser import FileParser, PDFParser
+from ..deps import RAGServiceDeps
+from app.tools.file_parser import FileParser, file_parser_factory
 from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead
 
 router = APIRouter(prefix="/knowledge-base", tags=["Knowledge-Base"])
 
 
-def parser_factory(file: UploadFile) -> FileParser:
+def get_file_parser(file: UploadFile) -> FileParser:
     """文件解析器工厂：根据请求传输的文件类型返回对应的解析器实例"""
+    file_type = "unknown"
+
     content_type = (file.content_type or "").lower()
     filename = (file.filename or "").lower()
+
     if content_type in {"application/pdf", "application/x-pdf"} or filename.endswith(
         ".pdf"
     ):
-        return PDFParser()
-    else:
-        raise ValueError(f"Unsupported file type for parsing: {file.content_type}")
+        file_type = "pdf"
+    return file_parser_factory(file_type=file_type)
+
+
+FileParserDeps = Annotated[FileParser, Depends(get_file_parser)]
 
 
 @router.post("/collection/new", response_model=SourceRead)
 async def create_collection(
     payload: SourceCreate,
-    session: Annotated[AsyncSession, Depends(get_db)],
-    rag_service: Annotated[RAGService, Depends(get_rag_service)],
+    rag_service: RAGServiceDeps,
 ):
     """
     创建新的向量集合（知识库）
 
     Args:
         payload: 包含 collection 的 display_name 和 collection_name 的请求体
-        session: 数据库会话，通过依赖注入获取
         rag_service: RAGService 实例，通过依赖注入获取
 
     Returns:
@@ -47,14 +48,13 @@ async def create_collection(
     internal_payload = SourceInternal.model_validate(payload.model_dump())
 
     # 调用 RAG 业务代码
-    collection = await rag_service.create_collection(session, internal_payload)
+    collection = await rag_service.create_collection(internal_payload)
     return collection
 
 
 @router.get("/collections", response_model=list[SourceRead])
 async def list_collections(
-    session: Annotated[AsyncSession, Depends(get_db)],
-    rag_service: Annotated[RAGService, Depends(get_rag_service)],
+    rag_service: RAGServiceDeps,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -73,7 +73,7 @@ async def list_collections(
     logger.info("获取向量集合列表")
 
     # 调用 RAG 业务代码获取集合列表
-    collections = await rag_service.get_collections(session, limit=limit, offset=offset)
+    collections = await rag_service.get_collections(limit=limit, offset=offset)
     return collections
 
 
@@ -81,9 +81,8 @@ async def list_collections(
 async def upsert_document(
     collection_uid: str,
     file: UploadFile,
-    session: Annotated[AsyncSession, Depends(get_db)],
-    file_parser: Annotated[FileParser, Depends(parser_factory)],
-    rag_service: Annotated[RAGService, Depends(get_rag_service)],
+    file_parser: FileParserDeps,
+    rag_service: RAGServiceDeps,
 ):
     """
     上传文件并将其内容解析后存储为文档
@@ -103,7 +102,6 @@ async def upsert_document(
     filename = file.filename or f"unnamed_{uuid.uuid4()}"
 
     document = await rag_service.process_and_store_document(
-        session,
         parser=file_parser,
         collection_uid=collection_uid,
         file_content=await file.read(),

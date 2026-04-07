@@ -4,8 +4,7 @@ from fastapi import APIRouter
 from loguru import logger
 
 from ..schemas import ChatRequest
-from ..deps import ModelDeps, ThreadServiceDeps, RAGServiceDeps
-from app.services.chat import ChatService
+from ..deps import ChatServiceDeps
 
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -15,9 +14,7 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 async def stream_chat(
     thread_uid: str,
     chat_request: ChatRequest,
-    thread_service: ThreadServiceDeps,
-    rag_service: RAGServiceDeps,
-    llm_model: ModelDeps,
+    chat_service: ChatServiceDeps,
 ) -> AsyncIterable[str]:
     """
     流式调用 LLM 生成聊天回复（无 Agent）
@@ -34,12 +31,6 @@ async def stream_chat(
     """
     logger.info(
         f"接收 chat 流式请求，thread_uid={thread_uid}, collection_uid={chat_request.collection_uid}, top_k={chat_request.doc_top_k}"
-    )
-
-    chat_service = ChatService(
-        llm_model=llm_model,
-        thread_service=thread_service,
-        rag_service=rag_service,
     )
 
     async for chunk in chat_service.stream_chat_reply(

@@ -23,7 +23,7 @@ class ChatService:
         """
         Args:
             llm_model: Model 实例，提供构造消息和流式对话接口，通过外部 IoC 反向注入
-            thread_service: ChatThreadService 实例，提供获取历史消息和相关文档等功能
+            thread_service: ThreadService 实例，提供获取历史消息和相关文档等功能
         """
         self.llm_model = llm_model
         self.thread_service = thread_service
