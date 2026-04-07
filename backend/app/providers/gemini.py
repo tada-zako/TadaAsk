@@ -1,13 +1,27 @@
-from typing import AsyncGenerator
+from typing import AsyncIterator
+from contextlib import asynccontextmanager
 
 import google.genai as genai
 from google.genai import types
+from google.genai.types import GenerateContentResponse
 
-from .base import ModelRequestContext
+from .base import ModelRequestContext, StreamedResponse
 from app.tools.prompts import DEFAULT_SYSTEM_PROMPT
-from app.knowledge.chromadb import ChromaQueryItem
+from app.knowledge import VectorQueryItem
 from app.db.schemas import ChatMessageInternal
 from app.core.config import settings
+
+
+class GeminiStreamedResponse(StreamedResponse):
+    def __init__(self, stream_iter: AsyncIterator[GenerateContentResponse]):
+        self.stream_iter = stream_iter
+
+    async def _get_stream_iter(self) -> AsyncIterator[str]:
+        async for chunk in self.stream_iter:
+            # TODO: 这里先简单实现，直接返回文本内容，
+            # 未来扩展更多的中间操作，例如过滤、清洗、统计 token 使用量等
+            if chunk.text:
+                yield chunk.text
 
 
 class GeminiModel:
@@ -26,7 +40,7 @@ class GeminiModel:
 
     def construct_messages(
         self,
-        document: list[ChromaQueryItem],
+        document: list[VectorQueryItem],
         user_message: str,
         chat_history: list[ChatMessageInternal] | None = None,
     ) -> ModelRequestContext[types.ContentOrDict]:
@@ -66,21 +80,25 @@ class GeminiModel:
             chat_history=history_contents,
         )
 
+    @asynccontextmanager
     async def stream_chat(
         self, context: ModelRequestContext[types.ContentOrDict]
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncIterator[GeminiStreamedResponse]:
         """
-        Gemini LLM 流式对话接口
-        通过对 google.genai 的封装，提供简洁的流式对话接口
+        Gemini LLM 流式对话接口: 通过对 google.genai 的封装，提供简洁的流式对话接口,
+        返回一个 GeminiStreamedResponse 对象，供业务层异步迭代获取流式响应内容
         """
-        chat = self.client.aio.chats.create(
+
+        stream_iter = await self.client.aio.models.generate_content_stream(
             model=self.model,
             config=types.GenerateContentConfig(
                 system_instruction=context.system_prompt,
             ),
-            history=context.chat_history,
+            contents=[
+                context.chat_history,
+                types.Content(
+                    role="user", parts=[types.Part(text=context.user_message)]
+                ),
+            ],
         )
-
-        async for chunk in await chat.send_message_stream(context.user_message):
-            if chunk.text:
-                yield chunk.text
+        yield GeminiStreamedResponse(stream_iter=stream_iter)

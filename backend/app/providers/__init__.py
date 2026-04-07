@@ -1,11 +1,12 @@
 from typing import Any
 
-from .base import Model
+from .base import Model, StreamedResponse
 from .gemini import GeminiModel
 from app.core.config import settings
 
 __all__ = [
     "Model",
+    "StreamedResponse",
     "GeminiModel",
 ]
 

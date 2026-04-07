@@ -4,13 +4,31 @@
 # 4. 构造 LLM 输入内容（系统提示词 + 历史消息 + 相关文档）
 # 5. 调用 LLM 接口获取回复
 # 6. 将用户消息和 AI 回复保存到数据库
-from typing import AsyncGenerator, Any
+from typing import Any, AsyncIterator
+from contextlib import asynccontextmanager
 
 from loguru import logger
 
+from app.providers import Model, StreamedResponse
 from app.services.thread import ThreadService
 from app.services.rag import RAGService
-from app.providers import Model
+
+
+class StreamedChatResult:
+    """
+    业务层流式对话结果封装：多保留一层封装中间件，方便未来扩展...
+    """
+
+    def __init__(self, raw_stream_response: StreamedResponse):
+        self._raw_stream_response: StreamedResponse = raw_stream_response
+
+    async def stream_reply(self) -> AsyncIterator[str]:
+        total_reply = ""
+        async for chunk in self._raw_stream_response:
+            total_reply += chunk
+            yield chunk
+
+        self.response_content = total_reply
 
 
 class ChatService:
@@ -29,6 +47,8 @@ class ChatService:
         self.thread_service = thread_service
         self.rag_service = rag_service
 
+    # TODO: 未来需要重构这里的业务逻辑，不由外部直接提供 collection_uid 来决定 RAG 检索的内容
+    @asynccontextmanager
     async def stream_chat_reply(
         self,
         *,
@@ -36,7 +56,7 @@ class ChatService:
         user_message: str,
         collection_uid: str | None = None,
         top_k: int = 5,
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncIterator[StreamedChatResult]:
         """
         基于 GeminiModel 的流式对话接口，获取 AI 回复内容
 
@@ -86,15 +106,22 @@ class ChatService:
         logger.info(
             f"开始调用 LLM 实例流式回复，用户消息长度={len(user_message)}, 历史消息轮数={len(chat_history) // 2}, 相关文档数量={len(related_docs)}"
         )
-        chunks: list[str] = []
-        async for chunk in self.llm_model.stream_chat(messages):
-            chunks.append(chunk)
-            yield chunk
-        reply_content = "".join(chunks)
 
-        logger.info(f"LLM 回复生成完成，回复内容长度={len(reply_content)}")
+        async with self.llm_model.stream_chat(messages) as stream_response:
+            # 业务层不直接迭代 yield LLM 的流式响应内容，而是封装一层 StreamedChatResult，方便未来扩展
+            chat_result = StreamedChatResult(stream_response)
+            yield chat_result
 
-        # 保存 AI 回复
-        await self.thread_service.save_chat_to_db(
-            thread_id=thread_id, role="assistant", message=reply_content
-        )
+            # TODO: 这里向上传递的是上下文内部的资源，
+            # 可能需要添加 asyncio.Event 来控制上下文窗口关闭的时机（？不确定是否必须）
+            # 避免过早关闭导致 LLM 回复内容无法正常传递
+            logger.info(
+                f"LLM 回复生成完成，回复内容长度={len(chat_result.response_content)}"
+            )
+
+            # 保存 AI 回复
+            await self.thread_service.save_chat_to_db(
+                thread_id=thread_id,
+                role="assistant",
+                message=chat_result.response_content,
+            )
