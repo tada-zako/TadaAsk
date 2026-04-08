@@ -179,7 +179,6 @@ class ThreadRead(ThreadBase):
 
 # ======= Chat Message Schemas ======
 class ChatMessageBase(BaseModel):
-    thread_id: int
     role: Literal["user", "assistant"]
     message: str
     citations: list[dict[str, Any]] | None = Field(

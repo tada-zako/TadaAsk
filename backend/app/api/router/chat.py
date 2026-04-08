@@ -33,10 +33,12 @@ async def stream_chat(
         f"接收 chat 流式请求，thread_uid={thread_uid}, collection_uid={chat_request.collection_uid}, top_k={chat_request.doc_top_k}"
     )
 
-    async for chunk in chat_service.stream_chat_reply(
+    async with chat_service.stream_chat_reply(
         thread_uid=thread_uid,
         collection_uid=chat_request.collection_uid,
         user_message=chat_request.message,
         top_k=chat_request.doc_top_k,
-    ):
-        yield chunk
+    ) as chat_result:
+        # 开启异步上下文，迭代异步生成器输出结果
+        async for chunk in chat_result.stream_reply():
+            yield chunk

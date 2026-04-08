@@ -112,9 +112,6 @@ class ChatService:
             chat_result = StreamedChatResult(stream_response)
             yield chat_result
 
-            # TODO: 这里向上传递的是上下文内部的资源，
-            # 可能需要添加 asyncio.Event 来控制上下文窗口关闭的时机（？不确定是否必须）
-            # 避免过早关闭导致 LLM 回复内容无法正常传递
             logger.info(
                 f"LLM 回复生成完成，回复内容长度={len(chat_result.response_content)}"
             )
