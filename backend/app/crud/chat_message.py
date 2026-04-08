@@ -1,25 +1,26 @@
-from typing import Sequence, Literal
+from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import ChatMessages, Threads
+from app.db.models import ChatMessages, ChatSessions
+from app.db.schemas import ChatMessageCreate
 
 
-async def get_thread_history(
+async def get_chat_history(
     session: AsyncSession,
     *,
-    thread_uid: str,
+    chat_session_uid: str,
     limit: int = 10,
     offset: int = 0,
 ) -> Sequence[ChatMessages]:
     """
-    获取指定 thread_uid 的历史消息，并返回 ChatMessages 实例列表
+    获取指定 chat_session_uid 的历史消息，并返回 ChatMessages 实例列表
     """
     result = await session.execute(
         select(ChatMessages)
-        .join(Threads)
-        .where(Threads.uid == thread_uid)
+        .join(ChatSessions)
+        .where(ChatSessions.uid == chat_session_uid)
         .offset(offset)
         .limit(limit)
         .order_by(ChatMessages.created_at.desc(), ChatMessages.id.desc())
@@ -32,11 +33,8 @@ async def get_thread_history(
 
 async def save_chat_to_db(
     session: AsyncSession,
-    *,
-    thread_id: int,
-    role: Literal["user", "assistant"],
-    message: str,
+    chat_message: ChatMessageCreate,
 ) -> None:
     """将聊天消息保存到数据库"""
-    chat = ChatMessages(thread_id=thread_id, role=role, message=message)
-    session.add(chat)
+    new_message = ChatMessages(**chat_message.model_dump())
+    session.add(new_message)

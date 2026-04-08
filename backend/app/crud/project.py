@@ -36,5 +36,4 @@ async def get_project_by_uid(
 ) -> Projects | None:
     """根据项目 UID 获取项目详情"""
     result = await session.execute(select(Projects).where(Projects.uid == project_uid))
-    project = result.scalar_one_or_none()
-    return project
+    return result.scalars().first()

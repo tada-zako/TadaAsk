@@ -40,7 +40,7 @@ class Projects(Base):
     )  # 项目对应的站点 URL
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    threads: Mapped[list["Threads"]] = relationship(
+    chat_sessions: Mapped[list["ChatSessions"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -101,7 +101,7 @@ class Sources(Base):
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE")
     )  # 外键关联到项目表
-    project: Mapped["Projects"] = relationship(back_populates="threads")
+    project: Mapped["Projects"] = relationship(back_populates="sources")
 
 
 class SourceItems(Base):
@@ -158,12 +158,12 @@ class DocumentChunks(Base):
     source_item: Mapped["SourceItems"] = relationship(back_populates="document_chunks")
 
 
-class Threads(Base):
+class ChatSessions(Base):
     """
     对话表：管理用户与知识库的对话信息
     """
 
-    __tablename__ = "threads"
+    __tablename__ = "chat_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -175,7 +175,7 @@ class Threads(Base):
         default=lambda: str(uuid.uuid4()),
     )
 
-    thread_name: Mapped[str]
+    chat_session_name: Mapped[str]
     model: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -186,10 +186,10 @@ class Threads(Base):
         ForeignKey("projects.id", ondelete="CASCADE")
     )  # 外键关联到项目表
 
-    project: Mapped["Projects"] = relationship(back_populates="threads")
+    project: Mapped["Projects"] = relationship(back_populates="chat_sessions")
 
     chat_messages: Mapped[list["ChatMessages"]] = relationship(
-        back_populates="thread",
+        back_populates="chat_session",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 对话中的消息列表
@@ -208,8 +208,8 @@ class ChatMessages(Base):
     )  # 引用信息，包含来源、相关文档等元数据  查询没有匹配时允许为空
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
-    thread_id: Mapped[int] = mapped_column(
-        ForeignKey("threads.id", ondelete="CASCADE")
+    chat_session_id: Mapped[int] = mapped_column(
+        ForeignKey("chat_sessions.id", ondelete="CASCADE")
     )  # 外键关联到对话表
 
-    thread: Mapped["Threads"] = relationship(back_populates="chat_messages")
+    chat_session: Mapped["ChatSessions"] = relationship(back_populates="chat_messages")

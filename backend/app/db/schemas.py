@@ -147,13 +147,13 @@ class DocumentChunkRead(DocumentChunkBase):
     )
 
 
-# ======= Thread Schemas ======
-class ThreadBase(BaseModel):
-    thread_name: str
+# ======= Chat Sessions Schemas ======
+class ChatSessionBase(BaseModel):
+    chat_session_name: str
     model: str
 
 
-class ThreadCreate(ThreadBase):
+class ChatSessionCreate(ChatSessionBase):
     model: str = Field(
         default=settings.gemini_model_perf,
         description="对话使用的模型，默认为项目配置的模型",
@@ -165,7 +165,7 @@ class ThreadCreate(ThreadBase):
     )
 
 
-class ThreadRead(ThreadBase):
+class ChatSessionRead(ChatSessionBase):
     uid: str
     created_at: datetime
     updated_at: datetime
@@ -185,6 +185,10 @@ class ChatMessageBase(BaseModel):
     citations: list[dict[str, Any]] | None = Field(
         default=None, description="消息中的引用列表，每个引用包含相关文档信息等"
     )
+
+
+class ChatMessageCreate(ChatMessageBase):
+    chat_session_id: int  # 绑定 ChatSessions 外键
 
 
 class ChatMessageInternal(ChatMessageBase):
