@@ -28,3 +28,13 @@ class ProjectService:
         )
         projects = result.scalars().all()
         return [ProjectRead.model_validate(project) for project in projects]
+
+    async def get_project_by_uid(self, project_uid: str) -> ProjectRead | None:
+        """根据项目 UID 获取项目详情"""
+        result = await self.session.execute(
+            select(Projects).where(Projects.uid == project_uid)
+        )
+        project = result.scalar_one_or_none()
+        if project:
+            return ProjectRead.model_validate(project)
+        return None

@@ -23,6 +23,13 @@ class Projects(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    uid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    )
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     description: Mapped[str]
     api_key: Mapped[str] = mapped_column(

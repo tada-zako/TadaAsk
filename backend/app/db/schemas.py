@@ -27,6 +27,7 @@ class ProjectCreate(ProjectBase):
 
 
 class ProjectRead(ProjectBase):
+    uid: str
     created_at: datetime
 
     model_config = ConfigDict(
