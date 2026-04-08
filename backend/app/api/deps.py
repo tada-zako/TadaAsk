@@ -1,13 +1,15 @@
 from typing import Annotated, Any
 
-from fastapi import Depends, Body
+from fastapi import Depends, Body, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app.db import get_db
 from app.knowledge import VectorDatabase, vector_db_factory
 from app.providers import Model, model_factory
-from app.services import ThreadService, RAGService, ProjectService, ChatService
+from app.crud import project as project_crud
+from app.db.models import Projects
+from app.services import ThreadService, RAGService, ChatService
 
 
 def get_model(
@@ -44,9 +46,14 @@ def get_rag_service(session: "SessionDeps", vector_db: "VectorDBDeps") -> RAGSer
     return RAGService(session=session, vector_db=vector_db)
 
 
-def get_project_service(session: "SessionDeps") -> ProjectService:
-    """项目服务工厂函数，提供 ProjectService 实例"""
-    return ProjectService(session=session)
+async def valid_project(project_uid: str, session: "SessionDeps") -> Projects:
+    """验证项目 UID 是否有效，返回项目实例或抛出 HTTPException"""
+    project = await project_crud.get_project_by_uid(
+        session=session, project_uid=project_uid
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
 
 
 def get_chat_service(
@@ -70,8 +77,8 @@ ModelDeps = Annotated[Model[Any], Depends(get_model)]
 VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]
 # 对话服务依赖
 ThreadServiceDeps = Annotated[ThreadService, Depends(get_chat_thread_service)]
-# 项目服务依赖
-ProjectServiceDeps = Annotated[ProjectService, Depends(get_project_service)]
+# valid project 依赖
+ValidProjectDeps = Annotated[Projects, Depends(valid_project)]
 # RAG 服务依赖
 RAGServiceDeps = Annotated[RAGService, Depends(get_rag_service)]
 # 聊天服务依赖

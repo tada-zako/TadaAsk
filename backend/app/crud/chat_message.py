@@ -25,10 +25,7 @@ async def get_chat_history(
         .limit(limit)
         .order_by(ChatMessages.created_at.desc(), ChatMessages.id.desc())
     )
-    chats = result.scalars().all()
-
-    # 反转序列，使最新消息在最后面
-    return chats[::-1]
+    return result.scalars().all()
 
 
 async def save_chat_to_db(
