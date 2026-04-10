@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, func, String, UniqueConstraint, JSON
+from sqlalchemy import ForeignKey, func, String, UniqueConstraint, JSON, Integer
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -113,9 +113,18 @@ class SourceItems(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    title: Mapped[str]  # 项目标题，如文件名、网页标题等
+    source_type: Mapped[str]  # 数据来源类型，如 "file", "web_url", "github_repo" 等
     origin_url_or_path: Mapped[str]  # 文件路径或 URL
     item_hash: Mapped[str]  # 文件或 URL 的哈希值，用于去重和校验
-    last_updated_at: Mapped[datetime] = mapped_column(
+    raw_content: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # 原始文本内容，是否使用尚不确定
+    version: Mapped[int]  # 版本号，便于实现增量更新和版本管理，现在不确定具体使用方式
+    status: Mapped[
+        str
+    ]  # 处理状态，如 "pending", "processing", "completed", "failed" 等
+    updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
     )  # 上次更新或访问时间
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -140,7 +149,6 @@ class SourceItems(Base):
 class DocumentChunks(Base):
     """
     文档切片表：管理知识库中切分后的文档信息，每个切片对应一个向量集合中的向量以及其对应的 source_item，
-    目前只作为 SQL 和向量 chunk 的映射，不负责 text 的存储
     """
 
     __tablename__ = "document_chunks"
@@ -149,13 +157,36 @@ class DocumentChunks(Base):
 
     vector_id: Mapped[str] = mapped_column(
         String, unique=True, nullable=False
-    )  # 向量 ID，唯一标识一个切片
+    )  # 向量 ID，切片的唯一标识
+    chunk_index: Mapped[int]  # 切片索引，表示该切片在原始文档中的位置
+    chunk_hash: Mapped[str]  # 切片内容的哈希值，用于去重和校验
+    raw_text: Mapped[str]  # 切片的原始文本内容
+
+    # TODO: 后期来源追溯功能实现预备扩展
+    page_number: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )  # 页码信息，适用于 PDF 等分页文档，其他类型文档可以不使用
+    section_header: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # 章节标题，适用于有明显章节结构的文档，如 Markdown、HTML 等，其他类型文档可以不使用
+    metadata_json: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # 其他元数据信息，如文档来源、创建时间等，具体内容可以根据实际需求进行调整
+
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     source_item_id: Mapped[int] = mapped_column(
         ForeignKey("source_items.id", ondelete="CASCADE")
     )  # 外键关联到来源项表
     source_item: Mapped["SourceItems"] = relationship(back_populates="document_chunks")
+
+
+# TODO: 向量表结构：存储向量化后的结果，目前先不使用
+# embeddings
+# - id
+# - chunk_id
+# - embedding_model
+# - vector_id（对应向量库）
 
 
 class ChatSessions(Base):
@@ -213,3 +244,23 @@ class ChatMessages(Base):
     )  # 外键关联到对话表
 
     chat_session: Mapped["ChatSessions"] = relationship(back_populates="chat_messages")
+
+
+# TODO: 目前对于实际的业务逻辑还是有些不太清楚：
+# 1. 每个 project 对应用户的一个部署的站点
+# 2. 每个 project 下可以有多个 source，每个 source 对应一个数据来源（如文件上传、网页爬取等）
+# 2.5 这里设置 sources 分层，每个 source 对应一个向量集合，后续可以根据 source 来复用向量集合
+# 多 sources 情况下，如何进行向量检索结果的合并和展示？向量查询时，需要一次查询多个向量集合？
+# 3. 每个 source 下可以有多个 source_item，每个 source_item 对应一个具体的文件或 URL 等
+# 4. 每个 source_item 可以切分成多个 document_chunk，每个 document_chunk 对应向量库中的一个向量
+# 4.5 这里的 document_chunk 作用有些困惑：如果目前只是用 SQL 维护一个文档向量 ID 的集合，其实没有多大的作用....
+# 这里的期望，其实需要存储 raw_text 和更多的 metadata 字段，实现：
+# 4.5.1 在 RAG 检索时，从 SQL 中获取相关文本内容和元数据，向量库只负责存储向量内容 —— 这意味着向量检索逻辑需要单独实现（？到底是否依赖于向量库的检索 API 呢）
+# 4.5.2 在后续的文档管理中，实现增量式的文档更新和增删，而不是每次都全量更新向量库
+# 4.5.3 提供更加准确的查询方式，不止是通过向量查询，也通过文本内容、元数据等进行查询（？具体的实现方式还不太清楚）
+# 4.5.4 能够将检索到的结果，更加清晰的展示给用户，实现文档信息来源的可视化展示功能
+# 5. 外来游客通过访问站点，每次对话时，自动创建 ChatSession，并将用户的消息保存到 ChatMessages 中
+
+# MVP 需要实现的功能：
+# - project-source 业务的实现，source-source_item 业务的实现，source_item-chunk 业务的实现
+# - project-chat_session 业务组合的实现，这里的重点是需要基于 project 进行 RAG 查询，涉及到多 collection 的查询和结果合并逻辑

@@ -79,3 +79,4 @@ Web Search：MVP 阶段不建议加入。个人博客 Agent 的目标是“基�
     - github repo 解析
     - 集成更多的 LLM 模型和向量库
     - Agent MCP 能力等
+    - 多向量 collection 召回后的 reranking 逻辑
