@@ -38,6 +38,11 @@ class GeminiModel:
         # self.grounding_tool = types.Tool(google_search=types.GoogleSearch())
         # NOTE: 目前不通过 SDK 提供 google search 工具
 
+    @property
+    def model_name(self) -> str:
+        """返回模型名称，供业务层记录日志等使用"""
+        return self.model
+
     def construct_messages(
         self,
         document: list[VectorQueryItem],
