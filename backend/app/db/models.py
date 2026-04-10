@@ -15,14 +15,11 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.core.constants import SourceProcessStatus
+from app.core.constants import SourceProcessStatus, ChatSessionType
 
 
 class Base(AsyncAttrs, DeclarativeBase):
     pass
-
-
-# TODO: 数据库时区配置，确保所有时间字段使用 UTC 存储，并在应用层进行时区转换
 
 
 class Projects(Base):
@@ -42,13 +39,15 @@ class Projects(Base):
         default=lambda: str(uuid.uuid4()),
     )
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    model: Mapped[str]  # 项目使用的模型
     description: Mapped[str]
-    api_key: Mapped[str] = mapped_column(
-        String, unique=True, nullable=False
-    )  # 保留字段，尚不清楚具体配置方式
     site_url: Mapped[str] = mapped_column(
         String, unique=True, nullable=False
     )  # 项目对应的站点 URL
+
+    api_key: Mapped[str] = mapped_column(
+        String, unique=True, nullable=False
+    )  # 保留字段，尚不清楚具体配置方式
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -226,6 +225,9 @@ class ChatSessions(Base):
     )
 
     chat_session_name: Mapped[str]
+    session_type: Mapped[ChatSessionType] = mapped_column(
+        Enum(ChatSessionType)
+    )  # 对话类型
     model: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
