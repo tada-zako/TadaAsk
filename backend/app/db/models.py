@@ -2,9 +2,20 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import ForeignKey, func, String, UniqueConstraint, JSON, Integer
+from sqlalchemy import (
+    ForeignKey,
+    func,
+    String,
+    UniqueConstraint,
+    JSON,
+    Integer,
+    Enum,
+    DateTime,
+)
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from app.core.constants import SourceProcessStatus
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -38,7 +49,9 @@ class Projects(Base):
     site_url: Mapped[str] = mapped_column(
         String, unique=True, nullable=False
     )  # 项目对应的站点 URL
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     chat_sessions: Mapped[list["ChatSessions"]] = relationship(
         back_populates="project",
@@ -80,17 +93,19 @@ class Sources(Base):
     source_type: Mapped[
         str
     ]  # 数据来源类型，如 "file", "web_sitemap", "web_url", "github_repo" 等
-    status: Mapped[
-        str
-    ]  # 数据来源状态，如 "pending", "processing", "completed", "failed" 等，后期添加自动监听同步和定时同步功能时会用到
+    status: Mapped[SourceProcessStatus] = mapped_column(
+        Enum(SourceProcessStatus), default=SourceProcessStatus.PENDING
+    )  # 数据来源状态，如 "pending", "processing", "completed", "failed" 等，后期添加自动监听同步和定时同步功能时会用到
     # 同步周期
     sync_interval: Mapped[
         int
     ]  # 同步周期，单位为小时，后期添加自动监听同步和定时同步功能时会用到
-    last_synced_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )  # 上次同步时间，后期添加自动监听同步和定时同步功能时会用到
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     source_items: Mapped[list["SourceItems"]] = relationship(
         back_populates="source",
@@ -114,20 +129,22 @@ class SourceItems(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     title: Mapped[str]  # 项目标题，如文件名、网页标题等
-    source_type: Mapped[str]  # 数据来源类型，如 "file", "web_url", "github_repo" 等
     origin_url_or_path: Mapped[str]  # 文件路径或 URL
     item_hash: Mapped[str]  # 文件或 URL 的哈希值，用于去重和校验
     raw_content: Mapped[Optional[str]] = mapped_column(
         String, nullable=True
     )  # 原始文本内容，是否使用尚不确定
     version: Mapped[int]  # 版本号，便于实现增量更新和版本管理，现在不确定具体使用方式
-    status: Mapped[
-        str
-    ]  # 处理状态，如 "pending", "processing", "completed", "failed" 等
+    status: Mapped[SourceProcessStatus] = mapped_column(
+        Enum(SourceProcessStatus), default=SourceProcessStatus.PENDING
+    )  # 处理状态，如 "pending", "processing", "completed", "failed" 等
+
     updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )  # 上次更新或访问时间
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     source_id: Mapped[int] = mapped_column(
         ForeignKey("sources.id", ondelete="CASCADE")
@@ -173,7 +190,9 @@ class DocumentChunks(Base):
         JSON, nullable=True
     )  # 其他元数据信息，如文档来源、创建时间等，具体内容可以根据实际需求进行调整
 
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     source_item_id: Mapped[int] = mapped_column(
         ForeignKey("source_items.id", ondelete="CASCADE")
@@ -208,9 +227,11 @@ class ChatSessions(Base):
 
     chat_session_name: Mapped[str]
     model: Mapped[str]
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     project_id: Mapped[int] = mapped_column(
@@ -237,7 +258,9 @@ class ChatMessages(Base):
     citations: Mapped[Optional[dict]] = mapped_column(
         JSON, nullable=True
     )  # 引用信息，包含来源、相关文档等元数据  查询没有匹配时允许为空
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     chat_session_id: Mapped[int] = mapped_column(
         ForeignKey("chat_sessions.id", ondelete="CASCADE")
