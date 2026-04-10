@@ -5,7 +5,6 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from app.core.config import settings
 from app.core.constants import SourceProcessStatus
 
 
@@ -163,18 +162,6 @@ class ChatSessionBase(BaseModel):
     model: str
 
 
-class ChatSessionCreate(ChatSessionBase):
-    model: str = Field(
-        default=settings.gemini_model_perf,
-        description="对话使用的模型，默认为项目配置的模型",
-    )
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-    )
-
-
 class ChatSessionRead(ChatSessionBase):
     uid: str
     created_at: datetime
@@ -192,13 +179,6 @@ class ChatSessionRead(ChatSessionBase):
 class ChatMessageBase(BaseModel):
     role: Literal["user", "assistant"]
     message: str
-    citations: list[dict[str, Any]] | None = Field(
-        default=None, description="消息中的引用列表，每个引用包含相关文档信息等"
-    )
-
-
-class ChatMessageCreate(ChatMessageBase):
-    chat_session_id: int  # 绑定 ChatSessions 外键
 
 
 class ChatMessageInternal(ChatMessageBase):
@@ -210,6 +190,9 @@ class ChatMessageInternal(ChatMessageBase):
 
 
 class ChatMessageRead(ChatMessageBase):
+    citations: list[dict[str, Any]] | None = Field(
+        default=None, description="消息中的引用列表，每个引用包含相关文档信息等"
+    )
     created_at: datetime
 
     model_config = ConfigDict(
