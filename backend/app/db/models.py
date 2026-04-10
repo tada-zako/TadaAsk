@@ -39,6 +39,7 @@ class Projects(Base):
         default=lambda: str(uuid.uuid4()),
     )
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    provider: Mapped[str]  # 项目使用的模型提供商
     model: Mapped[str]  # 项目使用的模型
     description: Mapped[str]
     site_url: Mapped[str] = mapped_column(
