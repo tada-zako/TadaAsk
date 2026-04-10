@@ -6,12 +6,8 @@ from pydantic.alias_generators import to_camel
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="用户输入的消息文本")
-    collection_uid: str | None = Field(
-        default=None,
-        description="RAG 检索使用的向量集合 UID，如果不提供则不进行 RAG 检索",
-    )
     doc_top_k: int = Field(
-        default=5,
+        default=3,
         ge=1,
         le=20,
         description="RAG 检索相关文档的数量",

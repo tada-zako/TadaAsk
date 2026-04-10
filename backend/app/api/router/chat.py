@@ -4,38 +4,35 @@ from fastapi import APIRouter
 from loguru import logger
 
 from ..schemas import ChatRequest
-from ..deps import ChatServiceDeps
+from ..deps import ChatServiceDeps, ValidProjectDeps, ValidChatSessionDeps
 
 
-router = APIRouter(prefix="/chat", tags=["Chat"])
+router = APIRouter(tags=["Chat"])
 
 
-@router.post("/{thread_uid}/message")
+@router.post("/project/{project_uid}/chat_session/{chat_session_uid}/stream_reply")
 async def stream_chat(
-    thread_uid: str,
     chat_request: ChatRequest,
+    project: ValidProjectDeps,
+    chat_session: ValidChatSessionDeps,
     chat_service: ChatServiceDeps,
 ) -> AsyncIterable[str]:
     """
     流式调用 LLM 生成聊天回复（无 Agent）
 
     Args:
-        thread_uid: 聊天线程 UID，从路径参数获取
-        chat_request: 包含用户消息、RAG 检索使用的 collection_uid 和 doc_top_k 的请求体（NOTE: API 中使用驼峰命名）
-        thread_service: 通过依赖注入获取 ThreadService 实例，用于获取历史消息和保存聊天记录
-        rag_service: 通过依赖注入获取 RAGService 实例，用于向量库查询相关文档
-        llm_model: 通过依赖注入获取 Model 实例，用于调用 LLM 接口生成回复
+
 
     Returns:
         异步生成的聊天回复字符串流
     """
     logger.info(
-        f"接收 chat 流式请求，thread_uid={thread_uid}, collection_uid={chat_request.collection_uid}, top_k={chat_request.doc_top_k}"
+        f"Received chat request: {chat_request} for project {project.id} and chat session {chat_session.uid}"
     )
 
     async with chat_service.stream_chat_reply(
-        thread_uid=thread_uid,
-        collection_uid=chat_request.collection_uid,
+        project=project,
+        chat_session=chat_session,
         user_message=chat_request.message,
         top_k=chat_request.doc_top_k,
     ) as chat_result:

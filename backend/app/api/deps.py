@@ -1,15 +1,16 @@
 from typing import Annotated, Any
 
-from fastapi import Depends, Body, HTTPException
+from fastapi import Depends, Body, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app.db import get_db
+from app.core.constants import ChatSessionType
 from app.knowledge import VectorDatabase, vector_db_factory
 from app.providers import Model, model_factory
-from app.crud import project as project_crud
-from app.db.models import Projects
-from app.services import ThreadService, RAGService, ChatService
+from app.crud import project_crud, chat_session_crud
+from app.db.models import Projects, ChatSessions
+from app.services import RAGService, ChatService
 
 
 def get_model(
@@ -36,17 +37,15 @@ def get_vector_db(
     return vector_db_factory(vector_store=vector_store_name)
 
 
-def get_chat_thread_service(session: "SessionDeps") -> ThreadService:
-    """依赖注入接口：提供 ThreadService 实例"""
-    return ThreadService(session=session)
-
-
 def get_rag_service(session: "SessionDeps", vector_db: "VectorDBDeps") -> RAGService:
     """依赖注入接口：提供 RAGService 实例"""
     return RAGService(session=session, vector_db=vector_db)
 
 
-async def valid_project(project_uid: str, session: "SessionDeps") -> Projects:
+async def valid_project(
+    project_uid: Annotated[str, Path(..., description="Project UID")],
+    session: "SessionDeps",
+) -> Projects:
     """验证项目 UID 是否有效，返回项目实例或抛出 HTTPException"""
     project = await project_crud.get_project_by_uid(
         session=session, project_uid=project_uid
@@ -56,15 +55,44 @@ async def valid_project(project_uid: str, session: "SessionDeps") -> Projects:
     return project
 
 
+async def valid_or_create_chat_session(
+    session: "SessionDeps",
+    model: "ModelDeps",
+    project: "ValidProjectDeps",
+    chat_session_uid: Annotated[str | None, Body(embed=True, alias="chatSessionUid")],
+) -> ChatSessions:
+    """
+    验证 chat_session_uid 是否有效，返回对应的 ChatSessions 实例。
+    如果 chat_session_uid 为空或无效，则创建新的 ChatSessions 实例并返回。
+    """
+    if chat_session_uid:
+        chat_session = await chat_session_crud.get_chat_session_by_uid(
+            session=session, chat_session_uid=chat_session_uid
+        )
+        if chat_session:
+            return chat_session
+
+    # TODO: 这里还是需要基于鉴权方式的实现来确定会话的创建逻辑
+    # 如果没有提供有效的 chat_session_uid，则创建新的聊天会话
+    new_chat_session = await chat_session_crud.create_chat_session(
+        session,
+        chat_session_name="New Chat Session",
+        project_id=project.id,
+        session_type=ChatSessionType.ADMIN,
+        model=model.model_name,
+    )
+    return new_chat_session
+
+
 def get_chat_service(
+    session: "SessionDeps",
     llm_model: "ModelDeps",
-    thread_service: "ThreadServiceDeps",
     rag_service: "RAGServiceDeps",
 ) -> ChatService:
     """聊天服务工厂函数，提供 ChatService 实例"""
     return ChatService(
+        session,
         llm_model=llm_model,
-        thread_service=thread_service,
         rag_service=rag_service,
     )
 
@@ -75,10 +103,10 @@ SessionDeps = Annotated[AsyncSession, Depends(get_db)]
 ModelDeps = Annotated[Model[Any], Depends(get_model)]
 # 向量库依赖
 VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]
-# 对话服务依赖
-ThreadServiceDeps = Annotated[ThreadService, Depends(get_chat_thread_service)]
 # valid project 依赖
 ValidProjectDeps = Annotated[Projects, Depends(valid_project)]
+# chat session 依赖
+ValidChatSessionDeps = Annotated[ChatSessions, Depends(valid_or_create_chat_session)]
 # RAG 服务依赖
 RAGServiceDeps = Annotated[RAGService, Depends(get_rag_service)]
 # 聊天服务依赖
