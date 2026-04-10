@@ -6,9 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.core.config import settings
-
-
-# TODO: 对于 pydantic 模型是否需要设置外键字段，考虑一下...
+from app.core.constants import SourceProcessStatus
 
 
 # ======= Project Schemas ======
@@ -47,7 +45,6 @@ def generate_collection_name() -> str:
 class SourceBase(BaseModel):
     source_name: str
     source_type: Literal["local_file", "web_scrape", "github_repo"]
-    status: Literal["pending", "processing", "completed", "failed"]
     sync_interval: int = Field(
         default=24, ge=1, description="同步周期，单位为小时，默认值为 24 小时"
     )
@@ -68,7 +65,8 @@ class SourceInternal(SourceBase):
 
 class SourceRead(SourceBase):
     uid: str
-    last_synced_at: datetime
+    synced_at: datetime
+    status: SourceProcessStatus
     created_at: datetime
 
     model_config = ConfigDict(
@@ -80,7 +78,7 @@ class SourceRead(SourceBase):
 
 
 class SourceUpdate(BaseModel):
-    status: Literal["pending", "processing", "completed", "failed"] | None = None
+    status: SourceProcessStatus | None = None
     sync_interval: int | None = Field(
         default=None, ge=1, description="同步周期，单位为小时，必须大于等于 1"
     )
@@ -93,19 +91,16 @@ class SourceUpdate(BaseModel):
 
 # ======= Source Items Schemas ======
 class SourceItemBase(BaseModel):
+    title: str
     origin_url_or_path: str
     item_hash: str
-
-
-class SourceItemCreate(SourceItemBase):
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-    )
+    raw_content: str | None = None  # 可选字段，存储原始文本内容，便于后续调试和分析
+    version: int = Field(default=1, description="文档版本号，默认为 1，每次更新时递增")
 
 
 class SourceItemRead(SourceItemBase):
-    last_updated_at: datetime
+    status: SourceProcessStatus
+    updated_at: datetime
     created_at: datetime
 
     model_config = ConfigDict(
@@ -117,8 +112,14 @@ class SourceItemRead(SourceItemBase):
 
 
 class SourceItemUpdate(BaseModel):
+    title: str | None = None
+    version: int | None = Field(
+        default=None, ge=1, description="文档版本号，必须大于等于 1，每次更新时递增"
+    )
     origin_url_or_path: str | None = None
+    raw_content: str | None = None
     item_hash: str | None = None
+    status: SourceProcessStatus | None = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -129,11 +130,20 @@ class SourceItemUpdate(BaseModel):
 # ======= Document Chunks Schemas ======
 class DocumentChunkBase(BaseModel):
     vector_id: str
+    chunk_index: int
+    chunk_hash: str
+    raw_text: str  # 切片的原始文本内容，便于后续调试和分析
     source_item_id: int
 
-
-class DocumentChunkCreate(DocumentChunkBase):
-    pass  # 一般由内部创建，不需要外部输入
+    page_number: int | None = Field(
+        default=None, description="文档页码，针对 PDF 等分页文档可选字段"
+    )
+    section_header: str | None = Field(
+        default=None, description="文档章节标题，便于后续分析和调试"
+    )
+    metadata_json: dict[str, Any] | None = Field(
+        default=None, description="切片的额外元数据信息，便于后续分析和调试"
+    )
 
 
 class DocumentChunkRead(DocumentChunkBase):
