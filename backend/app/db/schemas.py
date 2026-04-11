@@ -5,14 +5,13 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from app.core.constants import SourceProcessStatus
+from app.core.constants import SourceProcessStatus, ChatSessionType
 
 
 # ======= Project Schemas ======
 class ProjectBase(BaseModel):
     name: str
     description: str | None = None
-    api_key: str
     site_url: str
 
 
@@ -160,6 +159,14 @@ class DocumentChunkRead(DocumentChunkBase):
 class ChatSessionBase(BaseModel):
     chat_session_name: str
     model: str
+
+
+class ChatSessionCreate(ChatSessionBase):
+    visitor_id: str | None = Field(
+        default=None, description="访客 ID，针对匿名用户可选字段，便于后续分析和调试"
+    )
+    session_type: ChatSessionType
+    project_id: int = Field(..., description="所属项目 ID")
 
 
 class ChatSessionRead(ChatSessionBase):

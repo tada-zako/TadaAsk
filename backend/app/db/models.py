@@ -46,9 +46,6 @@ class Projects(Base):
         String, unique=True, nullable=False
     )  # 项目对应的站点 URL
 
-    api_key: Mapped[str] = mapped_column(
-        String, unique=True, nullable=False
-    )  # 保留字段，尚不清楚具体配置方式
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -224,6 +221,10 @@ class ChatSessions(Base):
         index=True,
         default=lambda: str(uuid.uuid4()),
     )
+    visitor_id: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # 访客标识，后续可以基于 IP 地址或其他方式生成访客 ID，实现对话的归属和分析
+    # TODO: 考虑是否需要记录访客 IP 字段，实现更加细致的访问分析
 
     chat_session_name: Mapped[str]
     session_type: Mapped[ChatSessionType] = mapped_column(
