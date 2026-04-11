@@ -81,3 +81,4 @@ Web Search：MVP 阶段不建议加入。个人博客 Agent 的目标是“基�
     - 集成更多的 LLM 模型和向量库
     - Agent MCP 能力等
     - 多向量 collection 召回后的 reranking 逻辑
+    - CLI 支持（项目初始化，设置用户账号密码等）
