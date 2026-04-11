@@ -4,23 +4,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ChatSessions
-from app.core.constants import ChatSessionType
+from app.db.schemas import ChatSessionCreate
 
 
 async def create_chat_session(
     session: AsyncSession,
-    *,
-    chat_session_name: str,
-    session_type: ChatSessionType,
-    model: str,
-    project_id: int,
+    chat_session_data: ChatSessionCreate,
 ) -> ChatSessions:
     """创建新的聊天会话，并返回创建的对话实例"""
     new_chat = ChatSessions(
-        chat_session_name=chat_session_name,
-        session_type=session_type,
-        model=model,
-        project_id=project_id,
+        **chat_session_data.model_dump(),
     )
     session.add(new_chat)
     await session.flush()  # 获取新对话的 UID

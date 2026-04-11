@@ -12,7 +12,7 @@ from app.db.schemas import (
     SourceRead,
     SourceItemRead,
 )
-from app.tools.calcu_file_hash import calculate_file_hash
+from app.utils.calcu_file_hash import calculate_file_hash
 
 # TODO: 需要完整重构，新增的 Projects 模型尚未与 Service 集成
 

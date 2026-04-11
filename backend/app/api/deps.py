@@ -5,11 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app.db import get_db
+from app.db.models import Projects, ChatSessions
+from app.db.schemas import ChatSessionCreate
+from app.crud import project_crud, chat_session_crud
 from app.core.constants import ChatSessionType
 from app.rag import VectorDatabase, vector_db_factory
 from app.providers import Model, model_factory
-from app.crud import project_crud, chat_session_crud
-from app.db.models import Projects, ChatSessions
 from app.services import RAGService, ChatService
 
 
@@ -59,7 +60,22 @@ async def valid_or_create_chat_session(
     session: "SessionDeps",
     model: "ModelDeps",
     project: "ValidProjectDeps",
-    chat_session_uid: Annotated[str | None, Body(embed=True, alias="chatSessionUid")],
+    visitor_id: Annotated[
+        str | None,
+        Body(
+            default=None,
+            alias="visitorId",
+            description="访客 ID: 针对匿名用户可选字段，便于后续分析和调试",
+        ),
+    ] = None,
+    chat_session_uid: Annotated[
+        str | None,
+        Body(
+            embed=True,
+            alias="chatSessionUid",
+            description="前端传递的 chat_session_uid: 为空时创建新的对话",
+        ),
+    ] = None,
 ) -> ChatSessions:
     """
     验证 chat_session_uid 是否有效，返回对应的 ChatSessions 实例。
@@ -76,10 +92,12 @@ async def valid_or_create_chat_session(
     # 如果没有提供有效的 chat_session_uid，则创建新的聊天会话
     new_chat_session = await chat_session_crud.create_chat_session(
         session,
-        chat_session_name="New Chat Session",
-        project_id=project.id,
-        session_type=ChatSessionType.ADMIN,
-        model=model.model_name,
+        chat_session_data=ChatSessionCreate(
+            chat_session_name="New Chat Session",
+            model=model.model_name,
+            session_type=ChatSessionType.ADMIN,
+            project_id=project.id,
+        ),
     )
     return new_chat_session
 
