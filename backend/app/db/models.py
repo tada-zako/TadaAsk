@@ -22,6 +22,35 @@ class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 
+class Admins(Base):
+    """
+    admins 表：控制台管理员账号
+    """
+
+    __tablename__ = "admins"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    uid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)  # 存储密码哈希值
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )  # 上次登录时间，初始值为 None
+    token_version: Mapped[int] = mapped_column(
+        Integer, default=0
+    )  # token 版本号，用于实现 token 的强制失效，每次密码修改或管理员操作时递增（MVP阶段暂时使用）
+
+
 class Projects(Base):
     """
     项目表：用于管理部署于不同站点的数据
