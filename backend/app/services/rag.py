@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.knowledge import VectorQueryItem, VectorDatabase
-from app.tools.file_parser import FileParser
+from app.rag import VectorQueryItem, VectorDatabase
+from app.rag.file_parser import FileParser
 from app.db.models import Sources, SourceItems
 from app.db.schemas import (
     SourceInternal,

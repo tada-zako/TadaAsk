@@ -6,8 +6,8 @@ from google.genai import types
 from google.genai.types import GenerateContentResponse
 
 from .base import ModelRequestContext, StreamedResponse
-from app.tools.prompts import DEFAULT_SYSTEM_PROMPT
-from app.knowledge import VectorQueryItem
+from app.providers.prompts import DEFAULT_SYSTEM_PROMPT
+from app.rag import VectorQueryItem
 from app.db.schemas import ChatMessageInternal
 from app.core.config import settings
 

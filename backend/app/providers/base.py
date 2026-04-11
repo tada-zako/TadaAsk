@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-from app.knowledge import VectorQueryItem
+from app.rag import VectorQueryItem
 from app.db.schemas import ChatMessageInternal
 
 T = TypeVar("T")

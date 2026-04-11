@@ -5,7 +5,7 @@ from fastapi import APIRouter, UploadFile, Query, Depends
 from loguru import logger
 
 from ..deps import RAGServiceDeps
-from app.tools.file_parser import FileParser, file_parser_factory
+from app.rag.file_parser import FileParser, file_parser_factory
 from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead
 
 router = APIRouter(prefix="/knowledge-base", tags=["Knowledge-Base"])

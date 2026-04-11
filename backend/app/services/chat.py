@@ -17,7 +17,7 @@ from app.db.schemas import ChatMessageInternal
 from app.crud import chat_message_crud
 from app.providers import Model, StreamedResponse
 from app.context import build_history_context_window
-from app.knowledge import VectorQueryItem
+from app.rag import VectorQueryItem
 from app.services.rag import RAGService
 from app.core.config import settings
 

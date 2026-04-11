@@ -9,7 +9,7 @@ from pydantic_ai import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.tools.prompts import DEFAULT_SYSTEM_PROMPT
+from app.providers.prompts import DEFAULT_SYSTEM_PROMPT
 from app.services.thread import ChatThreadService
 from app.services.rag import RAGService
 

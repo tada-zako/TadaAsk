@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.core.constants import ChatSessionType
-from app.knowledge import VectorDatabase, vector_db_factory
+from app.rag import VectorDatabase, vector_db_factory
 from app.providers import Model, model_factory
 from app.crud import project_crud, chat_session_crud
 from app.db.models import Projects, ChatSessions
