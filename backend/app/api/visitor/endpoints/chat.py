@@ -14,10 +14,18 @@ from app.crud import chat_session_crud
 router = APIRouter()
 
 
-async def valid_or_create_admin_chat_session(
+async def valid_or_create_visitor_chat_session(
     session: SessionDeps,
     model: ModelDeps,
     project: ValidProjectDeps,
+    visitor_id: Annotated[
+        str | None,
+        Body(
+            default=None,
+            alias="visitorId",
+            description="访客 ID: 针对匿名用户可选字段，便于后续分析和调试",
+        ),
+    ] = None,
     chat_session_uid: Annotated[
         str | None,
         Body(
@@ -37,6 +45,15 @@ async def valid_or_create_admin_chat_session(
             session=session, chat_session_uid=chat_session_uid
         )
         if chat_session:
+            # 检查会话类型是否为 VISITOR，如果不是则抛出异常
+            if chat_session.session_type != ChatSessionType.VISITOR:
+                logger.warning(
+                    f"Chat session {chat_session_uid} is not a visitor session, creating new chat session"
+                )
+                raise ValueError(
+                    "Invalid chat_session_uid for visitor session, creating new chat session"
+                )
+
             return chat_session
         else:
             logger.warning(
@@ -50,7 +67,8 @@ async def valid_or_create_admin_chat_session(
         chat_session_data=ChatSessionCreate(
             chat_session_name="New Chat Session",
             model=model.model_name,
-            session_type=ChatSessionType.ADMIN,
+            visitor_id=visitor_id,
+            session_type=ChatSessionType.VISITOR,
             project_id=project.id,
         ),
     )
@@ -61,7 +79,9 @@ async def valid_or_create_admin_chat_session(
 async def stream_chat(
     chat_request: ChatRequest,
     project: ValidProjectDeps,
-    chat_session: Annotated[ChatSessions, Depends(valid_or_create_admin_chat_session)],
+    chat_session: Annotated[
+        ChatSessions, Depends(valid_or_create_visitor_chat_session)
+    ],
     chat_service: ChatServiceDeps,
 ) -> AsyncIterable[str]:
     """
