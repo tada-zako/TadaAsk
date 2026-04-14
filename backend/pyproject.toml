@@ -13,8 +13,10 @@ dependencies = [
     "langchain-text-splitters>=1.1.1",
     "loguru>=0.7.3",
     "openai>=2.30.0",
+    "pwdlib[argon2]>=0.3.0",
     "pydantic-ai>=1.77.0",
     "pydantic-settings>=2.13.1",
+    "pyjwt>=2.12.1",
     "sqlalchemy>=2.0.49",
     "tokenizer>=3.6.2",
 ]
