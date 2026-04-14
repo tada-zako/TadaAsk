@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from loguru import logger
 
 from ..deps import SessionDeps
 from ..schemas import Token
@@ -35,6 +36,7 @@ async def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
     """管理员登录接口：验证用户名和密码，返回 JWT 访问令牌"""
+    logger.info(f"Admin 登录尝试，用户名：{form_data.username}")
     admin = await authenticate_admin(
         session, username=form_data.username, password=form_data.password
     )
@@ -49,4 +51,5 @@ async def login(
     access_token = create_access_token(
         data={"username": admin.username, "token_version": admin.token_version}
     )
+    logger.info(f"Admin 登录成功，用户名：{admin.username}")
     return Token(access_token=access_token, token_type="bearer")
