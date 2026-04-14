@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     # 数据库配置
     sqlite_path: str = ""
 
+    # JWT 配置
+    jwt_secret_key: str = ""
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 30
+
+    # 管理员账号配置
+    admin_username: str = "admin"
+    admin_password: str = "admin123"
+
     model_config = SettingsConfigDict(env_file=PROJECT_ROOT / ".env")
 
 

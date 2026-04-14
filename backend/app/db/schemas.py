@@ -8,7 +8,44 @@ from pydantic.alias_generators import to_camel
 from app.core.constants import SourceProcessStatus, ChatSessionType
 
 
-# ======= Project Schemas ======
+# ======= Admin Schemas =======
+class AdminBase(BaseModel):
+    username: str
+
+
+class AdminCreate(AdminBase):
+    password_hash: str
+
+
+class AdminRead(AdminBase):
+    uid: str
+    created_at: datetime
+    last_login_at: datetime | None = None
+    token_version: int = Field(
+        ..., description="Token 版本号，默认为 0，每次密码修改时递增"
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class AdminUpdate(BaseModel):
+    password_hash: str | None = None
+    token_version: int | None = Field(
+        default=None, description="Token 版本号，必须大于等于 0，每次密码修改时递增"
+    )
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+    )
+
+
+# ======= Project Schemas =======
 class ProjectBase(BaseModel):
     name: str
     description: str | None = None
@@ -34,7 +71,7 @@ class ProjectRead(ProjectBase):
     )
 
 
-# ======= Source Schemas ======
+# ======= Source Schemas =======
 def generate_collection_name() -> str:
     """pydantic schema 内部函数：生成唯一且符合 ChromaDB 标准的 collection_name"""
     return f"c_{uuid.uuid4().hex[:16]}"
@@ -87,7 +124,7 @@ class SourceUpdate(BaseModel):
     )
 
 
-# ======= Source Items Schemas ======
+# ======= Source Items Schemas =======
 class SourceItemBase(BaseModel):
     title: str
     origin_url_or_path: str
@@ -125,7 +162,7 @@ class SourceItemUpdate(BaseModel):
     )
 
 
-# ======= Document Chunks Schemas ======
+# ======= Document Chunks Schemas =======
 class DocumentChunkBase(BaseModel):
     vector_id: str
     chunk_index: int
@@ -155,7 +192,7 @@ class DocumentChunkRead(DocumentChunkBase):
     )
 
 
-# ======= Chat Sessions Schemas ======
+# ======= Chat Sessions Schemas =======
 class ChatSessionBase(BaseModel):
     chat_session_name: str
     model: str
@@ -182,7 +219,7 @@ class ChatSessionRead(ChatSessionBase):
     )
 
 
-# ======= Chat Message Schemas ======
+# ======= Chat Message Schemas =======
 class ChatMessageBase(BaseModel):
     role: Literal["user", "assistant"]
     message: str
