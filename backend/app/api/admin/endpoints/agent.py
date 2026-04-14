@@ -8,7 +8,7 @@ from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.providers.google import GoogleProvider
 from loguru import logger
 
-from ..schemas import AgentRequest
+from ...schemas import AgentRequest
 from app.db import get_db
 from app.core.config import settings
 from app.services.thread import get_chat_thread_service, ChatThreadService

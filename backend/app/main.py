@@ -13,7 +13,7 @@ from app.db import init_db
 from app.db.config import async_session
 from app.db.schemas import AdminCreate
 from app.crud import admin_crud
-from app.api.router import auth_router, chat_router, kb_router, workspace_router
+from app.api import admin, visitor
 
 
 async def valid_or_create_admin():
@@ -99,11 +99,8 @@ async def generic_error_handler(_: Request, exc: Exception) -> JSONResponse:
 
 
 # 注册路由
-app.include_router(auth_router)
-app.include_router(chat_router)
-app.include_router(kb_router)
-app.include_router(workspace_router)
-# app.include_router(agent_router)    # Agent 功能尚未完全开发，暂不注册
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+app.include_router(visitor.router, prefix="/visitor", tags=["Visitor"])
 
 
 @app.get("/")

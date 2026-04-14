@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from loguru import logger
 
-from ..deps import ThreadServiceDeps
+from ...deps import ThreadServiceDeps
 from app.db.schemas import (
     ThreadCreate,
     ThreadRead,

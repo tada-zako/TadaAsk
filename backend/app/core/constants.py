@@ -18,4 +18,4 @@ class ChatSessionType(str, enum.Enum):
     """
 
     ADMIN = "admin"
-    VISIT = "visit"
+    VISITOR = "visitor"

@@ -3,11 +3,11 @@ from typing import AsyncIterable
 from fastapi import APIRouter
 from loguru import logger
 
-from ..schemas import ChatRequest
-from ..deps import ChatServiceDeps, ValidProjectDeps, ValidChatSessionDeps
+from ...schemas import ChatRequest
+from ...deps import ChatServiceDeps, ValidProjectDeps, ValidChatSessionDeps
 
 
-router = APIRouter(tags=["Chat"])
+router = APIRouter()
 
 
 @router.post("/project/{project_uid}/chat_session/{chat_session_uid}/stream_reply")

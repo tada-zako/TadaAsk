@@ -2,11 +2,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from ..deps import SessionDeps
+from ...deps import SessionDeps
 from app.crud import project as project_crud
 from app.db.schemas import ProjectCreate, ProjectRead
 
-router = APIRouter(prefix="/project", tags=["Project"])
+router = APIRouter()
 
 
 @router.post("/new", response_model=ProjectRead)

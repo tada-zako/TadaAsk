@@ -4,14 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 
-from ..deps import SessionDeps
-from ..schemas import Token
+from ...deps import SessionDeps
+from ...schemas import Token
 from app.core.security import verify_password, create_access_token
 from app.db.models import Admins
 from app.crud import admin_crud
 
 
-router = APIRouter(prefix="/auth", tags=["Admin Authentication"])
+router = APIRouter()
 
 
 async def authenticate_admin(

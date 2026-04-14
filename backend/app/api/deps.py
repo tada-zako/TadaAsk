@@ -82,7 +82,7 @@ async def valid_project(
     return project
 
 
-async def valid_or_create_chat_session(
+async def valid_or_create_visitor_chat_session(
     session: "SessionDeps",
     model: "ModelDeps",
     project: "ValidProjectDeps",
