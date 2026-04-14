@@ -1,14 +1,17 @@
 from typing import Annotated, Any
 
 from fastapi import Depends, Body, HTTPException, Path
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+from .schemas import TokenData
 from app.db import get_db
-from app.db.models import Projects, ChatSessions
+from app.db.models import Admins, Projects, ChatSessions
 from app.db.schemas import ChatSessionCreate
-from app.crud import project_crud, chat_session_crud
+from app.crud import project_crud, chat_session_crud, admin_crud
 from app.core.constants import ChatSessionType
+from app.core.security import decode_access_token
 from app.rag import VectorDatabase, vector_db_factory
 from app.providers import Model, model_factory
 from app.services import RAGService, ChatService
@@ -38,9 +41,32 @@ def get_vector_db(
     return vector_db_factory(vector_store=vector_store_name)
 
 
-def get_rag_service(session: "SessionDeps", vector_db: "VectorDBDeps") -> RAGService:
-    """依赖注入接口：提供 RAGService 实例"""
-    return RAGService(session=session, vector_db=vector_db)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+
+async def get_current_admin(
+    session: "SessionDeps",
+    token: Annotated[str, Depends(oauth2_scheme)],
+) -> Admins:
+    """获取当前登录的管理员实例，基于 JWT 令牌进行鉴权"""
+    credentials_exception = HTTPException(
+        status_code=401, detail="Invalid authentication credentials"
+    )
+
+    payload = decode_access_token(token)
+    if not payload:
+        raise credentials_exception
+
+    token_data = TokenData.model_validate(payload)
+    if not token_data.username:
+        raise credentials_exception
+
+    admin = await admin_crud.get_admin_by_username(
+        session, username=token_data.username
+    )
+    if not admin or admin.token_version != token_data.token_version:
+        raise credentials_exception
+    return admin
 
 
 async def valid_project(
@@ -100,6 +126,11 @@ async def valid_or_create_chat_session(
         ),
     )
     return new_chat_session
+
+
+def get_rag_service(session: "SessionDeps", vector_db: "VectorDBDeps") -> RAGService:
+    """依赖注入接口：提供 RAGService 实例"""
+    return RAGService(session=session, vector_db=vector_db)
 
 
 def get_chat_service(

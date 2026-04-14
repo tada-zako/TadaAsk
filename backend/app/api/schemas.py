@@ -25,3 +25,17 @@ class AgentRequest(ChatRequest):
         default="rag_search",
         description="Agent 运行模式，决定使用哪个工具集，目前支持 'rag_search' 和 'web_search'",
     )
+
+
+class Token(BaseModel):
+    """JWT 访问令牌响应模型"""
+
+    access_token: str
+    token_type: str = Field(default="bearer")
+
+
+class TokenData(BaseModel):
+    """JWT 令牌数据模型，用于解析令牌中的有效载荷"""
+
+    username: str = Field(..., description="管理员用户名")
+    token_version: int = Field(..., description="Token 版本号")
