@@ -318,6 +318,6 @@ class ChatMessages(Base):
 # 4.5.4 能够将检索到的结果，更加清晰的展示给用户，实现文档信息来源的可视化展示功能
 # 5. 外来游客通过访问站点，每次对话时，自动创建 ChatSession，并将用户的消息保存到 ChatMessages 中
 
-# MVP 需要实现的功能：
+# TODO: MVP 需要实现的功能：
 # - project-source 业务的实现，source-source_item 业务的实现，source_item-chunk 业务的实现
 # - project-chat_session 业务组合的实现，这里的重点是需要基于 project 进行 RAG 查询，涉及到多 collection 的查询和结果合并逻辑
