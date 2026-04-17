@@ -53,6 +53,13 @@ class ProjectBase(BaseModel):
 
 
 class ProjectCreate(ProjectBase):
+    provider: str | None = Field(
+        default=None, description="模型提供商，初次创建可以为空"
+    )
+    model: str | None = Field(
+        default=None, description="使用的模型名称，初次创建可以为空"
+    )
+
     model_config = ConfigDict(
         alias_generator=to_camel,
         validate_by_alias=True,
@@ -62,6 +69,8 @@ class ProjectCreate(ProjectBase):
 class ProjectRead(ProjectBase):
     uid: str
     created_at: datetime
+    provider: str
+    model: str
 
     model_config = ConfigDict(
         from_attributes=True,

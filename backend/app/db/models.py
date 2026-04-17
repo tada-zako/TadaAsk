@@ -84,10 +84,17 @@ class Projects(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 项目下的对话列表
-    sources: Mapped[list["Sources"]] = relationship(
+
+    # 中间表关联
+    source_links: Mapped[list["ProjectSourceLinks"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         passive_deletes=True,
+    )  # 项目与数据来源的关联列表
+    sources: Mapped[list["Sources"]] = relationship(
+        secondary="project_source_links",
+        back_populates="projects",
+        viewonly=True,  # 多对多关系只通过 ProjectSourceLinks 进行维护
     )  # 项目下的数据来源列表
 
 
@@ -139,10 +146,38 @@ class Sources(Base):
         passive_deletes=True,
     )  # 数据来源中的具体项目信息，如文件路径、URL 等
 
+    # 中间表关联
+    project_links: Mapped[list["ProjectSourceLinks"]] = relationship(
+        back_populates="source",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )  # 数据来源与项目的关联列表
+    projects: Mapped[list["Projects"]] = relationship(
+        secondary="project_source_links",
+        back_populates="sources",
+        viewonly=True,
+    )  # 数据来源对应的项目列表
+
+
+class ProjectSourceLinks(Base):
+    """
+    项目-数据来源关联表：实现项目与数据来源的多对多关系
+    """
+
+    __tablename__ = "project_source_links"
+
     project_id: Mapped[int] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE")
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        primary_key=True,
     )  # 外键关联到项目表
-    project: Mapped["Projects"] = relationship(back_populates="sources")
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"),
+        primary_key=True,
+    )  # 外键关联到数据来源表
+
+    # 反向关系
+    project: Mapped["Projects"] = relationship(back_populates="source_links")
+    source: Mapped["Sources"] = relationship(back_populates="project_links")
 
 
 class SourceItems(Base):
