@@ -68,7 +68,6 @@ class Projects(Base):
         default=lambda: str(uuid.uuid4()),
     )
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    # TODO: visitor API 使用 model factory 选择模型逻辑需要和 admin 逻辑分离
     provider: Mapped[str]  # 项目使用的模型提供商
     model: Mapped[str]  # 项目使用的模型
     description: Mapped[str]

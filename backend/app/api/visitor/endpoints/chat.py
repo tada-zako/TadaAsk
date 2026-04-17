@@ -1,17 +1,36 @@
-from typing import AsyncIterable, Annotated
+from typing import AsyncIterable, Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
 from loguru import logger
 
 from ...schemas import ChatRequest
-from ...deps import SessionDeps, ModelDeps, ChatServiceDeps, ValidProjectDeps
+from ...deps import SessionDeps, ValidProjectDeps, RAGServiceDeps
+from app.core.config import settings
 from app.core.constants import ChatSessionType
 from app.db.models import ChatSessions
 from app.db.schemas import ChatSessionCreate
 from app.crud import chat_session_crud
+from app.providers import Model, model_factory
+from app.services import ChatService
 
 
 router = APIRouter()
+
+
+def get_visitor_model(
+    project: ValidProjectDeps,
+) -> Model[Any]:
+    """
+    游客级 model 工厂: 基于关联的 Project 获取对应的 Model 实例。
+    NOTE: 目前仅支持 GeminiModel。
+    """
+    provider_name = project.provider or settings.llm_provider_perf or "google"
+    # TODO: 模型字段的获取逻辑，后期重新处理；目前系统设置中拿到的模型名只能来自于 gemini
+    model_name = project.model or settings.gemini_model_perf or None
+    return model_factory(provider=provider_name, model=model_name)
+
+
+ModelDeps = Annotated[Model[Any], Depends(get_visitor_model)]
 
 
 async def valid_or_create_visitor_chat_session(
@@ -75,6 +94,19 @@ async def valid_or_create_visitor_chat_session(
     return new_chat_session
 
 
+def get_visitor_chat_service(
+    session: SessionDeps,
+    llm_model: ModelDeps,
+    rag_service: RAGServiceDeps,
+) -> ChatService:
+    """聊天服务工厂函数，提供 ChatService 实例"""
+    return ChatService(
+        session,
+        llm_model=llm_model,
+        rag_service=rag_service,
+    )
+
+
 @router.post("/project/{project_uid}/chat/stream")
 async def stream_chat(
     chat_request: ChatRequest,
@@ -82,7 +114,7 @@ async def stream_chat(
     chat_session: Annotated[
         ChatSessions, Depends(valid_or_create_visitor_chat_session)
     ],
-    chat_service: ChatServiceDeps,
+    chat_service: Annotated[ChatService, Depends(get_visitor_chat_service)],
 ) -> AsyncIterable[str]:
     """
     流式调用 LLM 生成聊天回复（无 Agent）

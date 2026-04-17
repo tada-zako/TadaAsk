@@ -1,17 +1,34 @@
-from typing import AsyncIterable, Annotated
+from typing import AsyncIterable, Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
 from loguru import logger
 
 from ...schemas import ChatRequest
-from ...deps import SessionDeps, ModelDeps, ChatServiceDeps, ValidProjectDeps
+from ...deps import SessionDeps, ValidProjectDeps, RAGServiceDeps
 from app.core.constants import ChatSessionType
 from app.db.models import ChatSessions
 from app.db.schemas import ChatSessionCreate
 from app.crud import chat_session_crud
+from app.providers import Model, model_factory
+from app.services import ChatService
 
 
 router = APIRouter()
+
+
+def get_admin_model(
+    provider_name: Annotated[str | None, Body(embed=True, alias="providerName")] = None,
+    model_name: Annotated[str | None, Body(embed=True, alias="modelName")] = None,
+) -> Model[Any]:
+    """
+    model 工厂: 根据 provider_name 返回对应的 Model 实例。
+    不验证会话级 model 字段，这里认为前端会基于会话级字段正确传递 providerName 和 modelName。
+    NOTE: 目前仅支持 GeminiModel。
+    """
+    return model_factory(provider=provider_name, model=model_name)
+
+
+ModelDeps = Annotated[Model[Any], Depends(get_admin_model)]
 
 
 async def valid_or_create_admin_chat_session(
@@ -57,12 +74,25 @@ async def valid_or_create_admin_chat_session(
     return new_chat_session
 
 
+def get_admin_chat_service(
+    session: SessionDeps,
+    llm_model: ModelDeps,
+    rag_service: RAGServiceDeps,
+) -> ChatService:
+    """聊天服务工厂函数，提供 ChatService 实例"""
+    return ChatService(
+        session,
+        llm_model=llm_model,
+        rag_service=rag_service,
+    )
+
+
 @router.post("/project/{project_uid}/chat/stream")
 async def stream_chat(
     chat_request: ChatRequest,
     project: ValidProjectDeps,
     chat_session: Annotated[ChatSessions, Depends(valid_or_create_admin_chat_session)],
-    chat_service: ChatServiceDeps,
+    chat_service: Annotated[ChatService, Depends(get_admin_chat_service)],
 ) -> AsyncIterable[str]:
     """
     流式调用 LLM 生成聊天回复（无 Agent）
