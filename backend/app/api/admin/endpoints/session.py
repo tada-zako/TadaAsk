@@ -65,11 +65,14 @@ async def valid_admin_chat_session(
         raise ValueError("Invalid chat_session_uid, creating new chat session")
 
 
+ChatSessionDeps = Annotated[ChatSessions, Depends(valid_admin_chat_session)]
+
+
 @router.get(
     "/session/{chat_session_uid}/messages", response_model=list[ChatMessageRead]
 )
 async def list_chat_messages(
-    chat_session: Annotated[ChatSessions, Depends(valid_admin_chat_session)],
+    chat_session: ChatSessionDeps,
     session: SessionDeps,
     # 这里会话消息不允许外部分页，内部处理
     # limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -96,7 +99,7 @@ async def list_chat_messages(
 
 @router.delete("/session/{chat_session_uid}")
 async def delete_chat_session(
-    chat_session: Annotated[ChatSessions, Depends(valid_admin_chat_session)],
+    chat_session: ChatSessionDeps,
     session: SessionDeps,
 ):
     """
