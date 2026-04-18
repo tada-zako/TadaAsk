@@ -37,3 +37,13 @@ async def get_project_by_uid(
     """根据项目 UID 获取项目详情"""
     result = await session.execute(select(Projects).where(Projects.uid == project_uid))
     return result.scalars().first()
+
+
+async def delete_project_by_id(session: AsyncSession, project_id: int) -> bool:
+    """根据项目 ID 删除项目，返回是否删除成功"""
+    result = await session.execute(select(Projects).where(Projects.id == project_id))
+    project = result.scalars().first()
+    if project:
+        await session.delete(project)
+        return True
+    return False

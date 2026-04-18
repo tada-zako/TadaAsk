@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
 
-from ...deps import SessionDeps
+from ...deps import SessionDeps, ValidProjectDeps
 from app.crud import project as project_crud
 from app.db.schemas import ProjectCreate, ProjectRead
 
@@ -46,3 +46,46 @@ async def list_projects(
     """
 
     return await project_crud.get_projects(session=session, limit=limit, offset=offset)
+
+
+@router.get("/{project_uid}", response_model=ProjectRead)
+async def get_project(
+    project: ValidProjectDeps,
+):
+    """
+    获取项目详情
+
+    Args:
+        project: 通过依赖注入获取的有效项目实例
+
+    Returns:
+        项目详情
+    """
+    return project
+
+
+@router.delete("/{project_uid}")
+async def delete_project(
+    project: ValidProjectDeps,
+    session: SessionDeps,
+):
+    """
+    删除项目
+
+    Args:
+        project: 通过依赖注入获取的有效项目实例
+        session: 数据库会话，通过依赖注入获取
+
+    Returns:
+        删除结果
+    """
+    success = await project_crud.delete_project_by_id(
+        session=session, project_id=project.id
+    )
+    if success:
+        return {
+            "uid": project.uid,
+            "status": "deleted",
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete project")
