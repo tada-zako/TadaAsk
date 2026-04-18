@@ -62,7 +62,7 @@ class ChatService:
     ) -> list[ChatMessageInternal]:
         """基于 chat_session_id 获取历史消息，并构建上下文窗口"""
         # 基于 CRUD 获取历史对话内容
-        chat_history = await chat_message_crud.get_chat_history(
+        chat_history = await chat_message_crud.get_messages_by_session_id(
             self.session,
             chat_session_id=chat_session_id,
             limit=settings.sql_history_fetch_limit,

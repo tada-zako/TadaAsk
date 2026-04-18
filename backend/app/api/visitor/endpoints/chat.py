@@ -8,7 +8,7 @@ from ...deps import SessionDeps, ValidProjectDeps, RAGServiceDeps
 from app.core.config import settings
 from app.core.constants import ChatSessionType
 from app.db.models import ChatSessions
-from app.db.schemas import ChatSessionCreate
+from app.db.schemas import ChatSessionInternal
 from app.crud import chat_session_crud
 from app.providers import Model, model_factory
 from app.services import ChatService
@@ -83,7 +83,7 @@ async def valid_or_create_visitor_chat_session(
     # 如果没有提供有效的 chat_session_uid，则创建新的聊天会话
     new_chat_session = await chat_session_crud.create_chat_session(
         session,
-        chat_session_data=ChatSessionCreate(
+        chat_session_data=ChatSessionInternal(
             chat_session_name="New Chat Session",
             model=model.model_name,
             visitor_id=visitor_id,

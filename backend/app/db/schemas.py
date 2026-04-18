@@ -121,6 +121,10 @@ class SourceRead(SourceBase):
     )
 
 
+class SourceWithItemsCount(SourceRead):
+    items_count: int = Field(default=0, description="数据源中的文档数量")
+
+
 class SourceUpdate(BaseModel):
     status: SourceProcessStatus | None = None
     sync_interval: int | None = Field(
@@ -140,6 +144,12 @@ class SourceItemBase(BaseModel):
     item_hash: str
     raw_content: str | None = None  # 可选字段，存储原始文本内容，便于后续调试和分析
     version: int = Field(default=1, description="文档版本号，默认为 1，每次更新时递增")
+
+
+class SourceItemInternal(SourceItemBase):
+    """系统内部使用的模型，包含 source_id 字段"""
+
+    source_id: int
 
 
 class SourceItemRead(SourceItemBase):
@@ -207,7 +217,7 @@ class ChatSessionBase(BaseModel):
     model: str
 
 
-class ChatSessionCreate(ChatSessionBase):
+class ChatSessionInternal(ChatSessionBase):
     visitor_id: str | None = Field(
         default=None, description="访客 ID，针对匿名用户可选字段，便于后续分析和调试"
     )
@@ -217,6 +227,7 @@ class ChatSessionCreate(ChatSessionBase):
 
 class ChatSessionRead(ChatSessionBase):
     uid: str
+    session_type: ChatSessionType
     created_at: datetime
     updated_at: datetime
 

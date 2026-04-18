@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import ChatMessages
 
 
-async def get_chat_history(
+async def get_messages_by_session_id(
     session: AsyncSession,
     *,
     chat_session_id: int,

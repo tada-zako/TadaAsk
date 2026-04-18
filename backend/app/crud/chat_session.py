@@ -3,13 +3,14 @@ from typing import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import ChatSessionType
 from app.db.models import ChatSessions
-from app.db.schemas import ChatSessionCreate
+from app.db.schemas import ChatSessionInternal
 
 
 async def create_chat_session(
     session: AsyncSession,
-    chat_session_data: ChatSessionCreate,
+    chat_session_data: ChatSessionInternal,
 ) -> ChatSessions:
     """创建新的聊天会话，并返回创建的对话实例"""
     new_chat = ChatSessions(
@@ -21,11 +22,16 @@ async def create_chat_session(
 
 
 async def get_chat_sessions(
-    session: AsyncSession, *, limit: int = 5, offset: int = 0
+    session: AsyncSession,
+    *,
+    session_type: ChatSessionType,
+    limit: int = 5,
+    offset: int = 0,
 ) -> Sequence[ChatSessions]:
-    """获取所有聊天会话列表"""
+    """获取指定类型聊天会话列表"""
     result = await session.execute(
         select(ChatSessions)
+        .where(ChatSessions.session_type == session_type)
         .offset(offset)
         .limit(limit)
         .order_by(ChatSessions.created_at.desc())
@@ -41,3 +47,17 @@ async def get_chat_session_by_uid(
         select(ChatSessions).where(ChatSessions.uid == chat_session_uid)
     )
     return result.scalars().first()
+
+
+async def delete_chat_session_by_id(
+    session: AsyncSession, chat_session_id: int
+) -> bool:
+    """根据聊天会话 ID 删除会话，返回是否删除成功"""
+    result = await session.execute(
+        select(ChatSessions).where(ChatSessions.id == chat_session_id)
+    )
+    chat_session = result.scalars().first()
+    if chat_session:
+        await session.delete(chat_session)
+        return True
+    return False
