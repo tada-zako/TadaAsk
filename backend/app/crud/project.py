@@ -3,8 +3,8 @@ from typing import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import Projects, ProjectSourceLinks
 from app.db.schemas import ProjectCreate
-from app.db.models import Projects
 
 
 async def create_project(
@@ -47,3 +47,13 @@ async def delete_project_by_id(session: AsyncSession, project_id: int) -> bool:
         await session.delete(project)
         return True
     return False
+
+
+async def bind_source_to_project(
+    session: AsyncSession, *, project_id: int, source_id: int
+) -> ProjectSourceLinks:
+    """将数据源绑定到项目，返回绑定关系实例"""
+    link = ProjectSourceLinks(project_id=project_id, source_id=source_id)
+    session.add(link)
+    await session.flush()
+    return link
