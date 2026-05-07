@@ -238,7 +238,8 @@ class DocumentChunks(Base):
     )  # 向量 ID，切片的唯一标识
     chunk_index: Mapped[int]  # 切片索引，表示该切片在原始文档中的位置
     chunk_hash: Mapped[str]  # 切片内容的哈希值，用于去重和校验
-    raw_text: Mapped[str]  # 切片的原始文本内容
+    # raw_text: Mapped[str]  # 切片的原始文本内容
+    chunk_pos: Mapped[int]  # 切片在原始文档中的起始位置
 
     # TODO: 后期来源追溯功能实现预备扩展
     page_number: Mapped[Optional[int]] = mapped_column(

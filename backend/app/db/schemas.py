@@ -186,7 +186,7 @@ class DocumentChunkBase(BaseModel):
     vector_id: str
     chunk_index: int
     chunk_hash: str
-    raw_text: str  # 切片的原始文本内容，便于后续调试和分析
+    chunk_pos: int  # 切片在原始文档中的起始位置
     source_item_id: int
 
     page_number: int | None = Field(

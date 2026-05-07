@@ -79,7 +79,7 @@ Web Search：MVP 阶段不建议加入。个人博客 Agent 的目标是“基�
     - 网络爬取
     - github repo 解析
     - 集成更多的 LLM 模型和向量库
-    - Agent MCP 能力等
+    - Agentic Hybrid Search，不再只是检索 -> 作为 context -> LLM 生成的单项流程，而是引入 Agent 能力，由 LLM 决定是否进一步检索、调用工具等
     - 多向量 collection 召回后的 reranking 逻辑
     - 首次运行网页端的初始化向导（初始化完成后，需要确保 login/ 相关功能锁定，避免安全风险）
     - 考虑分布式/多进程部署情况下，代码的兼容性和逻辑优化
