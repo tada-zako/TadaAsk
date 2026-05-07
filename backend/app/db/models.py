@@ -22,7 +22,7 @@ class Base(AsyncAttrs, DeclarativeBase):
     pass
 
 
-class Admins(Base):
+class Admin(Base):
     """
     admins 表：控制台管理员账号
     """
@@ -51,7 +51,7 @@ class Admins(Base):
     )  # token 版本号，用于实现 token 的强制失效，每次密码修改或管理员操作时递增（MVP阶段暂时使用）
 
 
-class Projects(Base):
+class Project(Base):
     """
     项目表：用于管理部署于不同站点的数据
     """
@@ -79,26 +79,26 @@ class Projects(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    chat_sessions: Mapped[list["ChatSessions"]] = relationship(
+    chat_sessions: Mapped[list["ChatSession"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 项目下的对话列表
 
     # 中间表关联
-    source_links: Mapped[list["ProjectSourceLinks"]] = relationship(
+    source_links: Mapped[list["ProjectSourceLink"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 项目与数据来源的关联列表
-    sources: Mapped[list["Sources"]] = relationship(
+    sources: Mapped[list["Source"]] = relationship(
         secondary="project_source_links",
         back_populates="projects",
-        viewonly=True,  # 多对多关系只通过 ProjectSourceLinks 进行维护
+        viewonly=True,  # 多对多关系只通过 ProjectSourceLink 进行维护
     )  # 项目下的数据来源列表
 
 
-class Sources(Base):
+class Source(Base):
     """
     数据来源表：管理知识库数据的来源信息
     """
@@ -140,26 +140,26 @@ class Sources(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    source_items: Mapped[list["SourceItems"]] = relationship(
+    source_items: Mapped[list["SourceItem"]] = relationship(
         back_populates="source",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 数据来源中的具体项目信息，如文件路径、URL 等
 
     # 中间表关联
-    project_links: Mapped[list["ProjectSourceLinks"]] = relationship(
+    project_links: Mapped[list["ProjectSourceLink"]] = relationship(
         back_populates="source",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 数据来源与项目的关联列表
-    projects: Mapped[list["Projects"]] = relationship(
+    projects: Mapped[list["Project"]] = relationship(
         secondary="project_source_links",
         back_populates="sources",
         viewonly=True,
     )  # 数据来源对应的项目列表
 
 
-class ProjectSourceLinks(Base):
+class ProjectSourceLink(Base):
     """
     项目-数据来源关联表：实现项目与数据来源的多对多关系
     """
@@ -176,11 +176,11 @@ class ProjectSourceLinks(Base):
     )  # 外键关联到数据来源表
 
     # 反向关系
-    project: Mapped["Projects"] = relationship(back_populates="source_links")
-    source: Mapped["Sources"] = relationship(back_populates="project_links")
+    project: Mapped["Project"] = relationship(back_populates="source_links")
+    source: Mapped["Source"] = relationship(back_populates="project_links")
 
 
-class SourceItems(Base):
+class SourceItem(Base):
     """
     来源项表：管理每个数据来源中的具体项目信息，如文件路径、URL 等
     """
@@ -211,12 +211,12 @@ class SourceItems(Base):
         ForeignKey("sources.id", ondelete="CASCADE")
     )  # 外键关联到数据来源表
 
-    document_chunks: Mapped[list["DocumentChunks"]] = relationship(
+    document_chunks: Mapped[list["DocumentChunk"]] = relationship(
         back_populates="source_item",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 来源项对应的文档切片列表
-    source: Mapped["Sources"] = relationship(back_populates="source_items")
+    source: Mapped["Source"] = relationship(back_populates="source_items")
 
     # 复合唯一约束
     __table_args__ = (
@@ -224,7 +224,7 @@ class SourceItems(Base):
     )
 
 
-class DocumentChunks(Base):
+class DocumentChunk(Base):
     """
     文档切片表：管理知识库中切分后的文档信息，每个切片对应一个向量集合中的向量以及其对应的 source_item，
     """
@@ -259,18 +259,18 @@ class DocumentChunks(Base):
     source_item_id: Mapped[int] = mapped_column(
         ForeignKey("source_items.id", ondelete="CASCADE")
     )  # 外键关联到来源项表
-    source_item: Mapped["SourceItems"] = relationship(back_populates="document_chunks")
+    source_item: Mapped["SourceItem"] = relationship(back_populates="document_chunks")
 
 
 # TODO: 向量表结构：存储向量化后的结果，目前先不使用
-# embeddings
+# embedding
 # - id
 # - chunk_id
 # - embedding_model
 # - vector_id（对应向量库）
 
 
-class ChatSessions(Base):
+class ChatSession(Base):
     """
     对话表：管理用户与知识库的对话信息
     """
@@ -307,16 +307,16 @@ class ChatSessions(Base):
         ForeignKey("projects.id", ondelete="CASCADE")
     )  # 外键关联到项目表
 
-    project: Mapped["Projects"] = relationship(back_populates="chat_sessions")
+    project: Mapped["Project"] = relationship(back_populates="chat_sessions")
 
-    chat_messages: Mapped[list["ChatMessages"]] = relationship(
+    chat_messages: Mapped[list["ChatMessage"]] = relationship(
         back_populates="chat_session",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 对话中的消息列表
 
 
-class ChatMessages(Base):
+class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -335,7 +335,7 @@ class ChatMessages(Base):
         ForeignKey("chat_sessions.id", ondelete="CASCADE")
     )  # 外键关联到对话表
 
-    chat_session: Mapped["ChatSessions"] = relationship(back_populates="chat_messages")
+    chat_session: Mapped["ChatSession"] = relationship(back_populates="chat_messages")
 
 
 # TODO: 目前对于实际的业务逻辑还是有些不太清楚：
@@ -351,7 +351,7 @@ class ChatMessages(Base):
 # 4.5.2 在后续的文档管理中，实现增量式的文档更新和增删，而不是每次都全量更新向量库
 # 4.5.3 提供更加准确的查询方式，不止是通过向量查询，也通过文本内容、元数据等进行查询（？具体的实现方式还不太清楚）
 # 4.5.4 能够将检索到的结果，更加清晰的展示给用户，实现文档信息来源的可视化展示功能
-# 5. 外来游客通过访问站点，每次对话时，自动创建 ChatSession，并将用户的消息保存到 ChatMessages 中
+# 5. 外来游客通过访问站点，每次对话时，自动创建 ChatSession，并将用户的消息保存到 ChatMessage 中
 
 # TODO: MVP 需要实现的功能：
 # - project-source 业务的实现，source-source_item 业务的实现，source_item-chunk 业务的实现

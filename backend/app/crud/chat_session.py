@@ -4,16 +4,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import ChatSessionType
-from app.db.models import ChatSessions
+from app.db.models import ChatSession
 from app.db.schemas import ChatSessionInternal
 
 
 async def create_chat_session(
     session: AsyncSession,
     chat_session_data: ChatSessionInternal,
-) -> ChatSessions:
+) -> ChatSession:
     """创建新的聊天会话，并返回创建的对话实例"""
-    new_chat = ChatSessions(
+    new_chat = ChatSession(
         **chat_session_data.model_dump(),
     )
     session.add(new_chat)
@@ -27,24 +27,24 @@ async def get_chat_sessions(
     session_type: ChatSessionType,
     limit: int = 5,
     offset: int = 0,
-) -> Sequence[ChatSessions]:
+) -> Sequence[ChatSession]:
     """获取指定类型聊天会话列表"""
     result = await session.execute(
-        select(ChatSessions)
-        .where(ChatSessions.session_type == session_type)
+        select(ChatSession)
+        .where(ChatSession.session_type == session_type)
         .offset(offset)
         .limit(limit)
-        .order_by(ChatSessions.created_at.desc())
+        .order_by(ChatSession.created_at.desc())
     )
     return result.scalars().all()
 
 
 async def get_chat_session_by_uid(
     session: AsyncSession, *, chat_session_uid: str
-) -> ChatSessions | None:
+) -> ChatSession | None:
     """根据 UID 获取指定的聊天会话"""
     result = await session.execute(
-        select(ChatSessions).where(ChatSessions.uid == chat_session_uid)
+        select(ChatSession).where(ChatSession.uid == chat_session_uid)
     )
     return result.scalars().first()
 
@@ -54,7 +54,7 @@ async def delete_chat_session_by_id(
 ) -> bool:
     """根据聊天会话 ID 删除会话，返回是否删除成功"""
     result = await session.execute(
-        select(ChatSessions).where(ChatSessions.id == chat_session_id)
+        select(ChatSession).where(ChatSession.id == chat_session_id)
     )
     chat_session = result.scalars().first()
     if chat_session:

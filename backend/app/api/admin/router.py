@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
-from .endpoints import auth, project, chat, knowledge_base, session as session_endpoints
+from .endpoints import auth, project, chat, session as session_endpoints, source
 from ..deps import SessionDeps
 from ..schemas import TokenData
-from app.db.models import Admins
+from app.db.models import Admin
 from app.crud import admin_crud
 from app.core.security import decode_access_token
 
@@ -19,7 +19,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin/auth/login")
 async def get_current_admin(
     session: SessionDeps,
     token: Annotated[str, Depends(oauth2_scheme)],
-) -> Admins:
+) -> Admin:
     """获取当前登录的管理员实例，基于 JWT 令牌进行鉴权"""
     credentials_exception = HTTPException(
         status_code=401, detail="Invalid authentication credentials"
@@ -49,7 +49,7 @@ router.include_router(
     dependencies=[Depends(get_current_admin)],
 )
 router.include_router(
-    knowledge_base.router,
+    source.router,
     prefix="/knowledge-base",
     tags=["Knowledge-Base"],
     dependencies=[Depends(get_current_admin)],

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app.db import get_db
-from app.db.models import Projects
+from app.db.models import Project
 from app.crud import project_crud
 from app.rag import VectorDatabase, vector_db_factory
 from app.services import RAGService
@@ -27,7 +27,7 @@ def get_vector_db(
 async def valid_project(
     project_uid: Annotated[str, Path(..., description="Project UID")],
     session: "SessionDeps",
-) -> Projects:
+) -> Project:
     """验证项目 UID 是否有效，返回项目实例或抛出 HTTPException"""
     project = await project_crud.get_project_by_uid(
         session=session, project_uid=project_uid
@@ -47,6 +47,6 @@ SessionDeps = Annotated[AsyncSession, Depends(get_db)]
 # 向量库依赖
 VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]
 # valid project 依赖
-ValidProjectDeps = Annotated[Projects, Depends(valid_project)]
+ValidProjectDeps = Annotated[Project, Depends(valid_project)]
 # RAG 服务依赖
 RAGServiceDeps = Annotated[RAGService, Depends(get_rag_service)]

@@ -6,7 +6,7 @@ from loguru import logger
 
 from app.rag import VectorQueryItem, VectorDatabase
 from app.rag.file_parser import FileParser
-from app.db.models import Sources, SourceItems
+from app.db.models import Source, SourceItem
 from app.db.schemas import (
     SourceInternal,
     SourceRead,
@@ -14,7 +14,8 @@ from app.db.schemas import (
 )
 from app.utils.calcu_file_hash import calculate_file_hash
 
-# TODO: 需要完整重构，新增的 Projects 模型尚未与 Service 集成
+# TODO: 需要完整重构，新增的 Project 模型尚未与 Service 集成
+# TODO: 这里的重构逻辑还需要额外考虑
 
 
 class RAGService:
@@ -33,7 +34,7 @@ class RAGService:
 
         # 检查数据库中是否已存在同名集合记录
         result = await self.session.execute(
-            select(1).where(Sources.source_name == source_data.source_name).limit(1)
+            select(1).where(Source.source_name == source_data.source_name).limit(1)
         )
         if result.scalar():
             logger.warning(f"集合 '{source_data.source_name}' 已存在")
@@ -54,7 +55,7 @@ class RAGService:
 
         try:
             # 数据库中创建集合记录
-            new_collection = Sources(**source_data.model_dump())
+            new_collection = Source(**source_data.model_dump())
             self.session.add(new_collection)
             await self.session.flush()
 
@@ -81,10 +82,10 @@ class RAGService:
     ) -> list[SourceRead]:
         """获取所有集合列表"""
         result = await self.session.execute(
-            select(Sources)
+            select(Source)
             .offset(offset)
             .limit(limit)
-            .order_by(Sources.created_at.desc())
+            .order_by(Source.created_at.desc())
         )
         collections = result.scalars().all()
         return [SourceRead.model_validate(col) for col in collections]
@@ -116,7 +117,7 @@ class RAGService:
 
         # 获取 collection
         collection_res = await self.session.execute(
-            select(Sources).where(Sources.uid == collection_uid)
+            select(Source).where(Source.uid == collection_uid)
         )
         collection = collection_res.scalar_one_or_none()
         if not collection:
@@ -130,8 +131,8 @@ class RAGService:
         is_duplicate = await self.session.execute(
             select(1)
             .where(
-                SourceItems.item_hash == file_hash,
-                SourceItems.source_id == collection.id,
+                SourceItem.item_hash == file_hash,
+                SourceItem.source_id == collection.id,
             )
             .limit(1)
         )
@@ -158,7 +159,7 @@ class RAGService:
         )
 
         # 写入文档数据
-        new_document = SourceItems(
+        new_document = SourceItem(
             filename=filename,
             source=source,
             file_hash=file_hash,
@@ -185,8 +186,8 @@ class RAGService:
             f"进行向量库查询，collection_uid={collection_uid}, query_text='{query_text[:50]}', top_k={top_k}"
         )
         result = await self.session.execute(
-            select(Sources.collection_name).where(
-                Sources.uid == collection_uid,
+            select(Source.collection_name).where(
+                Source.uid == collection_uid,
             )
         )
         collection_name = result.scalar_one_or_none()

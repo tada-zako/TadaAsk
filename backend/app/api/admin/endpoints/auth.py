@@ -7,7 +7,7 @@ from loguru import logger
 from ...deps import SessionDeps
 from ...schemas import Token
 from app.core.security import verify_password, create_access_token
-from app.db.models import Admins
+from app.db.models import Admin
 from app.crud import admin_crud
 
 
@@ -16,7 +16,7 @@ router = APIRouter()
 
 async def authenticate_admin(
     session: SessionDeps, username: str, password: str
-) -> Admins | None:
+) -> Admin | None:
     """验证管理员用户名和密码"""
     admin = await admin_crud.get_admin_by_username(session, username)
     if not admin:

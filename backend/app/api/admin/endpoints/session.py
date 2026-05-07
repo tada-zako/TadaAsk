@@ -5,7 +5,7 @@ from loguru import logger
 
 from ...deps import SessionDeps, ValidProjectDeps
 from app.core.constants import ChatSessionType
-from app.db.models import ChatSessions
+from app.db.models import ChatSession
 from app.db.schemas import ChatSessionRead, ChatMessageRead
 from app.crud import chat_session_crud, chat_message_crud
 
@@ -47,10 +47,10 @@ async def valid_admin_chat_session(
             description="前端传递的 chat_session_uid",
         ),
     ],
-) -> ChatSessions:
+) -> ChatSession:
     """
     Admin 端 ChatSession 依赖：
-    验证 chat_session_uid 是否有效，返回对应的 ChatSessions 实例。
+    验证 chat_session_uid 是否有效，返回对应的 ChatSession 实例。
     如果 chat_session_uid 为空或无效，报错
     """
     chat_session = await chat_session_crud.get_chat_session_by_uid(
@@ -65,7 +65,7 @@ async def valid_admin_chat_session(
         raise ValueError("Invalid chat_session_uid, creating new chat session")
 
 
-ChatSessionDeps = Annotated[ChatSessions, Depends(valid_admin_chat_session)]
+ChatSessionDeps = Annotated[ChatSession, Depends(valid_admin_chat_session)]
 
 
 @router.get(

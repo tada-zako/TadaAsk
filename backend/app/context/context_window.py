@@ -3,7 +3,7 @@ from functools import lru_cache
 
 from tiktoken import Encoding, encoding_for_model, get_encoding
 
-from app.db.models import ChatMessages
+from app.db.models import ChatMessage
 from app.db.schemas import ChatMessageInternal
 
 
@@ -55,7 +55,7 @@ def truncate_text_by_tokens(
 
 
 def build_history_context_window(
-    chats: Sequence[ChatMessages],
+    chats: Sequence[ChatMessage],
     *,
     max_context_tokens: int,
     max_single_message_tokens: int = 2048,

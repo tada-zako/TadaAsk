@@ -6,7 +6,7 @@ from loguru import logger
 from ...schemas import ChatRequest
 from ...deps import SessionDeps, ValidProjectDeps, RAGServiceDeps
 from app.core.constants import ChatSessionType
-from app.db.models import ChatSessions
+from app.db.models import ChatSession
 from app.db.schemas import ChatSessionInternal
 from app.crud import chat_session_crud
 from app.providers import Model, model_factory
@@ -43,11 +43,11 @@ async def valid_or_create_admin_chat_session(
             description="前端传递的 chat_session_uid, 为空时创建新的对话",
         ),
     ] = None,
-) -> ChatSessions:
+) -> ChatSession:
     """
     Admin 端 ChatSession 依赖：
-    验证 chat_session_uid 是否有效，返回对应的 ChatSessions 实例。
-    如果 chat_session_uid 为空或无效，则创建新的 ChatSessions 实例并返回。
+    验证 chat_session_uid 是否有效，返回对应的 ChatSession 实例。
+    如果 chat_session_uid 为空或无效，则创建新的 ChatSession 实例并返回。
     """
     if chat_session_uid:
         chat_session = await chat_session_crud.get_chat_session_by_uid(
@@ -91,7 +91,7 @@ def get_admin_chat_service(
 async def stream_chat(
     chat_request: ChatRequest,
     project: ValidProjectDeps,
-    chat_session: Annotated[ChatSessions, Depends(valid_or_create_admin_chat_session)],
+    chat_session: Annotated[ChatSession, Depends(valid_or_create_admin_chat_session)],
     chat_service: Annotated[ChatService, Depends(get_admin_chat_service)],
 ) -> AsyncIterable[str]:
     """

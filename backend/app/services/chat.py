@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
 # TODO: 使用 CRUD 层代码重构 Chat 服务层实现
-from app.db.models import ChatSessions, Projects, Sources
+from app.db.models import ChatSession, Project, Source
 from app.db.schemas import ChatMessageInternal
 from app.crud import chat_message_crud
 from app.providers import Model, StreamedResponse
@@ -89,7 +89,7 @@ class ChatService:
         related_docs = []
         # 基于 project 获取关联的 sources
         result = await self.session.execute(
-            select(Sources).where(Sources.project_id == project_id)
+            select(Source).where(Source.project_id == project_id)
         )
         sources = result.scalars().all()
 
@@ -120,8 +120,8 @@ class ChatService:
     async def stream_chat_reply(
         self,
         *,
-        project: Projects,  # 业务中可能会需要基于 project 获取相关资源
-        chat_session: ChatSessions,  # 业务层认为 chat_session 确实存在
+        project: Project,  # 业务中可能会需要基于 project 获取相关资源
+        chat_session: ChatSession,  # 业务层认为 chat_session 确实存在
         user_message: str,
         top_k: int = 5,
     ) -> AsyncIterator[StreamedChatResult]:
