@@ -192,10 +192,7 @@ class SourceItem(Base):
     title: Mapped[str]  # 项目标题，如文件名、网页标题等
     origin_url_or_path: Mapped[str]  # 文件路径或 URL
     item_hash: Mapped[str]  # 文件或 URL 的哈希值，用于去重和校验
-    raw_content: Mapped[Optional[str]] = mapped_column(
-        String, nullable=True
-    )  # 原始文本内容，是否使用尚不确定
-    version: Mapped[int]  # 版本号，便于实现增量更新和版本管理，现在不确定具体使用方式
+
     status: Mapped[SourceProcessStatus] = mapped_column(
         Enum(SourceProcessStatus), default=SourceProcessStatus.PENDING
     )  # 处理状态，如 "pending", "processing", "completed", "failed" 等
@@ -218,10 +215,37 @@ class SourceItem(Base):
     )  # 来源项对应的文档切片列表
     source: Mapped["Source"] = relationship(back_populates="source_items")
 
+    document_content: Mapped[Optional["DocumentContent"]] = relationship(
+        back_populates="source_item",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,  # 一对一关系
+    )  # 来源项对应的文档内容
+
     # 复合唯一约束
     __table_args__ = (
         UniqueConstraint("item_hash", "source_id", name="_item_source_uc"),
     )
+
+
+class DocumentContent(Base):
+    """
+    文档内容表：管理知识库中原始文档内容
+    """
+
+    __tablename__ = "document_contents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str]  # 文档标题，冗余数据，兼容 FTS 外部数据模式
+    document_content: Mapped[str] = mapped_column(String)  # 文档的原始文本内容
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    source_item_id: Mapped[int] = mapped_column(
+        ForeignKey("source_items.id", ondelete="CASCADE")
+    )  # 外键关联到来源项表
+    source_item: Mapped["SourceItem"] = relationship(back_populates="document_content")
 
 
 class DocumentChunk(Base):

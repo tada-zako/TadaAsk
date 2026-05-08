@@ -3,6 +3,7 @@ from pathlib import Path
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from .models import Base
+from .fts import init_fts_tables
 from app.core.config import settings
 
 
@@ -25,6 +26,7 @@ async def init_db():
     # 创建数据库表
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await init_fts_tables(conn)  # 初始化 FTS5 虚表及相关触发器
 
 
 async def drop_db():
