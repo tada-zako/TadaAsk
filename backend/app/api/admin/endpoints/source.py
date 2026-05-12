@@ -4,9 +4,9 @@ import uuid
 from fastapi import APIRouter, UploadFile, Query, Depends
 from loguru import logger
 
-from ...deps import RAGServiceDeps
-from app.rag.file_parser import FileParser, file_parser_factory
+from ...deps import RAGServiceDeps, SourceCRUDDeps
 from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead
+from app.rag.file_parser import FileParser, file_parser_factory
 
 router = APIRouter()
 
@@ -28,17 +28,16 @@ def get_file_parser(file: UploadFile) -> FileParser:
 FileParserDeps = Annotated[FileParser, Depends(get_file_parser)]
 
 
-@router.post("/collection/new", response_model=SourceRead)
-async def create_collection(
-    payload: SourceCreate,
+@router.post("/new", response_model=SourceRead)
+async def create_source(
+    source_data: SourceCreate,
     rag_service: RAGServiceDeps,
 ):
     """
-    创建新的向量集合（知识库）
+
 
     Args:
-        payload: 包含 collection 的 display_name 和 collection_name 的请求体
-        rag_service: RAGService 实例，通过依赖注入获取
+
 
     Returns:
     """

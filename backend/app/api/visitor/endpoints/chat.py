@@ -4,12 +4,17 @@ from fastapi import APIRouter, Body, Depends
 from loguru import logger
 
 from ...schemas import ChatRequest
-from ...deps import SessionDeps, ValidProjectDeps, RAGServiceDeps
+from ...deps import (
+    SessionDeps,
+    ValidProjectDeps,
+    RAGServiceDeps,
+    ChatMessageCRUDDeps,
+    ChatSessionCRUDDeps,
+)
 from app.core.config import settings
 from app.core.constants import ChatSessionType
 from app.db.models import ChatSession
 from app.db.schemas import ChatSessionInternal
-from app.crud import chat_session_crud
 from app.providers import Model, model_factory
 from app.services import ChatService
 
@@ -34,7 +39,7 @@ ModelDeps = Annotated[Model[Any], Depends(get_visitor_model)]
 
 
 async def valid_or_create_visitor_chat_session(
-    session: SessionDeps,
+    chat_session_crud: ChatSessionCRUDDeps,
     model: ModelDeps,
     project: ValidProjectDeps,
     visitor_id: Annotated[
@@ -61,7 +66,7 @@ async def valid_or_create_visitor_chat_session(
     """
     if chat_session_uid:
         chat_session = await chat_session_crud.get_chat_session_by_uid(
-            session=session, chat_session_uid=chat_session_uid
+            chat_session_uid=chat_session_uid
         )
         if chat_session:
             # 检查会话类型是否为 VISITOR，如果不是则抛出异常
@@ -82,7 +87,6 @@ async def valid_or_create_visitor_chat_session(
 
     # 如果没有提供有效的 chat_session_uid，则创建新的聊天会话
     new_chat_session = await chat_session_crud.create_chat_session(
-        session,
         chat_session_data=ChatSessionInternal(
             chat_session_name="New Chat Session",
             model=model.model_name,
@@ -96,12 +100,14 @@ async def valid_or_create_visitor_chat_session(
 
 def get_visitor_chat_service(
     session: SessionDeps,
+    chat_message_crud: ChatMessageCRUDDeps,
     llm_model: ModelDeps,
     rag_service: RAGServiceDeps,
 ) -> ChatService:
     """聊天服务工厂函数，提供 ChatService 实例"""
     return ChatService(
         session,
+        chat_message_crud=chat_message_crud,
         llm_model=llm_model,
         rag_service=rag_service,
     )

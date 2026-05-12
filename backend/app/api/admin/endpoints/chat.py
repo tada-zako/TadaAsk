@@ -4,11 +4,16 @@ from fastapi import APIRouter, Body, Depends
 from loguru import logger
 
 from ...schemas import ChatRequest
-from ...deps import SessionDeps, ValidProjectDeps, RAGServiceDeps
+from ...deps import (
+    SessionDeps,
+    ValidProjectDeps,
+    RAGServiceDeps,
+    ChatSessionCRUDDeps,
+    ChatMessageCRUDDeps,
+)
 from app.core.constants import ChatSessionType
 from app.db.models import ChatSession
 from app.db.schemas import ChatSessionInternal
-from app.crud import chat_session_crud
 from app.providers import Model, model_factory
 from app.services import ChatService
 
@@ -32,7 +37,7 @@ ModelDeps = Annotated[Model[Any], Depends(get_admin_model)]
 
 
 async def valid_or_create_admin_chat_session(
-    session: SessionDeps,
+    chat_session_crud: ChatSessionCRUDDeps,
     model: ModelDeps,
     project: ValidProjectDeps,
     chat_session_uid: Annotated[
@@ -51,7 +56,7 @@ async def valid_or_create_admin_chat_session(
     """
     if chat_session_uid:
         chat_session = await chat_session_crud.get_chat_session_by_uid(
-            session=session, chat_session_uid=chat_session_uid
+            chat_session_uid=chat_session_uid
         )
         if chat_session:
             return chat_session
@@ -63,7 +68,6 @@ async def valid_or_create_admin_chat_session(
 
     # 如果没有提供有效的 chat_session_uid，则创建新的聊天会话
     new_chat_session = await chat_session_crud.create_chat_session(
-        session,
         chat_session_data=ChatSessionInternal(
             chat_session_name="New Chat Session",
             model=model.model_name,
@@ -76,12 +80,14 @@ async def valid_or_create_admin_chat_session(
 
 def get_admin_chat_service(
     session: SessionDeps,
+    chat_message_crud: ChatMessageCRUDDeps,
     llm_model: ModelDeps,
     rag_service: RAGServiceDeps,
 ) -> ChatService:
     """聊天服务工厂函数，提供 ChatService 实例"""
     return ChatService(
         session,
+        chat_message_crud=chat_message_crud,
         llm_model=llm_model,
         rag_service=rag_service,
     )
@@ -99,7 +105,7 @@ async def stream_chat(
 
     Args:
         chat_request: 前端传递的聊天请求数据，包含用户消息和相关参数
-        project: 通过依赖注入获取的项目实例，基于 project_uid 验证
+        project: 通过依赖注入获取的项目实例，用于 project_uid 验证
         chat_session: 通过依赖注入获取或创建的聊天会话实例，基于 chat_session_uid 验证或创建
         chat_service: 通过依赖注入获取的 ChatService 实例，用于处理聊天逻辑
 

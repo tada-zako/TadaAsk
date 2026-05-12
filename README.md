@@ -72,6 +72,8 @@ Web Search：MVP 阶段不建议加入。个人博客 Agent 的目标是“基�
     - 重点重构 SQL Table 设计，明确具体业务逻辑，包括如何接入用户不同的站点、文档等（重点）
     - 抽象 VectorDB 接口，将已有的 ChromaDB 封装通过 VectorDB Protocol 暴露出来，后续方便进一步集成 Qdrant、LanceDB 等其他向量库。
     - 用户身份鉴权设计：至少需要实现能够确认 Admin 与 Visitor 的身份鉴权逻辑。需要 Admin 权限用于 admin/api/ 的访问控制，以及 visitor 与 admin 之间不同的 API 内部业务处理方式。（MVP 基于 env 驱动实现）
+    - 封装 llama.cpp API，提供 embedding 和 hyde/hype 功能
+    - 实现基于 breakpoints 的文档切割器
 2. 前端开发（重点）：前端的设计最为关键，由于我没有 widget 的开发经验，所以需要非常长的时间进行迭代设计。
     - 首先设计 Widget 的 UI/UX，确保它足够简洁、易用，并且能够无缝集成到各种博客平台。
     - 随后提供简单的 Admin 控制台，提供必要的功能来管理和监控 Agent 的运行状态。

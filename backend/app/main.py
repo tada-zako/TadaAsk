@@ -12,7 +12,7 @@ from app.core.security import get_password_hash
 from app.db import init_db
 from app.db.config import async_session
 from app.db.schemas import AdminCreate
-from app.crud import admin_crud
+from app.crud import AdminCRUD
 from app.api import admin, visitor
 
 
@@ -20,8 +20,10 @@ async def valid_or_create_admin():
     """在应用启动时验证是否存在管理员账号，如果不存在则创建一个默认管理员"""
     async with async_session() as session:
         async with session.begin():  # 开启事务
+            admin_crud = AdminCRUD(session)
+
             existing_admin = await admin_crud.get_admin_by_username(
-                session, username=settings.admin_username
+                username=settings.admin_username
             )
             if existing_admin:
                 logger.info(f"管理员账号已存在，用户名：{settings.admin_username}")
@@ -37,7 +39,7 @@ async def valid_or_create_admin():
                 username=settings.admin_username,
                 password_hash=password_hash,
             )
-            new_admin = await admin_crud.create_admin(session, default_admin_data)
+            new_admin = await admin_crud.create_admin(default_admin_data)
             logger.info(f"默认管理员账号已创建，用户名：{new_admin.username}")
 
 

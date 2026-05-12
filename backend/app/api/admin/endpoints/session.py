@@ -3,11 +3,14 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Path, Depends, HTTPException
 from loguru import logger
 
-from ...deps import SessionDeps, ValidProjectDeps
+from ...deps import (
+    ValidProjectDeps,
+    ChatSessionCRUDDeps,
+    ChatMessageCRUDDeps,
+)
 from app.core.constants import ChatSessionType
 from app.db.models import ChatSession
 from app.db.schemas import ChatSessionRead, ChatMessageRead
-from app.crud import chat_session_crud, chat_message_crud
 
 
 router = APIRouter()
@@ -16,7 +19,7 @@ router = APIRouter()
 @router.get("/project/{project_uid}/sessions", response_model=list[ChatSessionRead])
 async def list_chat_sessions(
     project: ValidProjectDeps,
-    session: SessionDeps,
+    chat_session_crud: ChatSessionCRUDDeps,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -24,8 +27,8 @@ async def list_chat_sessions(
     获取项目下的聊天会话列表
 
     Args:
-        project: 通过依赖注入获取的有效项目实例
-        session: 数据库会话，通过依赖注入获取
+        project: 通过依赖注入获取的有效项目实例，这里只用于验证 project uid 的有效性
+        chat_session_crud: 通过依赖注入获取的 ChatSessionCRUD 实例
         limit: 分页参数，限制返回的会话数量
         offset: 分页参数，指定返回会话的起始位置
 
@@ -33,12 +36,12 @@ async def list_chat_sessions(
         聊天会话列表
     """
     return await chat_session_crud.get_chat_sessions(
-        session, session_type=ChatSessionType.ADMIN, limit=limit, offset=offset
+        session_type=ChatSessionType.ADMIN, limit=limit, offset=offset
     )
 
 
 async def valid_admin_chat_session(
-    session: SessionDeps,
+    chat_session_crud: ChatSessionCRUDDeps,
     chat_session_uid: Annotated[
         str,
         Path(
@@ -54,7 +57,7 @@ async def valid_admin_chat_session(
     如果 chat_session_uid 为空或无效，报错
     """
     chat_session = await chat_session_crud.get_chat_session_by_uid(
-        session=session, chat_session_uid=chat_session_uid
+        chat_session_uid=chat_session_uid
     )
     if chat_session:
         return chat_session
@@ -73,7 +76,7 @@ ChatSessionDeps = Annotated[ChatSession, Depends(valid_admin_chat_session)]
 )
 async def list_chat_messages(
     chat_session: ChatSessionDeps,
-    session: SessionDeps,
+    chat_message_crud: ChatMessageCRUDDeps,
     # 这里会话消息不允许外部分页，内部处理
     # limit: Annotated[int, Query(ge=1, le=100)] = 20,
     # offset: Annotated[int, Query(ge=0)] = 0,
@@ -92,7 +95,7 @@ async def list_chat_messages(
     """
     # TODO: 这里的分页逻辑暂时固定为内部设置
     messages = await chat_message_crud.get_messages_by_session_id(
-        session, chat_session_id=chat_session.id, limit=20, offset=0
+        chat_session_id=chat_session.id, limit=20, offset=0
     )
     return [ChatMessageRead.model_validate(message) for message in messages]
 
@@ -100,7 +103,7 @@ async def list_chat_messages(
 @router.delete("/session/{chat_session_uid}")
 async def delete_chat_session(
     chat_session: ChatSessionDeps,
-    session: SessionDeps,
+    chat_session_crud: ChatSessionCRUDDeps,
 ):
     """
     删除聊天会话
@@ -113,7 +116,7 @@ async def delete_chat_session(
         删除结果
     """
     success = await chat_session_crud.delete_chat_session_by_id(
-        session=session, chat_session_id=chat_session.id
+        chat_session_id=chat_session.id
     )
     if success:
         return {"uid": chat_session.uid, "status": "deleted"}

@@ -14,7 +14,7 @@ from loguru import logger
 # TODO: 使用 CRUD 层代码重构 Chat 服务层实现
 from app.db.models import ChatSession, Project, Source
 from app.db.schemas import ChatMessageInternal
-from app.crud import chat_message_crud
+from app.crud import ChatMessageCRUD
 from app.providers import Model, StreamedResponse
 from app.context import build_history_context_window
 from app.rag import VectorQueryItem
@@ -44,15 +44,19 @@ class ChatService:
         self,
         session: AsyncSession,
         *,
+        chat_message_crud: ChatMessageCRUD,
         llm_model: Model[Any],
         rag_service: RAGService,
     ):
         """
         Args:
-            llm_model: Model 实例，提供构造消息和流式对话接口，通过外部 IoC 反向注入
-            thread_service: ThreadService 实例，提供获取历史消息和相关文档等功能
+            session: 数据库会话，由外部注入
+            chat_message_crud: ChatMessageCRUD 实例，由外部注入
+            llm_model: LLM 模型实例，由外部注入
+            rag_service: RAGService 实例，由外部注入
         """
         self.session = session
+        self.chat_message_crud = chat_message_crud
         self.llm_model = llm_model
         self.rag_service = rag_service
 
@@ -62,8 +66,7 @@ class ChatService:
     ) -> list[ChatMessageInternal]:
         """基于 chat_session_id 获取历史消息，并构建上下文窗口"""
         # 基于 CRUD 获取历史对话内容
-        chat_history = await chat_message_crud.get_messages_by_session_id(
-            self.session,
+        chat_history = await self.chat_message_crud.get_messages_by_session_id(
             chat_session_id=chat_session_id,
             limit=settings.sql_history_fetch_limit,
             offset=0,
@@ -88,6 +91,7 @@ class ChatService:
         """基于 project_id 获取关联的 sources，并进行 RAG 查询，返回相关文档列表"""
         related_docs = []
         # 基于 project 获取关联的 sources
+        # TODO: source 和 project 关系为多对多，这里需要重构
         result = await self.session.execute(
             select(Source).where(Source.project_id == project_id)
         )
@@ -149,8 +153,7 @@ class ChatService:
         )
 
         # 用户消息入库
-        await chat_message_crud.save_chat_to_db(
-            self.session,
+        await self.chat_message_crud.save_chat_to_db(
             role="user",
             message=user_message,
             chat_session_id=chat_session.id,
@@ -183,8 +186,7 @@ class ChatService:
             )
 
             # 保存 AI 回复
-            await chat_message_crud.save_chat_to_db(
-                self.session,
+            await self.chat_message_crud.save_chat_to_db(
                 role="assistant",
                 message=chat_result.response_content,
                 chat_session_id=chat_session.id,

@@ -2,8 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, HTTPException
 
-from ...deps import SessionDeps, ValidProjectDeps
-from app.crud import project as project_crud
+from ...deps import ValidProjectDeps, ProjectCRUDDeps
 from app.db.schemas import ProjectCreate, ProjectRead
 
 router = APIRouter()
@@ -12,24 +11,24 @@ router = APIRouter()
 @router.post("/new", response_model=ProjectRead)
 async def create_project(
     payload: ProjectCreate,
-    session: SessionDeps,
+    project_crud: ProjectCRUDDeps,
 ):
     """
     创建新的项目
 
     Args:
         payload: 包含 project 的 display_name 的请求体
-        session: 数据库会话，通过依赖注入获取
+        project_crud: 通过依赖注入获取的 ProjectCRUD 实例
 
     Returns:
         创建成功的项目信息
     """
-    return await project_crud.create_project(session=session, project_data=payload)
+    return await project_crud.create_project(project_data=payload)
 
 
 @router.get("/list", response_model=list[ProjectRead])
 async def list_projects(
-    session: SessionDeps,
+    project_crud: ProjectCRUDDeps,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -37,7 +36,7 @@ async def list_projects(
     获取项目列表
 
     Args:
-        session: 数据库会话，通过依赖注入获取
+        project_crud: 通过依赖注入获取的 ProjectCRUD 实例
         limit: 分页参数，限制返回的项目数量
         offset: 分页参数，指定返回项目的起始位置
 
@@ -45,7 +44,7 @@ async def list_projects(
         项目列表
     """
 
-    return await project_crud.get_projects(session=session, limit=limit, offset=offset)
+    return await project_crud.get_projects(limit=limit, offset=offset)
 
 
 @router.get("/{project_uid}", response_model=ProjectRead)
@@ -67,21 +66,19 @@ async def get_project(
 @router.delete("/{project_uid}")
 async def delete_project(
     project: ValidProjectDeps,
-    session: SessionDeps,
+    project_crud: ProjectCRUDDeps,
 ):
     """
     删除项目
 
     Args:
         project: 通过依赖注入获取的有效项目实例
-        session: 数据库会话，通过依赖注入获取
+        project_crud: 通过依赖注入获取的 ProjectCRUD 实例
 
     Returns:
         删除结果
     """
-    success = await project_crud.delete_project_by_id(
-        session=session, project_id=project.id
-    )
+    success = await project_crud.delete_project_by_id(project_id=project.id)
     if success:
         return {
             "uid": project.uid,
