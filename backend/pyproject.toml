@@ -25,3 +25,6 @@ dependencies = [
 dev = [
     "pytest>=9.0.2",
 ]
+
+[tool.pytest]
+asyncio_mode = "auto"
