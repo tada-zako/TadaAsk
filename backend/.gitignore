@@ -1,4 +1,5 @@
 # ========================
 # Custom ignores 
 # ========================
-backend/storage/
+storage/
+scripts/chore/
