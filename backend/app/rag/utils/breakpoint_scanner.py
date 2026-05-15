@@ -239,25 +239,57 @@ class ASTBreakpointScanner:
         return self._query_cache[language]
 
     def _extract_breakpoints_from_ast(
-        self, root_node: Node, cursor: QueryCursor
+        self, root_node: Node, cursor: QueryCursor, text: str
     ) -> list[Breakpoint]:
         """从 AST 根节点提取断点信息，返回断点列表"""
         captures: dict[str, list[Node]] = cursor.captures(root_node)
 
         # 去重：同一位置保留评分最高的断点
-        seen: dict[int, Breakpoint] = {}  # pos -> Breakpoint
-
+        seen: dict[
+            int, tuple[tuple[int, int], int, str]
+        ] = {}  # pos -> (row, col), score, type
         for capture_name, nodes in captures.items():
             score = SCORE_MAP.get(capture_name, 20)
             bp_type = capture_name
             for node in nodes:
                 pos = node.start_byte
                 # 如果位置已存在，则保留评分更高的断点
-                if pos not in seen or score > seen[pos].score:
-                    seen[pos] = Breakpoint(pos=pos, score=score, type=bp_type)
+                if pos not in seen or score > seen[pos][1]:
+                    seen[pos] = (node.start_point, score, bp_type)
+
+        if not seen:
+            return []  # 没有捕获到任何断点
 
         # 按位置排序断点列表
-        return sorted(seen.values(), key=lambda x: x.pos)
+        sorted_items = sorted(seen.items(), key=lambda x: x[0])
+
+        # 快路径：如果文本全是 ASCII 字符，无需转换
+        if text.isascii():
+            return [
+                Breakpoint(pos=pos, score=info[1], type=info[2])
+                for pos, info in sorted_items
+            ]
+
+        # 非 ASCII 字符路径：需要将 byte_offset 转换成 char_offset
+        lines = text.split(
+            "\n"
+        )  # 这里只在 \n 处切分，是因为 tree-sitter 只识别 \r\n 或 \n 作为换行符
+        line_char_starts = [0]
+        for line in lines[:-1]:
+            line_char_starts.append(line_char_starts[-1] + len(line) + 1)
+
+        result: list[Breakpoint] = []
+        for byte_pos, (start_point, score, bp_type) in sorted_items:
+            row, col_bytes = start_point
+            col_chars = len(
+                lines[row].encode("utf-8")[:col_bytes].decode("utf-8", errors="ignore")
+            )
+            result.append(
+                Breakpoint(
+                    pos=line_char_starts[row] + col_chars, score=score, type=bp_type
+                )
+            )
+        return result
 
     async def scan(self, text: str, file_path: str) -> list[Breakpoint]:
         """扫描输入代码文本，返回断点列表"""
@@ -286,7 +318,7 @@ class ASTBreakpointScanner:
             query_cursor = self._get_query_cursor(language, grammar)
             root_node = tree.root_node
 
-            return self._extract_breakpoints_from_ast(root_node, query_cursor)
+            return self._extract_breakpoints_from_ast(root_node, query_cursor, text)
 
         except Exception as e:
             logger.error(f"Error scanning AST for file {file_path}: {e}")
