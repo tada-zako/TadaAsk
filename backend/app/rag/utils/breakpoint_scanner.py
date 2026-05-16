@@ -189,6 +189,15 @@ SCORE_MAP: dict[str, int] = {
 }
 
 
+@dataclass
+class _BreakpointInfo:
+    """内部使用的断点信息类，临时存储断点的行列信息"""
+
+    start_point: tuple[int, int]  # (row, column) 临时存储行列信息
+    score: int
+    type: str
+
+
 class ASTBreakpointScanner:
     """扫描代码文本中的断点位置，基于抽象语法树（AST）分析"""
 
@@ -245,17 +254,17 @@ class ASTBreakpointScanner:
         captures: dict[str, list[Node]] = cursor.captures(root_node)
 
         # 去重：同一位置保留评分最高的断点
-        seen: dict[
-            int, tuple[tuple[int, int], int, str]
-        ] = {}  # pos -> (row, col), score, type
+        seen: dict[int, _BreakpointInfo] = {}  # pos -> (row, col), score, type
         for capture_name, nodes in captures.items():
             score = SCORE_MAP.get(capture_name, 20)
             bp_type = capture_name
             for node in nodes:
                 pos = node.start_byte
                 # 如果位置已存在，则保留评分更高的断点
-                if pos not in seen or score > seen[pos][1]:
-                    seen[pos] = (node.start_point, score, bp_type)
+                if pos not in seen or score > seen[pos].score:
+                    seen[pos] = _BreakpointInfo(
+                        start_point=node.start_point, score=score, type=bp_type
+                    )
 
         if not seen:
             return []  # 没有捕获到任何断点
@@ -266,7 +275,7 @@ class ASTBreakpointScanner:
         # 快路径：如果文本全是 ASCII 字符，无需转换
         if text.isascii():
             return [
-                Breakpoint(pos=pos, score=info[1], type=info[2])
+                Breakpoint(pos=pos, score=info.score, type=info.type)
                 for pos, info in sorted_items
             ]
 
@@ -279,14 +288,16 @@ class ASTBreakpointScanner:
             line_char_starts.append(line_char_starts[-1] + len(line) + 1)
 
         result: list[Breakpoint] = []
-        for byte_pos, (start_point, score, bp_type) in sorted_items:
-            row, col_bytes = start_point
+        for byte_pos, bp_info in sorted_items:
+            row, col_bytes = bp_info.start_point
             col_chars = len(
                 lines[row].encode("utf-8")[:col_bytes].decode("utf-8", errors="ignore")
             )
             result.append(
                 Breakpoint(
-                    pos=line_char_starts[row] + col_chars, score=score, type=bp_type
+                    pos=line_char_starts[row] + col_chars,
+                    score=bp_info.score,
+                    type=bp_info.type,
                 )
             )
         return result
