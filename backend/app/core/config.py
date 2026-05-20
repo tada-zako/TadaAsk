@@ -12,18 +12,20 @@ PROJECT_ROOT = pathlib.Path(__file__).parents[2]
 class Settings(BaseSettings):
     project_root: str = str(PROJECT_ROOT)
 
-    llm_provider_perf: str = "google"  # LLM 提供商，默认为 "google"
+    # ================= LLM 配置 =================
+    llm_provider_admin: str = "google"  # Admin LLM 提供商，默认为 "google"
+    llm_provider_visitor: str = "deepseek"  # Visitor LLM 提供商，默认为 "deepseek"
 
-    # Gemini LLM 配置
+    # ================= Gemini LLM 配置 =================
     gemini_api_key: str = ""
     gemini_model_perf: str = "gemini-2.5-flash"
 
-    # Chat 上下文窗口配置
+    # ================= Chat 上下文窗口配置 =================
     sql_history_fetch_limit: int = 100  # 数据库中获取的历史消息数量上限
     max_context_tokens: int = 12000  # LLM 输入的最大上下文 token 长度，只包含历史对话
     max_single_message_tokens: int = 2048  # 最大单条消息 token 长度，只约束历史消息
 
-    # 文本切割配置
+    # ================= 文本切割配置 =================
     chunk_size_tokens: int = 1000  # 文本块的目标 token 长度
     chunk_overlap_tokens: int = 0  # 文本块之间的重叠 token 数量
     chunk_window_tokens: int = (
@@ -34,20 +36,20 @@ class Settings(BaseSettings):
     chunk_overlap_chars: int = 0
     chunk_window_chars: int = 0
 
-    # 向量库配置
+    # ================= 向量库配置 =================
     vector_store_perf: str = "chromadb"  # 向量库，默认为 "chromadb"
 
-    # ChromaDB 配置
+    # ================= ChromaDB 配置 =================
     chromadb_path: str = ""
-    # 数据库配置
+    # ================= 数据库配置 =================
     sqlite_path: str = ""
 
-    # JWT 配置
+    # ================= JWT 配置 =================
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 30
 
-    # 管理员账号配置
+    # ================= 管理员账号配置 =================
     admin_username: str = "admin"
     admin_password: str = "admin123"
 

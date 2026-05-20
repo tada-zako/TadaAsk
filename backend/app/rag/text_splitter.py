@@ -26,7 +26,6 @@ class TextChunk:
 
     content: str
     pos: int  # 切片在原始文档中的起始位置
-    metadata: dict[str, str] | None = None
 
 
 class TextSplitter(Protocol):
@@ -122,7 +121,6 @@ class TokenAwareTextSplitter:
                 TextChunk(
                     content=fallback_content,
                     pos=chunk.pos,
-                    metadata=chunk.metadata,
                 )
             )
             # 放弃当前块剩余部分的切割，直接返回
@@ -134,7 +132,6 @@ class TokenAwareTextSplitter:
                 TextChunk(
                     content=sub_chunk.content,
                     pos=chunk.pos + sub_chunk.pos,
-                    metadata=sub_chunk.metadata,
                 ),
                 final_chunks,
                 file_path,

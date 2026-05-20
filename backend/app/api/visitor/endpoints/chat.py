@@ -29,8 +29,8 @@ def get_visitor_model(
     游客级 model 工厂: 基于关联的 Project 获取对应的 Model 实例。
     NOTE: 目前仅支持 GeminiModel。
     """
-    provider_name = project.provider or settings.llm_provider_perf or "google"
-    # TODO: 模型字段的获取逻辑，后期重新处理；目前系统设置中拿到的模型名只能来自于 gemini
+    provider_name = project.provider or settings.llm_provider_visitor or "deepseek"
+    # TODO: 模型字段的获取逻辑，后期重新处理；
     model_name = project.model or settings.gemini_model_perf or None
     return model_factory(provider=provider_name, model=model_name)
 

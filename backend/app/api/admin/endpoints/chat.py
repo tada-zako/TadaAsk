@@ -16,6 +16,7 @@ from app.db.models import ChatSession
 from app.db.schemas import ChatSessionInternal
 from app.providers import Model, model_factory
 from app.services import ChatService
+from app.core.config import settings
 
 
 router = APIRouter()
@@ -30,6 +31,9 @@ def get_admin_model(
     不验证会话级 model 字段，这里认为前端会基于会话级字段正确传递 providerName 和 modelName。
     NOTE: 目前仅支持 GeminiModel。
     """
+    provider_name = provider_name or settings.llm_provider_admin or "google"
+    # TODO: 模型字段的获取逻辑，后期重新处理；
+    model_name = model_name or settings.gemini_model_perf or None
     return model_factory(provider=provider_name, model=model_name)
 
 
