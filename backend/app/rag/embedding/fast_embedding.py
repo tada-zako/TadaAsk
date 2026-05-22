@@ -6,9 +6,16 @@ from app.core.config import settings
 class FastEmbeddingAdapter:
     """基于 fastembed 的文本嵌入适配器"""
 
-    def __init__(self, model_name: str = settings.embedding_model_name):
-        self.model_name = model_name or settings.embedding_model_name
+    def __init__(self, model_name: str):
         self.cache_dir = settings.fastembed_model_path or None
+
+        # 将 HF 格式的 model_name 映射为 fastembed 内部名称，找不到则原样传入
+        hf_to_fastembed = {
+            info["sources"]["hf"]: info["model"]
+            for info in TextEmbedding.list_supported_models()
+            if info["sources"].get("hf")
+        }
+        self.model_name = hf_to_fastembed.get(model_name, model_name)
 
         self.embedding = TextEmbedding(
             model_name=self.model_name, cache_dir=self.cache_dir
