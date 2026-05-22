@@ -60,8 +60,10 @@ class Settings(BaseSettings):
 
     vector_store_perf: str = "chromadb"  # 向量库配置，默认为 "chromadb"
 
+    # 模型缓存路径
     fastembed_model_path: str = ""  # FastEmbed 模型路径，默认由 fastembed 内部处理
     llamacpp_model_path: str = ""  # LLaMA.cpp 模型路径，默认由 llamacpp 内部处理
+    hf_hub_cache: str = ""  # HuggingFace Hub 模型缓存路径
 
     chromadb_path: str = ""  # ChromaDB 数据库文件存储路径
     sqlite_path: str = ""  # SQLite 数据库文件存储路径
