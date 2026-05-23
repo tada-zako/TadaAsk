@@ -1,19 +1,25 @@
-from typing import Protocol, runtime_checkable, TypeVar, Generic, AsyncIterator
+from typing import Protocol, runtime_checkable, Literal, AsyncIterator, TypeVar
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-from app.rag import VectorQueryItem
-from app.db.schemas import ChatMessageInternal
-
-T = TypeVar("T")
+from pydantic import BaseModel
 
 
 @dataclass
-class ModelRequestContext(Generic[T]):
-    system_prompt: str
-    user_message: str
-    chat_history: list[T] | None = None
+class Message:
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+@dataclass
+class ModelRequestParameters:
+    """LLM 请求参数定义：主要处理结构化输出处理和未来可能的工具调用（现在不添加）"""
+
+    # function_tools: list[Tool]
+
+    output_mode: Literal["text", "structured"] = "text"
+    output_schema: type[BaseModel] | None = None
 
 
 class StreamedResponse(ABC):
@@ -42,30 +48,12 @@ class StreamedResponse(ABC):
 
 
 @runtime_checkable
-class Model(Protocol, Generic[T]):
-    def construct_messages(
-        self,
-        document: list[VectorQueryItem],
-        user_message: str,
-        chat_history: list[ChatMessageInternal] | None = None,
-    ) -> ModelRequestContext[T]:
-        """
-        构建符合 LLM 请求接口格式的消息实例
+class TextCompleter(Protocol):
+    """流式文本生成"""
 
-        Args:
-            document: 向量库查询返回的相关文档列表，允许为空
-            user_message: 用户输入的消息内容
-            chat_history: 线程历史消息列表（可选）
-
-        Returns:
-            构建好的消息实例，包含系统提示语、用户消息和历史消息
-        """
-        ...
-
-    # TODO: 参考 AgentResponse 的实现，封装流式响应接口，对外提供更加安全的流式响应接口
     @asynccontextmanager
     async def stream_chat(
-        self, context: ModelRequestContext[T]
+        self, messages: list[Message]
     ) -> AsyncIterator[StreamedResponse]:
         """
         LLM 流式对话接口：通过对具体 LLM 的封装，提供简洁的流式对话接口，
@@ -78,3 +66,19 @@ class Model(Protocol, Generic[T]):
     def model_name(self) -> str:
         """返回模型名称，供业务层记录日志等使用"""
         raise NotImplementedError()
+
+
+T = TypeVar("T", bound=BaseModel)
+
+
+@runtime_checkable
+class StructuredCompleter(Protocol):
+    """结构化输出"""
+
+    async def complete_structured(self, messages: list[Message], schema: type[T]) -> T:
+        """
+        LLM 结构化输出接口：按照指定的 Pydantic 模型 schema 对 LLM 输出进行解析和校验，
+        返回一个符合 schema 定义的 Pydantic 模型实例
+        """
+        raise NotImplementedError()
+        yield
