@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model_perf: str = "gemini-2.5-flash"
 
+    # DeepSeek LLM 配置
+    deepseek_api_key: str = ""
+    deepseek_model_perf: str = "DeepSeek-V4-Flash"
+
     sql_history_fetch_limit: int = 100  # 数据库中获取的历史消息数量上限
     max_context_tokens: int = 12000  # LLM 输入的最大上下文 token 长度，只包含历史对话
     max_single_message_tokens: int = 2048  # 最大单条消息 token 长度，只约束历史消息

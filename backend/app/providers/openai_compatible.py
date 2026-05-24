@@ -1,28 +1,57 @@
 from typing import AsyncIterator, TypeVar
+from dataclasses import dataclass
 from contextlib import asynccontextmanager
-from deprecated import deprecated
 
-import google.genai as genai
-from google.genai import types
-from google.genai.types import (
-    GenerateContentResponse,
-    ContentUnionDict,
-    GenerateContentConfigDict,
-)
+from openai import AsyncOpenAI, AsyncStream
+from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 from pydantic import BaseModel
 
 from .base import StreamedResponse, Message, ModelRequestParameters
-from app.providers.prompts import DEFAULT_SYSTEM_PROMPT
-from app.rag import VectorQueryItem
-from app.db.schemas import ChatMessageInternal
+from .openai_compatible import OpenAIEndpoint
 from app.core.config import settings
 
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class GeminiStreamedResponse(StreamedResponse):
-    def __init__(self, stream_iter: AsyncIterator[GenerateContentResponse]):
+@dataclass
+class OpenAIEndpoint:
+    """OpenAI 兼容接口配置"""
+
+    endpoint_name: str
+    api_key: str | None = None
+    base_url: str | None = None
+
+    @classmethod
+    def deepseek(cls) -> OpenAIEndpoint:
+        """DeepSeek 兼容接口配置"""
+        return cls(
+            api_key=settings.deepseek_api_key,
+            base_url="https://api.deepseek.com",
+            endpoint_name="deepseek",
+        )
+
+    @classmethod
+    def openai(cls) -> OpenAIEndpoint:
+        """OpenAI 官方接口配置"""
+        return cls(
+            api_key=settings.gemini_api_key,
+            base_url=None,  # OpenAI 官方 API 使用默认 base URL，无需配置
+            endpoint_name="openai",
+        )
+
+    @classmethod
+    def ollama(cls) -> OpenAIEndpoint:
+        """Ollama 兼容接口配置，默认指向本地 Ollama 服务"""
+        return cls(
+            api_key=None,  # Ollama 本地服务通常不需要 API Key
+            base_url="http://localhost:11434",
+            endpoint_name="ollama",
+        )
+
+
+class OpenAIStreamedResponse(StreamedResponse):
+    def __init__(self, stream_iter: AsyncStream[ChatCompletionChunk]):
         self.stream_iter = stream_iter
 
     async def _get_stream_iter(self) -> AsyncIterator[str]:
@@ -33,65 +62,20 @@ class GeminiStreamedResponse(StreamedResponse):
                 yield chunk.text
 
 
-class GeminiModel:
-    def __init__(self, model_perf: str):
-        if not settings.gemini_api_key:
-            raise ValueError("Gemini API key is not set in the configuration.")
+class OpenAIChatModel:
+    def __init__(self, model_perf: str, endpoint: OpenAIEndpoint):
+        if not endpoint.api_key:
+            raise ValueError(
+                f"API key is not set for endpoint {endpoint.endpoint_name}."
+            )
 
         self._model = model_perf
-        self._client = genai.Client(api_key=settings.gemini_api_key)
-
-        # 模型工具配置
-        # self.grounding_tool = types.Tool(google_search=types.GoogleSearch())
-        # NOTE: 目前不通过 SDK 提供 google search 工具
+        self._client = AsyncOpenAI(base_url=endpoint.base_url, api_key=endpoint.api_key)
 
     @property
     def model_name(self) -> str:
         """返回模型名称，供业务层记录日志等使用"""
         return self._model
-
-    @deprecated(
-        "chat messages 构建方法后续提升到 Service 层，确保 messages 构建与 Provider 无关"
-    )
-    def build_chat_messages(
-        self,
-        document: list[VectorQueryItem],
-        user_message: str,
-        chat_history: list[ChatMessageInternal] | None = None,
-    ) -> list[Message]:
-        """
-        构建符合 Gemini LLM 请求接口格式的消息实例
-        """
-        history_contents: list[types.ContentOrDict] | None = None
-        if chat_history:
-            history_contents = [
-                types.Content(
-                    role="model" if entry.role == "assistant" else "user",
-                    parts=[types.Part(text=entry.message)],
-                )
-                for entry in chat_history
-            ]
-
-        # NOTE: 目前只提供静态系统提示词
-        system_prompt = DEFAULT_SYSTEM_PROMPT
-
-        if document:
-            # 允许 document 为空
-            context = "\n<Context>\n"
-            for doc in document:
-                context += (
-                    f"[context{doc.id}]:\n{doc.document}\n"
-                    + f"Metadata: {doc.metadata}\n\n"
-                )
-            context += "</Context>\n"
-
-            user_message = (
-                context + "\n<user_message>\n" + user_message + "\n</user_message>\n"
-            )
-
-        return [
-            Message(role="system", content=system_prompt),
-        ]
 
     def _build_content_and_config(
         self, messages: list[Message], request_parameters: ModelRequestParameters
@@ -142,7 +126,7 @@ class GeminiModel:
     @asynccontextmanager
     async def stream_chat(
         self, messages: list[Message]
-    ) -> AsyncIterator[GeminiStreamedResponse]:
+    ) -> AsyncIterator[OpenAIStreamedResponse]:
         """
         Gemini LLM 流式对话接口: 通过对 google.genai 的封装，提供简洁的流式对话接口,
         返回一个 GeminiStreamedResponse 对象，供业务层异步迭代获取流式响应内容
@@ -152,8 +136,8 @@ class GeminiModel:
             messages, ModelRequestParameters()
         )
 
-        stream_iter = await self._client.aio.models.generate_content_stream(
-            model=self._model,
+        stream_iter = await self._client.chat.completions.create(
+            model=self.model,
             config=config,
             contents=contents,
         )
@@ -170,8 +154,8 @@ class GeminiModel:
             ModelRequestParameters(output_mode="structured", output_schema=schema),
         )
 
-        response = await self._client.aio.models.generate_content(
-            model=self._model,
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
             config=config,
             contents=contents,
         )
