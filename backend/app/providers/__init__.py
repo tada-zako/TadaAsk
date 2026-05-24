@@ -1,12 +1,22 @@
 from typing import Any
 
-from .base import Model, StreamedResponse
+from .base import Message, StreamedResponse, TextCompleter, StructuredCompleter
 from .gemini import GeminiModel
+from .prompts import (
+    DEFAULT_SYSTEM_PROMPT,
+    QUERY_EXPAND_SYSTEM_PROMPT,
+    QUERY_EXPAND_USER_TEMPLATE,
+)
 
 __all__ = [
-    "Model",
+    "Message",
     "StreamedResponse",
+    "TextCompleter",
+    "StructuredCompleter",
     "GeminiModel",
+    "DEFAULT_SYSTEM_PROMPT",
+    "QUERY_EXPAND_SYSTEM_PROMPT",
+    "QUERY_EXPAND_USER_TEMPLATE",
 ]
 
 
