@@ -1,8 +1,33 @@
-from .base import VectorQueryItem, VectorDatabase
-from .chromadb import ChromaDB
+from .chromadb import VectorQueryResult, VectorDatabase, ChromaDB
+from .text_splitter import (
+    TextChunk,
+    TextSplitter,
+    TokenAwareTextSplitter,
+    ASTAwareTextSplitter,
+)
+from .embedding import EmbeddingProvider, FastEmbeddingAdapter
+from .utils.tokenizer import TokenizerBase, HuggingFaceTokenizer
+from .rerank import RerankProvider, FastRerankAdapter
+from .query_expand import QueryExpander, ExpandedQuery
 from app.core.config import settings
 
-__all__ = ["VectorQueryItem", "VectorDatabase", "ChromaDB"]
+__all__ = [
+    "VectorQueryResult",
+    "VectorDatabase",
+    "ChromaDB",
+    "TextChunk",
+    "TextSplitter",
+    "TokenAwareTextSplitter",
+    "ASTAwareTextSplitter",
+    "EmbeddingProvider",
+    "FastEmbeddingAdapter",
+    "TokenizerBase",
+    "HuggingFaceTokenizer",
+    "RerankProvider",
+    "FastRerankAdapter",
+    "QueryExpander",
+    "ExpandedQuery",
+]
 
 
 def vector_db_factory(
