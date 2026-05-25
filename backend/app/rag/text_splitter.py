@@ -3,21 +3,17 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from .utils import MarkdownBreakpointScanner, CodeFenceScanner, Breakpoint, CodeFence
+from .utils import (
+    MarkdownBreakpointScanner,
+    CodeFenceScanner,
+    Breakpoint,
+    CodeFence,
+    TokenizerBase,
+)
 from app.core.config import settings
 
 
 AVG_CHARS_PER_TOKEN_ESTIMATE = 3  # 粗略估计平均每个 token 约为 3 个字符
-
-
-def tokenize(text: str) -> list[str]:
-    """模拟 Tokenizer，后续替换成 llama-cpp-python 的实际 Tokenizer"""
-    ...
-
-
-def detokenize(tokens: list[str]) -> str:
-    """模拟 Detokenizer，后续替换成 llama-cpp-python 的实际 Detokenizer"""
-    ...
 
 
 @dataclass
@@ -46,6 +42,7 @@ class TokenAwareTextSplitter:
 
     def __init__(
         self,
+        tokenizer: TokenizerBase,
         chunk_tokens: int = settings.chunk_size_tokens,
         overlap_tokens: int = settings.chunk_overlap_tokens,
         window_tokens: int = settings.chunk_window_tokens,
@@ -53,10 +50,13 @@ class TokenAwareTextSplitter:
     ):
         """
         Args:
+            tokenizer: Tokenizer 实例，用于计算文本的 Token 数和进行 Token 切割
             chunk_tokens: 目标文本块大小（Token 数）
             overlap_tokens: 文本块之间的重叠大小（Token 数）
             window_tokens: 切割窗口大小（Token 数），在窗口范围内寻找切割点
+            splitter_strategy: 断点扫描策略，可调整不使用 AST 断点扫描，可选值为 "ast" 或 "markdown"
         """
+        self.tokenizer = tokenizer
         self.chunk_tokens = chunk_tokens
         self.overlap_tokens = overlap_tokens
         self.window_tokens = window_tokens
@@ -80,7 +80,7 @@ class TokenAwareTextSplitter:
     async def _push_chunk_with_token_limit(
         self, chunk: TextChunk, final_chunks: list[TextChunk], file_path: str
     ):
-        tokens = tokenize(chunk.content)
+        tokens = self.tokenizer.tokenize(chunk.content)
         if len(tokens) <= self.chunk_tokens or len(tokens) <= 1:
             final_chunks.append(chunk)
             return
@@ -116,7 +116,7 @@ class TokenAwareTextSplitter:
                 f"exceeds token limit but no breakpoints found, applying token-based fallback."
             )
             fallback_tokens = tokens[: self.chunk_tokens]
-            fallback_content = detokenize(fallback_tokens)
+            fallback_content = self.tokenizer.detokenize(fallback_tokens)
             final_chunks.append(
                 TextChunk(
                     content=fallback_content,

@@ -1,8 +1,21 @@
+from typing import Protocol
+
 from tokenizers import Tokenizer
 from huggingface_hub import hf_hub_download
 
-
 from app.core.config import settings
+
+
+class TokenizerBase(Protocol):
+    """Tokenizer 协议接口，定义 tokenize 和 detokenize 方法"""
+
+    def tokenize(self, text: str) -> list[int]:
+        """将文本转换为 token ID 列表"""
+        raise NotImplementedError()
+
+    def detokenize(self, tokens: list[int]) -> str:
+        """将 token ID 列表转换回文本"""
+        raise NotImplementedError()
 
 
 class HuggingFaceTokenizer:
