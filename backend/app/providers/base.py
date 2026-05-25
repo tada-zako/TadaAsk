@@ -12,16 +12,6 @@ class Message:
     content: str
 
 
-@dataclass
-class ModelRequestParameters:
-    """LLM 请求参数定义：主要处理结构化输出处理和未来可能的工具调用（现在不添加）"""
-
-    # function_tools: list[Tool]
-
-    output_mode: Literal["text", "structured"] = "text"
-    output_schema: type[BaseModel] | None = None
-
-
 class StreamedResponse(ABC):
     """
     LLM SDK 流式响应接口的返回类型：将 AsyncIterator 封装在类中，方

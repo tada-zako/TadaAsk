@@ -11,7 +11,7 @@ from google.genai.types import (
 )
 from pydantic import BaseModel
 
-from .base import StreamedResponse, Message, ModelRequestParameters
+from .base import StreamedResponse, Message
 from app.providers.prompts import DEFAULT_SYSTEM_PROMPT
 from app.rag import VectorQueryItem
 from app.db.schemas import ChatMessageInternal
@@ -93,8 +93,9 @@ class GeminiModel:
             Message(role="system", content=system_prompt),
         ]
 
-    def _build_content_and_config(
-        self, messages: list[Message], request_parameters: ModelRequestParameters
+    def _map_messages_and_config(
+        self,
+        messages: list[Message],
     ) -> tuple[list[ContentUnionDict], GenerateContentConfigDict]:
         """将通用 Message 转换为 Gemini LLM 请求接口需要的内容格式和配置格式"""
         system_prompt = next(
@@ -118,26 +119,16 @@ class GeminiModel:
                 types.Content(role=role, parts=[types.Part(text=msg.content)])
             )
 
-        # 处理结构化输出相关的配置
-        response_schema = None
-        response_mime_type = None
-        if request_parameters.output_mode == "structured":
-            if request_parameters.output_schema is None:
-                raise ValueError(
-                    "output_schema must be provided when output_mode is 'structured'."
-                )
-            # 这里简单实现为将 Pydantic 模型的 JSON Schema 作为系统提示词的一部分，
-            # 未来可以设计更复杂的提示词模板来引导 LLM 输出符合 schema 定义的内容
-            response_schema = request_parameters.output_schema.model_json_schema()
-            response_mime_type = "application/json"
-
-        config = GenerateContentConfigDict(
-            system_instruction=system_prompt,
-            response_mime_type=response_mime_type,
-            response_schema=response_schema,
-        )
-
+        config = GenerateContentConfigDict(system_instruction=system_prompt)
         return [*history_contents, user_content], config
+
+    def _map_json_schema(
+        self, config: GenerateContentConfigDict, schema: type[T]
+    ) -> GenerateContentConfigDict:
+        """将 Pydantic 模型的 JSON Schema 转换为 Gemini LLM 请求接口需要的配置格式"""
+        config["response_schema"] = schema.model_json_schema()
+        config["response_mime_type"] = "application/json"
+        return config
 
     @asynccontextmanager
     async def stream_chat(
@@ -148,9 +139,7 @@ class GeminiModel:
         返回一个 GeminiStreamedResponse 对象，供业务层异步迭代获取流式响应内容
         """
 
-        contents, config = self._build_content_and_config(
-            messages, ModelRequestParameters()
-        )
+        contents, config = self._map_messages_and_config(messages)
 
         stream_iter = await self._client.aio.models.generate_content_stream(
             model=self._model,
@@ -165,10 +154,8 @@ class GeminiModel:
         Gemini LLM 结构化输出接口：按照指定的 Pydantic 模型 schema 对 LLM 输出进行解析和校验，
         返回一个符合 schema 定义的 Pydantic 模型实例
         """
-        contents, config = self._build_content_and_config(
-            messages,
-            ModelRequestParameters(output_mode="structured", output_schema=schema),
-        )
+        contents, config = self._map_messages_and_config(messages)
+        config = self._map_json_schema(config, schema)
 
         response = await self._client.aio.models.generate_content(
             model=self._model,
