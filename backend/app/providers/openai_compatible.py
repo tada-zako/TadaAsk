@@ -3,12 +3,16 @@ from dataclasses import dataclass
 from contextlib import asynccontextmanager
 
 from openai import AsyncOpenAI, AsyncStream
-from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
+from openai.types import chat, shared_params
+from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
 from pydantic import BaseModel
 
-from .base import StreamedResponse, Message, ModelRequestParameters
+from .base import StreamedResponse, Message
 from .openai_compatible import OpenAIEndpoint
 from app.core.config import settings
+
+
+DEFAULT_RESPONSE_FORMAT_NAME = "response_format"
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -56,10 +60,16 @@ class OpenAIStreamedResponse(StreamedResponse):
 
     async def _get_stream_iter(self) -> AsyncIterator[str]:
         async for chunk in self.stream_iter:
-            # TODO: 这里先简单实现，直接返回文本内容，
-            # 未来扩展更多的中间操作，例如过滤、清洗、统计 token 使用量等
-            if chunk.text:
-                yield chunk.text
+            if not chunk.choices:
+                continue
+            choice = chunk.choices[0]
+            if choice.delta is None:
+                continue
+
+            # 只处理文本内容情况
+            content = choice.delta.content
+            if content:
+                yield content
 
 
 class OpenAIChatModel:
@@ -77,90 +87,82 @@ class OpenAIChatModel:
         """返回模型名称，供业务层记录日志等使用"""
         return self._model
 
-    def _build_content_and_config(
-        self, messages: list[Message], request_parameters: ModelRequestParameters
-    ) -> tuple[list[ContentUnionDict], GenerateContentConfigDict]:
-        """将通用 Message 转换为 Gemini LLM 请求接口需要的内容格式和配置格式"""
-        system_prompt = next(
-            (msg.content for msg in reversed(messages) if msg.role == "system"), ""
-        )
-
-        last_user_msg = messages[-1]
-        if last_user_msg.role != "user":
-            raise ValueError("The last message must be a user message.")
-        user_content = types.Content(
-            role="user", parts=[types.Part(text=last_user_msg.content)]
-        )
-
-        # 历史对话构建，过滤掉 system 消息和 user_message
-        history_contents: list[types.ContentOrDict] = []
-        for msg in messages[:-1]:
+    def _map_messages(
+        self, messages: list[Message]
+    ) -> list[ChatCompletionMessageParam]:
+        """将通用 Message 转换为 OpenAI SDK 兼容的 ChatCompletionMessageParam 列表"""
+        openai_messages: list[ChatCompletionMessageParam] = []
+        for msg in messages:
             if msg.role == "system":
-                continue
-            role = "model" if msg.role == "assistant" else "user"
-            history_contents.append(
-                types.Content(role=role, parts=[types.Part(text=msg.content)])
-            )
-
-        # 处理结构化输出相关的配置
-        response_schema = None
-        response_mime_type = None
-        if request_parameters.output_mode == "structured":
-            if request_parameters.output_schema is None:
-                raise ValueError(
-                    "output_schema must be provided when output_mode is 'structured'."
+                openai_messages.append(
+                    chat.ChatCompletionDeveloperMessageParam(
+                        role="developer", content=msg.content
+                    )
                 )
-            # 这里简单实现为将 Pydantic 模型的 JSON Schema 作为系统提示词的一部分，
-            # 未来可以设计更复杂的提示词模板来引导 LLM 输出符合 schema 定义的内容
-            response_schema = request_parameters.output_schema.model_json_schema()
-            response_mime_type = "application/json"
+            elif msg.role == "user":
+                openai_messages.append(
+                    chat.ChatCompletionUserMessageParam(
+                        role="user", content=msg.content
+                    )
+                )
+            elif msg.role == "assistant":
+                openai_messages.append(
+                    chat.ChatCompletionAssistantMessageParam(
+                        role="assistant", content=msg.content
+                    )
+                )
+            else:
+                raise ValueError(f"Unsupported message role: {msg.role}")
 
-        config = GenerateContentConfigDict(
-            system_instruction=system_prompt,
-            response_mime_type=response_mime_type,
-            response_schema=response_schema,
-        )
+        return openai_messages
 
-        return [*history_contents, user_content], config
+    def _map_json_schema(
+        self, schema: type[T]
+    ) -> chat.completion_create_params.ResponseFormat:
+        """将 Pydantic 模型的 JSON Schema 转换为 OpenAI SDK 兼容的 JSON Schema 格式"""
+        response_format: shared_params.ResponseFormatJSONSchema = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": DEFAULT_RESPONSE_FORMAT_NAME,
+                "schema": schema.model_json_schema(),
+            },
+        }
+        return response_format
 
     @asynccontextmanager
     async def stream_chat(
         self, messages: list[Message]
     ) -> AsyncIterator[OpenAIStreamedResponse]:
         """
-        Gemini LLM 流式对话接口: 通过对 google.genai 的封装，提供简洁的流式对话接口,
-        返回一个 GeminiStreamedResponse 对象，供业务层异步迭代获取流式响应内容
+        OpenAI LLM 流式聊天接口：返回一个异步迭代器，逐步产出 LLM 的响应内容
         """
 
-        contents, config = self._build_content_and_config(
-            messages, ModelRequestParameters()
-        )
+        openai_messages = self._map_messages(messages)
 
         stream_iter = await self._client.chat.completions.create(
-            model=self.model,
-            config=config,
-            contents=contents,
+            model=self._model,
+            messages=openai_messages,
+            stream=True,
         )
 
-        yield GeminiStreamedResponse(stream_iter=stream_iter)
+        yield OpenAIStreamedResponse(stream_iter=stream_iter)
 
     async def complete_structured(self, messages: list[Message], schema: type[T]) -> T:
         """
         Gemini LLM 结构化输出接口：按照指定的 Pydantic 模型 schema 对 LLM 输出进行解析和校验，
         返回一个符合 schema 定义的 Pydantic 模型实例
         """
-        contents, config = self._build_content_and_config(
-            messages,
-            ModelRequestParameters(output_mode="structured", output_schema=schema),
+        openai_messages = self._map_messages(messages)
+        response_format = self._map_json_schema(schema)
+
+        response = await self._client.chat.completions.create(
+            model=self._model,
+            messages=openai_messages,
+            response_format=response_format,
         )
 
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            config=config,
-            contents=contents,
-        )
+        content = response.choices[0].message.content
+        if not content:
+            raise ValueError("LLM response does not contain content.")
 
-        if not response.text:
-            raise ValueError("LLM response does not contain text content.")
-
-        return schema.model_validate_json(response.text)
+        return schema.model_validate_json(content)
