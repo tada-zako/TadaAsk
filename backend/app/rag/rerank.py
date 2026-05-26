@@ -24,11 +24,11 @@ class FastRerankAdapter:
 
     def __init__(self, model_name: str, cache_dir: str | None = None):
         # TODO: model_name 由顶层 IoC 注入，基于传入 -> 环境变量 -> 默认值的方式确定
-        self.model_name = model_name
-        self.cache_dir = cache_dir
+        self._model_name = model_name
+        self._cache_dir = cache_dir
 
         self.reranker = TextCrossEncoder(
-            model_name=self.model_name, cache_dir=self.cache_dir
+            model_name=self._model_name, cache_dir=self._cache_dir
         )
 
     def rerank(self, query: str, documents: list[str]) -> list[float]:

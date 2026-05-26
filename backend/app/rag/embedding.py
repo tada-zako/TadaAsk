@@ -47,17 +47,24 @@ class FastEmbeddingAdapter:
     """基于 fastembed 的文本嵌入适配器"""
 
     def __init__(self, model_name: str, cache_dir: str | None = None):
-        self.model_name = model_name
-        self.cache_dir = cache_dir
+        self._model_name = model_name
+        self._cache_dir = cache_dir
 
         self.embedding = TextEmbedding(
-            model_name=self.model_name, cache_dir=self.cache_dir
+            model_name=self._model_name, cache_dir=self._cache_dir
         )
 
     def embed_documents(self, documents: list[str]) -> list[list[float]]:
         """将文档列表转换为嵌入向量列表"""
         return [list(e) for e in self.embedding.embed(documents)]
 
-    def embed_query(self, query: str) -> list[list[float]]:
+    def embed_query(self, query: str) -> list[float]:
         """将查询文本转换为嵌入向量"""
-        return [list(e) for e in self.embedding.query_embed(query)]
+        try:
+            first_item = next(iter(self.embedding.query_embed([query])))
+            result_list = list(first_item)
+        except StopIteration:
+            # 处理空迭代器的情况
+            result_list = []
+
+        return result_list
