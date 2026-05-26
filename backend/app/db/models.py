@@ -237,6 +237,7 @@ class DocumentContent(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str]  # 文档标题，冗余数据，兼容 FTS 外部数据模式
+    tokens: Mapped[str]  # 应用层文档的分词结果
     document_content: Mapped[str] = mapped_column(String)  # 文档的原始文本内容
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
