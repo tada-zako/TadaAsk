@@ -5,6 +5,7 @@ from .breakpoint_scanner import (
 )
 from .code_fence_scanner import CodeFenceScanner, CodeFence
 from .tokenizer import HuggingFaceTokenizer, TokenizerBase
+from .fts_tokenizer import FTSTokenizer, JiebaFTSTokenizer
 
 
 __all__ = [
@@ -15,4 +16,6 @@ __all__ = [
     "CodeFenceScanner",
     "TokenizerBase",
     "HuggingFaceTokenizer",
+    "FTSTokenizer",
+    "JiebaFTSTokenizer",
 ]

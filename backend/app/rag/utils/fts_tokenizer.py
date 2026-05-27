@@ -66,6 +66,10 @@ class FTSTokenizer(Protocol):
         """将查询文本处理为 FTS5 MATCH 表达式（用于构建 FTS 查询语句）"""
         ...
 
+    def build_match_expr_from_expanded_tokens(self, tokens: list[str]) -> str:
+        """从扩展查询生成的关键词列表构建 MATCH 表达式"""
+        ...
+
 
 class JiebaFTSTokenizer:
     """基于 jieba 的中英文混合分词器"""
@@ -233,7 +237,7 @@ class JiebaFTSTokenizer:
 
         topK = max(3, MAX_QUERY_TOKENS - len(en_tokens))  # 中文关键词检索数量
         chinese_text = "".join(CHINESE_RE.findall(text))
-        cn_keywords: list[str] = (
+        cn_keywords = (
             jieba.analyse.extract_tags(chinese_text, topK=topK) if chinese_text else []
         )
 
@@ -260,3 +264,23 @@ class JiebaFTSTokenizer:
         if n <= 5 and all(len(t.rstrip("*")) > 3 for t in expr_tokens):
             return " AND ".join(expr_tokens)
         return " OR ".join(expr_tokens)
+
+    def build_match_expr_from_expanded_tokens(self, tokens: list[str]) -> str:
+        """
+        从扩展查询生成的关键词列表构建 MATCH 表达式。
+        """
+        # 区分中英文 token
+        cn_tokens = []
+        en_tokens = []
+        for t in tokens:
+            if CHINESE_RE.search(t):
+                cn_tokens.append(t)
+            else:
+                token = _sanitize_fts5(t.lower())
+                if token and not _PUNCT_ONLY_RE.match(token):
+                    en_tokens.append(
+                        token if _SPECIAL_EN_RE.search(token) else f"{token}*"
+                    )
+
+        # 构建 MATCH 表达式
+        return self._build_match_expr(cn_tokens, en_tokens)
