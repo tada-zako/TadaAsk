@@ -10,6 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # 后端项目根路径，指向 backend/ 目录
 PROJECT_ROOT = pathlib.Path(__file__).parents[2]
 
+# 类型别名
+type EmbeddingBackend = Literal["fastembed", "llamacpp"]  # 文本嵌入后端
+
 
 class Settings(BaseSettings):
     project_root: str = str(PROJECT_ROOT)
@@ -18,8 +21,8 @@ class Settings(BaseSettings):
     # LLM 配置
     # =======================================
 
-    llm_provider_admin: str = "google"  # Admin LLM 提供商，默认为 "google"
-    llm_provider_visitor: str = "deepseek"  # Visitor LLM 提供商，默认为 "deepseek"
+    llm_provider_admin: str = "google"  # Admin LLM 提供商
+    llm_provider_visitor: str = "deepseek"  # Visitor LLM 提供商
 
     # Gemini LLM 配置
     gemini_api_key: str = ""
@@ -37,12 +40,8 @@ class Settings(BaseSettings):
     # RAG 相关配置
     # =======================================
 
-    embedding_backend: Literal["fastembed", "llamacpp"] = (
-        "fastembed"  # 文本嵌入后端，默认为 "fastembed"
-    )
-    rerank_backend: Literal["fastembed", "llamacpp"] = (
-        "fastembed"  # Rerank 后端，默认为 "fastembed"
-    )
+    embedding_backend: EmbeddingBackend = "fastembed"  # 文本嵌入后端
+    rerank_backend: EmbeddingBackend = "fastembed"  # Rerank 后端
     hyde_enabled: bool = False  # 是否启用 HyDE 生成虚拟文档增强检索，默认为 False
 
     embedding_model_name: str = ""  # 文本嵌入模型名称，默认由具体嵌入实现内部处理
@@ -62,11 +61,11 @@ class Settings(BaseSettings):
     # 系统配置
     # =======================================
 
-    vector_store_perf: str = "chromadb"  # 向量库配置，默认为 "chromadb"
+    vector_store_perf: str = "chromadb"  # 向量库配置
 
     # 模型缓存路径
-    fastembed_model_path: str = ""  # FastEmbed 模型路径，默认由 fastembed 内部处理
-    llamacpp_model_path: str = ""  # LLaMA.cpp 模型路径，默认由 llamacpp 内部处理
+    fastembed_model_path: str = ""  # FastEmbed 模型路径
+    llamacpp_model_path: str = ""  # LLaMA.cpp 模型路径
     hf_hub_cache: str = ""  # HuggingFace Hub 模型缓存路径
 
     chromadb_path: str = ""  # ChromaDB 数据库文件存储路径

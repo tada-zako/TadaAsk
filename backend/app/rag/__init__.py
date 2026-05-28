@@ -5,11 +5,12 @@ from .text_splitter import (
     TokenAwareTextSplitter,
     ASTAwareTextSplitter,
 )
-from .embedding import EmbeddingProvider, FastEmbeddingAdapter
-from .utils.tokenizer import TokenizerBase, HuggingFaceTokenizer
-from .rerank import RerankProvider, FastRerankAdapter
+from .embedding import EmbeddingProvider
+from .utils.tokenizer import TokenizerBase
+from .rerank import RerankProvider
 from .query_expand import QueryExpander, ExpandedQuery
-from app.core.config import settings
+from .fts import FTSProvider
+from app.core.config import EmbeddingBackend
 
 __all__ = [
     "VectorQueryResult",
@@ -20,25 +21,38 @@ __all__ = [
     "TokenAwareTextSplitter",
     "ASTAwareTextSplitter",
     "EmbeddingProvider",
-    "FastEmbeddingAdapter",
     "TokenizerBase",
-    "HuggingFaceTokenizer",
     "RerankProvider",
-    "FastRerankAdapter",
     "QueryExpander",
     "ExpandedQuery",
+    "FTSProvider",
 ]
 
 
 def vector_db_factory(
-    vector_store: str | None = None,
+    vector_store: str,
 ) -> VectorDatabase:
     """
     向量库工厂函数，根据配置返回对应的 VectorDatabase 实例。
     NOTE: 目前仅支持 ChromaDB。
     """
-    v_name = (vector_store or settings.vector_store_perf or "chromadb").lower()
-
-    if v_name == "chromadb":
+    if vector_store == "chromadb":
         return ChromaDB()
-    raise ValueError(f"Unsupported vector store provider: {v_name}")
+    raise ValueError(f"Unsupported vector store provider: {vector_store}")
+
+
+def embedding_provider_factory(
+    embedding_mode: EmbeddingBackend, model_name: str, cache_dir: str | None = None
+) -> EmbeddingProvider:
+    """
+    向量化服务工厂函数，根据配置返回对应的 EmbeddingProvider 实例。
+    NOTE: 目前仅支持 FastEmbeddingAdapter（基于 HuggingFace 模型的适配器）。
+    """
+    if embedding_mode == "fastembed":
+        from .embedding import FastEmbeddingAdapter
+
+        return FastEmbeddingAdapter(
+            model_name=model_name,
+            cache_dir=cache_dir,
+        )
+    raise ValueError(f"Unsupported embedding provider: {embedding_mode}")

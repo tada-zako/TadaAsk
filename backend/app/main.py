@@ -9,10 +9,9 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.security import get_password_hash
-from app.db import init_db
-from app.db.config import async_session
+from app.db import init_db, async_session
 from app.db.schemas import AdminCreate
-from app.rag import vector_db_factory
+from app.rag import vector_db_factory, embedding_provider_factory, EmbeddingProvider
 from app.crud import AdminCRUD
 from app.api import admin, visitor
 
@@ -54,8 +53,15 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up the application...")
     await init_db()  # 初始化数据库连接
 
-    # 挂载向量库实例到 app.state，供全局使用
+    # 挂载向量库实例
     app.state.vector_db = vector_db_factory()
+    # 挂载 EmbeddingProvider 实例
+    embedding_provider: EmbeddingProvider = embedding_provider_factory(
+        embedding_mode=settings.embedding_backend,
+        model_name=settings.fastembed_model_path,
+        cache_dir=settings.hf_hub_cache,
+    )
+    app.state.embedding = embedding_provider
 
     # MVP 实现：在应用启动时验证管理员账号，如果不存在则创建一个默认管理员
     await valid_or_create_admin()
