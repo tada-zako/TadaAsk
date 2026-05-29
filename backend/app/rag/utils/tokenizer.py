@@ -6,7 +6,7 @@ from huggingface_hub import hf_hub_download
 from app.core.config import settings
 
 
-class TokenizerBase(Protocol):
+class EmbeddingTokenizer(Protocol):
     """Tokenizer 协议接口，定义 tokenize 和 detokenize 方法"""
 
     def tokenize(self, text: str) -> list[int]:
