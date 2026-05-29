@@ -12,6 +12,7 @@ PROJECT_ROOT = pathlib.Path(__file__).parents[2]
 
 # 类型别名
 type EmbeddingBackend = Literal["fastembed", "llamacpp"]  # 文本嵌入后端
+type RerankBackend = Literal["fastembed", "llamacpp"]  # Rerank 后端
 
 
 class Settings(BaseSettings):
@@ -41,7 +42,7 @@ class Settings(BaseSettings):
     # =======================================
 
     embedding_backend: EmbeddingBackend = "fastembed"  # 文本嵌入后端
-    rerank_backend: EmbeddingBackend = "fastembed"  # Rerank 后端
+    rerank_backend: RerankBackend = "fastembed"  # Rerank 后端
     hyde_enabled: bool = False  # 是否启用 HyDE 生成虚拟文档增强检索，默认为 False
 
     embedding_model_name: str = ""  # 文本嵌入模型名称，默认由具体嵌入实现内部处理

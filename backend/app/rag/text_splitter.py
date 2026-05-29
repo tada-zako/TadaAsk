@@ -8,7 +8,7 @@ from .utils import (
     CodeFenceScanner,
     Breakpoint,
     CodeFence,
-    TokenizerBase,
+    EmbeddingTokenizer,
 )
 from app.core.config import settings
 
@@ -42,7 +42,7 @@ class TokenAwareTextSplitter:
 
     def __init__(
         self,
-        tokenizer: TokenizerBase,
+        tokenizer: EmbeddingTokenizer,
         chunk_tokens: int = settings.chunk_size_tokens,
         overlap_tokens: int = settings.chunk_overlap_tokens,
         window_tokens: int = settings.chunk_window_tokens,

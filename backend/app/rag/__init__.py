@@ -1,4 +1,4 @@
-from .chromadb import VectorQueryResult, VectorDatabase, ChromaDB
+from .chromadb import VectorQueryResult, VectorDatabase
 from .text_splitter import (
     TextChunk,
     TextSplitter,
@@ -6,22 +6,21 @@ from .text_splitter import (
     ASTAwareTextSplitter,
 )
 from .embedding import EmbeddingProvider
-from .utils.tokenizer import TokenizerBase
+from .utils import EmbeddingTokenizer
 from .rerank import RerankProvider
 from .query_expand import QueryExpander, ExpandedQuery
 from .fts import FTSProvider
-from app.core.config import EmbeddingBackend
+from app.core.config import EmbeddingBackend, RerankBackend
 
 __all__ = [
     "VectorQueryResult",
     "VectorDatabase",
-    "ChromaDB",
     "TextChunk",
     "TextSplitter",
     "TokenAwareTextSplitter",
     "ASTAwareTextSplitter",
     "EmbeddingProvider",
-    "TokenizerBase",
+    "EmbeddingTokenizer",
     "RerankProvider",
     "QueryExpander",
     "ExpandedQuery",
@@ -37,6 +36,8 @@ def vector_db_factory(
     NOTE: 目前仅支持 ChromaDB。
     """
     if vector_store == "chromadb":
+        from .chromadb import ChromaDB
+
         return ChromaDB()
     raise ValueError(f"Unsupported vector store provider: {vector_store}")
 
@@ -56,3 +57,20 @@ def embedding_provider_factory(
             cache_dir=cache_dir,
         )
     raise ValueError(f"Unsupported embedding provider: {embedding_mode}")
+
+
+def rerank_provider_factory(
+    rerank_mode: RerankBackend, model_name: str, cache_dir: str | None = None
+) -> RerankProvider:
+    """
+    Rerank 服务工厂函数，根据配置返回对应的 RerankProvider 实例。
+    NOTE: 目前仅支持 FastRerankAdapter（基于 HuggingFace 模型的适配器）。
+    """
+    if rerank_mode == "fastembed":
+        from .rerank import FastRerankAdapter
+
+        return FastRerankAdapter(
+            model_name=model_name,
+            cache_dir=cache_dir,
+        )
+    raise ValueError(f"Unsupported rerank provider: {rerank_mode}")
