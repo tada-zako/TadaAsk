@@ -6,7 +6,7 @@ from .text_splitter import (
     ASTAwareTextSplitter,
 )
 from .embedding import EmbeddingProvider
-from .utils import EmbeddingTokenizer
+from .utils import EmbeddingTokenizer, embedding_tokenizer_factory
 from .rerank import RerankProvider
 from .query_expand import QueryExpander, ExpandedQuery
 from .fts import FTSProvider
@@ -21,6 +21,7 @@ __all__ = [
     "ASTAwareTextSplitter",
     "EmbeddingProvider",
     "EmbeddingTokenizer",
+    "embedding_tokenizer_factory",
     "RerankProvider",
     "QueryExpander",
     "ExpandedQuery",

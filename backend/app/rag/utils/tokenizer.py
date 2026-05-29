@@ -3,8 +3,6 @@ from typing import Protocol
 from tokenizers import Tokenizer
 from huggingface_hub import hf_hub_download
 
-from app.core.config import settings
-
 
 class EmbeddingTokenizer(Protocol):
     """Tokenizer 协议接口，定义 tokenize 和 detokenize 方法"""
@@ -21,9 +19,7 @@ class EmbeddingTokenizer(Protocol):
 class HuggingFaceTokenizer:
     """基于 HuggingFace Hub 模型的 Tokenizer 适配器"""
 
-    def __init__(self, model_name: str):
-        cache_dir = settings.hf_hub_cache or None
-
+    def __init__(self, model_name: str, cache_dir: str | None = None):
         # 下载 tokenizer 配置文件，获取 tokenizer.json 的本地路径
         try:
             tokenizer_path = hf_hub_download(
