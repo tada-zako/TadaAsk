@@ -237,9 +237,9 @@ class JiebaFTSTokenizer:
 
         topK = max(3, MAX_QUERY_TOKENS - len(en_tokens))  # 中文关键词检索数量
         chinese_text = "".join(CHINESE_RE.findall(text))
-        cn_keywords = (
+        cn_keywords: list[str] = (
             jieba.analyse.extract_tags(chinese_text, topK=topK) if chinese_text else []
-        )
+        )  # type: ignore
 
         keywords = list(dict.fromkeys(cn_keywords + en_tokens))
         return " OR ".join(keywords) if keywords else ""

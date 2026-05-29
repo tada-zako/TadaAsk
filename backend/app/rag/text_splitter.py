@@ -10,7 +10,6 @@ from .utils import (
     CodeFence,
     EmbeddingTokenizer,
 )
-from app.core.config import settings
 
 
 AVG_CHARS_PER_TOKEN_ESTIMATE = 3  # 粗略估计平均每个 token 约为 3 个字符
@@ -43,9 +42,9 @@ class TokenAwareTextSplitter:
     def __init__(
         self,
         tokenizer: EmbeddingTokenizer,
-        chunk_tokens: int = settings.chunk_size_tokens,
-        overlap_tokens: int = settings.chunk_overlap_tokens,
-        window_tokens: int = settings.chunk_window_tokens,
+        chunk_tokens: int,
+        overlap_tokens: int,
+        window_tokens: int,
         splitter_strategy: Literal["ast", "markdown"] = "ast",
     ):
         """
@@ -168,9 +167,9 @@ class ASTAwareTextSplitter:
 
     def __init__(
         self,
-        chunk_size: int = settings.chunk_size_chars,
-        chunk_overlap: int = settings.chunk_overlap_chars,
-        window_size: int = settings.chunk_window_chars,
+        chunk_size: int,
+        chunk_overlap: int,
+        window_size: int,
         splitter_strategy: Literal["ast", "markdown"] = "ast",
     ):
         """
