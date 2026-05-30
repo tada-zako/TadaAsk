@@ -29,30 +29,35 @@ class EmbeddingProvider(Protocol):
         ...
 
 
-def map_hf_to_fastembed(model_name: str) -> str:
-    """
-    将 HuggingFace 模型名称映射为 fastembed 内部名称
-    TODO: 该函数放置到顶层创建 EmbeddingProvider 时调用，方便 rerank 部分复用
-    """
-    # 将 HF 格式的 model_name 映射为 fastembed 内部名称，找不到则原样传入
-    hf_to_fastembed = {
-        info["sources"]["hf"]: info["model"]
-        for info in TextEmbedding.list_supported_models()
-        if info["sources"].get("hf")
-    }
-    return hf_to_fastembed.get(model_name, model_name)
-
-
 class FastEmbeddingAdapter:
     """基于 fastembed 的文本嵌入适配器"""
 
     def __init__(self, model_name: str, cache_dir: str | None = None):
-        self._model_name = model_name
+        self._model_name = self._map_hf_to_fastembed(model_name)
         self._cache_dir = cache_dir
 
         self.embedding = TextEmbedding(
             model_name=self._model_name, cache_dir=self._cache_dir
         )
+
+    def _map_hf_to_fastembed(self, model_name: str) -> str:
+        """
+        将 HuggingFace 模型名称映射为 fastembed 内部名称
+        """
+        # 未传入模型名称，使用默认
+        if not model_name:
+            return "BAAI/bge-small-en-v1.5"
+
+        hf_to_fastembed = {
+            info["sources"]["hf"]: info["model"]
+            for info in TextEmbedding.list_supported_models()
+            if info["sources"].get("hf")
+        }
+        if model_name in hf_to_fastembed:
+            return hf_to_fastembed[model_name]
+        else:
+            # 如果没有映射关系，直接返回原名称，交由 fastembed 内部处理
+            return model_name
 
     def embed_documents(self, documents: list[str]) -> list[list[float]]:
         """将文档列表转换为嵌入向量列表"""
