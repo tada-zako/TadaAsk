@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI):
     # 挂载 embedding tokenizer 实例
     embedding_tokenizer: EmbeddingTokenizer = embedding_tokenizer_factory(
         embedding_mode=settings.embedding_backend,
-        model_name=settings.fastembed_model_path,
+        model_name=settings.embedding_model_name,
         cache_dir=settings.hf_hub_cache,
     )
     app.state.embedding_tokenizer = embedding_tokenizer
@@ -87,17 +87,11 @@ async def lifespan(app: FastAPI):
     app.state.text_splitter = text_splitter
     # 挂载 EmbeddingProvider 实例
     embedding_provider: EmbeddingProvider = embedding_provider_factory(
-        embedding_mode=settings.embedding_backend,
-        model_name=settings.fastembed_model_path,
-        cache_dir=settings.hf_hub_cache,
+        settings=settings
     )
     app.state.embedding = embedding_provider
     # 挂载 RerankProvider 实例
-    rerank_provider: RerankProvider = rerank_provider_factory(
-        rerank_mode=settings.rerank_backend,
-        model_name=settings.fastembed_model_path,
-        cache_dir=settings.hf_hub_cache,
-    )
+    rerank_provider: RerankProvider = rerank_provider_factory(settings=settings)
     app.state.rerank = rerank_provider
 
     # MVP 实现：在应用启动时验证管理员账号，如果不存在则创建一个默认管理员

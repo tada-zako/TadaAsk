@@ -10,7 +10,7 @@ from .utils import EmbeddingTokenizer, embedding_tokenizer_factory
 from .rerank import RerankProvider
 from .query_expand import QueryExpander, ExpandedQuery
 from .fts import FTSProvider
-from app.core.config import EmbeddingBackend, RerankBackend
+from app.core.config import Settings
 
 __all__ = [
     "VectorQueryResult",
@@ -43,35 +43,34 @@ def vector_db_factory(
     raise ValueError(f"Unsupported vector store provider: {vector_store}")
 
 
-def embedding_provider_factory(
-    embedding_mode: EmbeddingBackend, model_name: str, cache_dir: str | None = None
-) -> EmbeddingProvider:
+def embedding_provider_factory(settings: Settings) -> EmbeddingProvider:
     """
     向量化服务工厂函数，根据配置返回对应的 EmbeddingProvider 实例。
     NOTE: 目前仅支持 FastEmbeddingAdapter（基于 HuggingFace 模型的适配器）。
+    NOTE: 该工厂函数传递 Settings 对象，是由于 FastEmbedding
+            和 LlamaCppEmbedding 使用的cache_dir 配置项不同，
+            不方便通过函数参数传递
     """
-    if embedding_mode == "fastembed":
+    if settings.embedding_backend == "fastembed":
         from .embedding import FastEmbeddingAdapter
 
         return FastEmbeddingAdapter(
-            model_name=model_name,
-            cache_dir=cache_dir,
+            model_name=settings.embedding_model_name,
+            cache_dir=settings.fastembed_model_path,
         )
-    raise ValueError(f"Unsupported embedding provider: {embedding_mode}")
+    raise ValueError(f"Unsupported embedding provider: {settings.embedding_backend}")
 
 
-def rerank_provider_factory(
-    rerank_mode: RerankBackend, model_name: str, cache_dir: str | None = None
-) -> RerankProvider:
+def rerank_provider_factory(settings: Settings) -> RerankProvider:
     """
     Rerank 服务工厂函数，根据配置返回对应的 RerankProvider 实例。
     NOTE: 目前仅支持 FastRerankAdapter（基于 HuggingFace 模型的适配器）。
     """
-    if rerank_mode == "fastembed":
+    if settings.rerank_backend == "fastembed":
         from .rerank import FastRerankAdapter
 
         return FastRerankAdapter(
-            model_name=model_name,
-            cache_dir=cache_dir,
+            model_name=settings.embedding_model_name,
+            cache_dir=settings.fastembed_model_path,
         )
-    raise ValueError(f"Unsupported rerank provider: {rerank_mode}")
+    raise ValueError(f"Unsupported rerank provider: {settings.rerank_backend}")
