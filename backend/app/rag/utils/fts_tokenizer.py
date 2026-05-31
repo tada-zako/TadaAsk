@@ -31,11 +31,9 @@ HIT_STOP_WORDS_FILE = (
 )  # jieba.analyse 停用词
 
 
-def _get_stop_words(file_path: str | Path | None = None) -> set[str]:
+def _get_stop_words(input_file: str | None = None) -> set[str]:
     """从文件中加载停用词列表"""
-    if file_path is None:
-        file_path = HYBRID_STOP_WORDS_FILE
-    file_path = Path(file_path)
+    file_path = Path(input_file) if input_file else HYBRID_STOP_WORDS_FILE
 
     if not file_path.is_file():
         raise FileNotFoundError(f"stop words file not found: {file_path}")
@@ -79,9 +77,9 @@ class JiebaFTSTokenizer:
         *,
         cut_all: bool = False,
         use_hmm: bool = True,
-        stop_words_file: str | Path | None = None,
-        jieba_stop_words_path: str | Path | None = None,
-        jieba_idf_path: str | Path | None = None,
+        stop_words_file: str | None = None,
+        jieba_stop_words_path: str | None = None,
+        jieba_idf_path: str | None = None,
     ):
         """
         Args:

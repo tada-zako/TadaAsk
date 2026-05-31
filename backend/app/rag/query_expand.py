@@ -32,7 +32,8 @@ class QueryExpander:
         self._completer = completer
 
     async def expand_query(self, query: str) -> ExpandedQuery:
-        """生成扩展查询
+        """
+        生成扩展查询
 
         Args:
             query (str): 原始用户查询

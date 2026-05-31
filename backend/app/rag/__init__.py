@@ -6,10 +6,9 @@ from .text_splitter import (
     ASTAwareTextSplitter,
 )
 from .embedding import EmbeddingProvider
-from .utils import EmbeddingTokenizer, embedding_tokenizer_factory
 from .rerank import RerankProvider
 from .query_expand import QueryExpander, ExpandedQuery
-from .fts import FTSProvider
+from .fts import FTSProvider, SQLiteFTSProvider
 from app.core.config import Settings
 
 __all__ = [
@@ -20,12 +19,11 @@ __all__ = [
     "TokenAwareTextSplitter",
     "ASTAwareTextSplitter",
     "EmbeddingProvider",
-    "EmbeddingTokenizer",
-    "embedding_tokenizer_factory",
     "RerankProvider",
     "QueryExpander",
     "ExpandedQuery",
     "FTSProvider",
+    "SQLiteFTSProvider",
 ]
 
 

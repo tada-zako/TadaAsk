@@ -14,14 +14,20 @@ from app.db.schemas import AdminCreate
 from app.rag import (
     vector_db_factory,
     VectorDatabase,
-    EmbeddingTokenizer,
-    embedding_tokenizer_factory,
     TextSplitter,
     TokenAwareTextSplitter,
     embedding_provider_factory,
     EmbeddingProvider,
     rerank_provider_factory,
     RerankProvider,
+    FTSProvider,
+    SQLiteFTSProvider,
+)
+from app.rag.utils import (
+    EmbeddingTokenizer,
+    embedding_tokenizer_factory,
+    FTSTokenizer,
+    JiebaFTSTokenizer,
 )
 from app.crud import AdminCRUD
 from app.api import admin, visitor
@@ -62,13 +68,16 @@ async def lifespan(app: FastAPI):
     """
 
     logger.info("Starting up the application...")
-    await init_db()  # 初始化数据库连接
+    # ======= 初始化数据库连接 =======
+    await init_db()
 
+    # ====== 初始化 RAG 组件实例 ======
     # 挂载向量库实例
     vector_db: VectorDatabase = vector_db_factory(
         vector_store=settings.vector_store_perf
     )
     app.state.vector_db = vector_db
+
     # 挂载 embedding tokenizer 实例
     embedding_tokenizer: EmbeddingTokenizer = embedding_tokenizer_factory(
         embedding_mode=settings.embedding_backend,
@@ -85,6 +94,19 @@ async def lifespan(app: FastAPI):
         splitter_strategy="ast",
     )
     app.state.text_splitter = text_splitter
+    # 创建 FTS 分词器实例
+    fts_tokenizer: FTSTokenizer = JiebaFTSTokenizer(
+        cut_all=False,
+        use_hmm=True,
+        stop_words_file=None,
+        jieba_stop_words_path=None,
+        jieba_idf_path=None,
+    )
+
+    # 挂载 FTS Search Provider 实例
+    fts_search_provider: FTSProvider = SQLiteFTSProvider(tokenizer=fts_tokenizer)
+    app.state.fts_search_provider = fts_search_provider
+
     # 挂载 EmbeddingProvider 实例
     embedding_provider: EmbeddingProvider = embedding_provider_factory(
         settings=settings
