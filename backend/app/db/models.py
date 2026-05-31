@@ -236,8 +236,6 @@ class DocumentContent(Base):
     __tablename__ = "document_contents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str]  # 文档标题，冗余数据，兼容 FTS 外部数据模式
-    tokens: Mapped[str]  # 应用层文档的分词结果
     document_content: Mapped[str] = mapped_column(String)  # 文档的原始文本内容
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -261,10 +259,11 @@ class DocumentChunk(Base):
     vector_id: Mapped[str] = mapped_column(
         String, unique=True, nullable=False
     )  # 向量 ID，切片的唯一标识
-    chunk_index: Mapped[int]  # 切片索引，表示该切片在原始文档中的位置
+    chunk_index: Mapped[int]  # 切片索引：切片在原文档中的排序位置
     chunk_hash: Mapped[str]  # 切片内容的哈希值，用于去重和校验
-    # raw_text: Mapped[str]  # 切片的原始文本内容
-    chunk_pos: Mapped[int]  # 切片在原始文档中的起始位置
+    chunk_content: Mapped[str]  # 切片的原始文本内容
+    chunk_tokens: Mapped[str]  # 切片内容的分词结果：提供 FTS 支持
+    # chunk_pos: Mapped[int]  # 切片在原始文档中的起始位置
 
     # TODO: 后期来源追溯功能实现预备扩展
     page_number: Mapped[Optional[int]] = mapped_column(
