@@ -8,7 +8,7 @@ from .text_splitter import (
 from .embedding import EmbeddingProvider
 from .rerank import RerankProvider
 from .query_expand import QueryExpander, ExpandedQuery
-from .fts import FTSProvider, SQLiteFTSProvider
+from .fts import FTSProvider, SQLiteFTSProvider, FTSResult
 from app.core.config import Settings
 
 __all__ = [
@@ -22,6 +22,7 @@ __all__ = [
     "RerankProvider",
     "QueryExpander",
     "ExpandedQuery",
+    "FTSResult",
     "FTSProvider",
     "SQLiteFTSProvider",
 ]

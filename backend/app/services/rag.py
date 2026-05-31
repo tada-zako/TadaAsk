@@ -4,9 +4,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
-from app.rag import VectorQueryItem, VectorDatabase
+from app.rag import (
+    VectorQueryResult,
+    VectorDatabase,
+    EmbeddingProvider,
+    RerankProvider,
+    FTSProvider,
+    QueryExpander,
+)
 from app.rag.file_parser import FileParser
-from app.db.models import Source, SourceItem
+from app.providers import Message
+from app.db.models import Source, SourceItem, DocumentContent, DocumentChunk
 from app.db.schemas import (
     SourceInternal,
     SourceRead,
@@ -15,18 +23,69 @@ from app.db.schemas import (
 from app.utils.calcu_file_hash import calculate_file_hash
 
 # TODO: 需要完整重构，新增的 Project 模型尚未与 Service 集成
-# TODO: 这里的重构逻辑还需要额外考虑
+
+# TODO: "chat messages 构建方法后续提升到 Service 层，确保 messages 构建与 Provider 无关"
+# def build_chat_messages(
+#     self,
+#     document: list[VectorQueryItem],
+#     user_message: str,
+#     chat_history: list[ChatMessageInternal] | None = None,
+# ) -> list[Message]:
+#     """
+#     构建符合 Gemini LLM 请求接口格式的消息实例
+#     """
+#     history_contents: list[types.ContentOrDict] | None = None
+#     if chat_history:
+#         history_contents = [
+#             types.Content(
+#                 role="model" if entry.role == "assistant" else "user",
+#                 parts=[types.Part(text=entry.message)],
+#             )
+#             for entry in chat_history
+#         ]
+
+#     # NOTE: 目前只提供静态系统提示词
+#     system_prompt = DEFAULT_SYSTEM_PROMPT
+
+#     if document:
+#         # 允许 document 为空
+#         context = "\n<Context>\n"
+#         for doc in document:
+#             context += (
+#                 f"[context{doc.id}]:\n{doc.document}\n"
+#                 + f"Metadata: {doc.metadata}\n\n"
+#             )
+#         context += "</Context>\n"
+
+#         user_message = (
+#             context + "\n<user_message>\n" + user_message + "\n</user_message>\n"
+#         )
+
+#     return [
+#         Message(role="system", content=system_prompt),
+#     ]
 
 
 class RAGService:
-    def __init__(self, session: AsyncSession, vector_db: VectorDatabase):
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        vector_db: VectorDatabase,
+        embedding: EmbeddingProvider,
+        query_expander: QueryExpander,
+        reranker: RerankProvider,
+        fts_provider: FTSProvider,
+    ):
         """
-        Args:
-            session: 数据库会话，提供数据库操作接口，通过外部 IoC 反向注入
-            vector_db: VectorDatabase 实例，提供向量库操作接口，通过外部 IoC 反向注入
+        具体的参数由依赖注入传入
         """
         self.session = session
         self.vector_db = vector_db
+        self.embedding = embedding
+        self.query_expander = query_expander
+        self.reranker = reranker
+        self.fts_provider = fts_provider
 
     async def create_collection(self, source_data: SourceInternal) -> SourceRead:
         """创建新的 self.vector_db 集合"""
