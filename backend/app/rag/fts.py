@@ -11,7 +11,7 @@ from .utils import FTSTokenizer
 class FTSResult:
     """FTS 检索结果"""
 
-    doc_id: int
+    chunk_id: int  # 匹配到的 chunk ID
     score: float
 
 
@@ -116,7 +116,7 @@ class SQLiteFTSProvider:
         rows = await session.execute(
             text(
                 """
-                SELECT rowid, bm25(documents_fts, 3.0, 1.0) AS bm25_score
+                SELECT rowid, bm25(documents_fts) AS bm25_score
                 FROM documents_fts
                 WHERE documents_fts MATCH :query
                 ORDER BY bm25_score ASC
@@ -126,10 +126,10 @@ class SQLiteFTSProvider:
             {"query": fts_query, "limit": limit},
         )
 
-        return [FTSResult(doc_id=row.rowid, score=row.bm25_score) for row in rows]
+        return [FTSResult(chunk_id=row.rowid, score=row.bm25_score) for row in rows]
 
     async def index_document(
-        self, session: AsyncSession, *, doc_id: int, title: str, content: str
+        self, session: AsyncSession, *, doc_id: int, content: str
     ) -> None:
         """将文档内容索引到 FTS 虚表中"""
         # NOTE: 暂不清楚用处，保留接口以备后续实现增量索引或其他索引维护策略
@@ -137,14 +137,13 @@ class SQLiteFTSProvider:
         await session.execute(
             text(
                 """
-                INSERT INTO document_contents (rowid, title, tokens)
-                VALUES (:doc_id, :title, :tokens)
+                INSERT INTO document_contents (rowid, chunk_tokens)
+                VALUES (:doc_id, :chunk_tokens)
                 ON CONFLICT(rowid) DO UPDATE SET
-                    title=excluded.title,
-                    tokens=excluded.tokens
+                    chunk_tokens=excluded.chunk_tokens
                 """
             ),
-            {"doc_id": doc_id, "title": title, "tokens": tokens},
+            {"doc_id": doc_id, "chunk_tokens": tokens},
         )
 
     async def remove_document(self, session: AsyncSession, doc_id: int) -> None:

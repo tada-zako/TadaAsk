@@ -18,8 +18,8 @@ _FTS_DDLS: list[str] = [
     """
     CREATE TRIGGER IF NOT EXISTS documents_fts_ai 
     AFTER INSERT ON document_chunks BEGIN
-        INSERT INTO documents_fts(rowid, tokens)
-        VALUES (new.id, new.tokens);
+        INSERT INTO documents_fts(rowid, chunk_tokens)
+        VALUES (new.id, new.chunk_tokens);
     END
     """,
     # 3. UPDATE 触发器
@@ -27,20 +27,20 @@ _FTS_DDLS: list[str] = [
     CREATE TRIGGER IF NOT EXISTS documents_fts_au
     AFTER UPDATE ON document_chunks BEGIN
         -- 删除旧文档
-        INSERT INTO documents_fts(documents_fts, rowid, tokens)
-        VALUES('delete', old.id, old.tokens);
+        INSERT INTO documents_fts(documents_fts, rowid, chunk_tokens)
+        VALUES('delete', old.id, old.chunk_tokens);
 
         -- 插入新文档
-        INSERT INTO documents_fts(rowid, tokens)
-        VALUES (new.id, new.tokens);
+        INSERT INTO documents_fts(rowid, chunk_tokens)
+        VALUES (new.id, new.chunk_tokens);
     END
     """,
     # 4. DELETE 触发器
     """
     CREATE TRIGGER IF NOT EXISTS documents_fts_ad
     AFTER DELETE ON document_chunks BEGIN
-        INSERT INTO documents_fts(documents_fts, rowid, tokens)
-        VALUES('delete', old.id, old.tokens);
+        INSERT INTO documents_fts(documents_fts, rowid, chunk_tokens)
+        VALUES('delete', old.id, old.chunk_tokens);
     END
     """,
 ]
