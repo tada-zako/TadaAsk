@@ -1,30 +1,32 @@
 from typing import Protocol
 
 from fastembed import TextEmbedding
+from numpy.typing import NDArray
+import numpy as np
 
 
 class EmbeddingProvider(Protocol):
     """文档嵌入协议"""
 
-    def embed_documents(self, documents: list[str]) -> list[list[float]]:
+    def embed_documents(self, documents: list[str]) -> list[NDArray[np.float32]]:
         """将文本列表转换为嵌入向量列表
 
         Args:
             documents (list[str]): 待转换的文本列表
 
         Returns:
-            list[list[float]]: 转换后的嵌入向量列表
+            list[NDArray[np.float32]]: 转换后的嵌入向量列表
         """
         ...
 
-    def embed_query(self, query: str) -> list[float]:
+    def embed_query(self, query: str) -> NDArray[np.float32]:
         """将查询文本转换为嵌入向量
 
         Args:
             query (str): 待转换的查询文本
 
         Returns:
-            list[float]: 转换后的查询嵌入向量
+            NDArray[np.float32]: 转换后的查询嵌入向量
         """
         ...
 
@@ -59,17 +61,15 @@ class FastEmbeddingAdapter:
             # 如果没有映射关系，直接返回原名称，交由 fastembed 内部处理
             return model_name
 
-    def embed_documents(self, documents: list[str]) -> list[list[float]]:
+    def embed_documents(self, documents: list[str]) -> list[NDArray[np.float32]]:
         """将文档列表转换为嵌入向量列表"""
-        return [list(e) for e in self.embedding.embed(documents)]
+        return [e.astype(np.float32) for e in self.embedding.embed(documents)]
 
-    def embed_query(self, query: str) -> list[float]:
+    def embed_query(self, query: str) -> NDArray[np.float32]:
         """将查询文本转换为嵌入向量"""
         try:
             first_item = next(iter(self.embedding.query_embed([query])))
-            result_list = list(first_item)
+            return first_item.astype(np.float32)
         except StopIteration:
             # 处理空迭代器的情况
-            result_list = []
-
-        return result_list
+            return np.array([], dtype=np.float32)
