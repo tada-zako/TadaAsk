@@ -258,7 +258,7 @@ class DocumentChunk(Base):
 
     vector_id: Mapped[str] = mapped_column(
         String, unique=True, nullable=False
-    )  # 向量 ID，切片的唯一标识
+    )  # 向量 ID，切片的唯一标识 = item_hash + chunk_index
     chunk_index: Mapped[int]  # 切片索引：切片在原文档中的排序位置
     chunk_hash: Mapped[str]  # 切片内容的哈希值，用于去重和校验
     chunk_content: Mapped[str]  # 切片的原始文本内容

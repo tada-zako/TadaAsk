@@ -1,9 +1,9 @@
 from typing import Protocol, runtime_checkable, Any
 from pathlib import Path
+from dataclasses import dataclass
 
 from chromadb import PersistentClient, Collection as ChromaCollection
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
-from pydantic import BaseModel, Field
 from numpy.typing import NDArray
 import numpy as np
 from loguru import logger
@@ -11,10 +11,10 @@ from loguru import logger
 from app.core.config import settings
 
 
-class VectorQueryResult(BaseModel):
-    id: str
-    document: str
-    metadata: dict[str, Any] = Field(default_factory=dict)
+@dataclass
+class VectorQueryResult:
+    vector_id: str  # 向量 ID
+    metadata: dict[str, Any]
     distance: float
 
 
@@ -56,7 +56,7 @@ class VectorDatabase(Protocol):
 
     def query_collection(
         self,
-        query_embedding: list[float],
+        query_embedding: NDArray[np.float32],
         collection: Any,
         top_k: int = 5,
     ) -> list[VectorQueryResult]:
@@ -122,7 +122,7 @@ class ChromaDB:
 
     def query_collection(
         self,
-        query_embedding: list[float],
+        query_embedding: NDArray[np.float32],
         collection: ChromaCollection,
         top_k: int = 5,
     ) -> list[VectorQueryResult]:
@@ -133,18 +133,16 @@ class ChromaDB:
         )
 
         ids = (results["ids"] or [[]])[0]
-        docs = (results["documents"] or [[]])[0]
         metas = (results["metadatas"] or [[]])[0]
         distances = (results["distances"] or [[]])[0]
 
         return [
             VectorQueryResult(
-                id=id,
-                document=doc,
+                vector_id=id,
                 metadata=dict(meta),
                 distance=dis,
             )
-            for id, doc, meta, dis in zip(ids, docs, metas, distances)
+            for id, meta, dis in zip(ids, metas, distances)
         ]
 
     def delete_collection(self, collection_name: str):
