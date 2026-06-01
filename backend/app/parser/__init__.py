@@ -1,7 +1,7 @@
-from .file_parser import FileParser
+from .file_parser import FileParser, ParsedDocument
 from .pdf_parser import PDFParser
 
-__all__ = ["FileParser", "PDFParser"]
+__all__ = ["FileParser", "ParsedDocument", "PDFParser"]
 
 
 def file_parser_factory(file_type: str) -> FileParser:
