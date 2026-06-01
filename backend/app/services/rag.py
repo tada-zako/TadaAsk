@@ -1,18 +1,23 @@
 import asyncio
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import numpy as np
+from numpy.typing import NDArray
 from loguru import logger
 
 from app.rag import (
     VectorQueryResult,
     VectorDatabase,
+    TextChunk,
+    TextSplitter,
     EmbeddingProvider,
     RerankProvider,
     FTSProvider,
     QueryExpander,
 )
-from app.rag.file_parser import FileParser
+from app.parser import FileParser, ParsedDocument
 from app.providers import Message
 from app.db.models import Source, SourceItem, DocumentContent, DocumentChunk
 from app.db.schemas import (
@@ -66,26 +71,36 @@ from app.utils.calcu_file_hash import calculate_file_hash
 #     ]
 
 
+class FileParserFactory:
+    def generate(self, file_type: str) -> FileParser:
+        # 假设有这么个接口
+        ...
+
+
 class RAGService:
     def __init__(
         self,
         session: AsyncSession,
         *,
         vector_db: VectorDatabase,
+        text_splitter: TextSplitter,
         embedding: EmbeddingProvider,
         query_expander: QueryExpander,
         reranker: RerankProvider,
         fts_provider: FTSProvider,
+        file_parser_factory: FileParserFactory,
     ):
         """
         具体的参数由依赖注入传入
         """
         self.session = session
         self.vector_db = vector_db
+        self.text_splitter = text_splitter
         self.embedding = embedding
         self.query_expander = query_expander
         self.reranker = reranker
         self.fts_provider = fts_provider
+        self.file_parser_factory = file_parser_factory
 
     async def create_collection(self, source_data: SourceInternal) -> SourceRead:
         """创建新的 self.vector_db 集合"""
@@ -262,4 +277,43 @@ class RAGService:
             collection_name=collection_name,
             query_text=query_text,
             top_k=top_k,
+        )
+
+    async def process_and_store_document(self, file_path: str) -> None:
+        """处理文档并存储到数据库中"""
+
+        # 1. 解析文档内容
+        parser = self.file_parser_factory.generate(file_type=Path(file_path).suffix)
+        # TODO: 存在同步文件读取，需要改成异步
+        parsed_doc: ParsedDocument = await asyncio.to_thread(
+            parser.parse, file_input=Path(file_path).read_bytes(), filename=file_path
+        )
+
+        # 2. 文档分块
+        chunks: list[TextChunk] = await self.text_splitter.split_text(
+            text=parsed_doc.text,
+            file_path=file_path,
+        )
+
+        # 3. FTS 分词
+        chunk_texts = [c.content for c in chunks]
+        tokens_list: list[str] = await asyncio.to_thread(
+            self._batch_tokenize_for_fts, chunk_texts
+        )
+
+        # 4. embedding
+        embeddings: list[NDArray[np.float32]] = await asyncio.to_thread(
+            self.embedding.embed_documents, chunk_texts
+        )
+
+        # 5. DB 写入
+        await self._save_chunks_to_db()
+
+        # ChromaDB 写入
+        await asyncio.to_thread(
+            self.vector_db.add_data_to_collection,
+            collection=collection_name,
+            ids=ids,
+            embeddings=embeddings,
+            metadatas=metadatas,
         )
