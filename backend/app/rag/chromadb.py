@@ -34,7 +34,6 @@ class VectorDatabase(Protocol):
         ids: list[str],
         embeddings: list[NDArray[np.float32]],
         metadatas: list[dict[str, Any]],
-        documents: list[str] | None = None,
     ):
         """将数据添加到集合中"""
         ...
@@ -45,7 +44,6 @@ class VectorDatabase(Protocol):
         ids: list[str],
         embeddings: list[NDArray[np.float32]],
         metadatas: list[dict[str, Any]],
-        documents: list[str] | None = None,
     ):
         """更新集合中的数据"""
         ...
@@ -90,14 +88,12 @@ class ChromaDB:
         ids: list[str],
         embeddings: list[NDArray[np.float32]],
         metadatas: list[dict[str, Any]],
-        documents: list[str] | None = None,
     ):
         """将数据添加到集合中"""
         collection.add(
             ids=ids,
             embeddings=embeddings,
             metadatas=metadatas,
-            documents=documents,
         )
 
     def update_data_in_collection(
@@ -106,14 +102,12 @@ class ChromaDB:
         ids: list[str],
         embeddings: list[NDArray[np.float32]],
         metadatas: list[dict[str, Any]],
-        documents: list[str] | None = None,
     ):
         """更新集合中的数据"""
         collection.update(
             ids=ids,
             embeddings=embeddings,
             metadatas=metadatas,
-            documents=documents,
         )
 
     def delete_data_from_collection(self, collection: ChromaCollection, ids: list[str]):

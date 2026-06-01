@@ -6,7 +6,7 @@ from loguru import logger
 
 from ...deps import RAGServiceDeps, SourceCRUDDeps
 from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead
-from app.rag.file_parser import FileParser, file_parser_factory
+from app.parser import FileParser, file_parser_factory
 
 router = APIRouter()
 
