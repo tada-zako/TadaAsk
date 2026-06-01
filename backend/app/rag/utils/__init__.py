@@ -1,4 +1,5 @@
 from .breakpoint_scanner import (
+    SupportedLanguages,
     MarkdownBreakpointScanner,
     ASTBreakpointScanner,
     Breakpoint,
@@ -13,6 +14,7 @@ __all__ = [
     "Breakpoint",
     "CodeFence",
     "MarkdownBreakpointScanner",
+    "SupportedLanguages",
     "ASTBreakpointScanner",
     "CodeFenceScanner",
     "EmbeddingTokenizer",

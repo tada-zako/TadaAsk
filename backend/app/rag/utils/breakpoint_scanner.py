@@ -1,6 +1,5 @@
 import importlib
 import asyncio
-from pathlib import Path
 from dataclasses import dataclass
 from typing import Literal, Callable
 import re
@@ -58,29 +57,6 @@ class MarkdownBreakpointScanner:
 SupportedLanguages = Literal[
     "python", "javascript", "java", "rust", "go", "typescript", "tsx"
 ]
-
-
-# 文件后缀对应的语言映射
-EXTENSION_MAP: dict[str, SupportedLanguages] = {
-    ".ts": "typescript",
-    ".tsx": "tsx",
-    ".js": "javascript",
-    ".jsx": "tsx",
-    ".mts": "typescript",
-    ".cts": "typescript",
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-    ".py": "python",
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-}
-
-
-def detect_language_from_extension(file_path: str) -> SupportedLanguages | None:
-    """根据文件后缀检测语言类型"""
-    ext = Path(file_path).suffix.lower()
-    return EXTENSION_MAP.get(ext)
 
 
 # ======================================
@@ -202,7 +178,12 @@ class ASTBreakpointScanner:
     """扫描代码文本中的断点位置，基于抽象语法树（AST）分析"""
 
     def __init__(self):
-        self._grammar_cache: dict[SupportedLanguages, asyncio.Task[Language]]
+        self._grammar_task_cache: dict[
+            SupportedLanguages, asyncio.Task[Language]
+        ] = {}  # 缓存加载 grammar 异步任务
+        self._grammar_result_cache: dict[
+            SupportedLanguages, Language
+        ] = {}  # 缓存加载成功的 grammar 结果
         self._query_cache: dict[SupportedLanguages, QueryCursor] = {}
         self._failed_languages: set[SupportedLanguages] = set()  # 记录加载失败的语言
 
@@ -213,9 +194,11 @@ class ASTBreakpointScanner:
         """
         if language in self._failed_languages:
             return None  # 已经记录为加载失败的语言
+        if language in self._grammar_result_cache:
+            return self._grammar_result_cache[language]  # 返回缓存的结果
 
         # 缓存未命中，创建新的 load task
-        if language not in self._grammar_cache:
+        if language not in self._grammar_task_cache:
             # 载入函数
             def grammar_load_task() -> Language:
                 module_name, func_name = GRAMMAR_MAP[language]
@@ -224,16 +207,18 @@ class ASTBreakpointScanner:
                 return Language(lang_fn())
 
             # 创建并缓存 load task
-            self._grammar_cache[language] = asyncio.create_task(
+            self._grammar_task_cache[language] = asyncio.create_task(
                 asyncio.to_thread(grammar_load_task)
             )
 
         try:
             # 并发控制：收缩到同一个 load task
-            return await self._grammar_cache[language]
+            grammar = await self._grammar_task_cache[language]
+            self._grammar_result_cache[language] = grammar  # 缓存成功结果
+            return grammar
         except Exception as e:
             self._failed_languages.add(language)  # 记录加载失败的语言
-            self._grammar_cache.pop(language, None)  # 移除失败的缓存项
+            self._grammar_task_cache.pop(language, None)  # 移除失败的缓存项
             logger.error(f"Failed to load grammar for language {language}: {e}")
             return None
 
@@ -302,35 +287,33 @@ class ASTBreakpointScanner:
             )
         return result
 
-    async def scan(self, text: str, file_path: str) -> list[Breakpoint]:
-        """扫描输入代码文本，返回断点列表"""
+    async def ensure_grammar_loaded(self, language: SupportedLanguages) -> bool:
+        """确保指定文件类型的 grammar 已经加载完成，返回是否成功"""
+        # 载入对应的 tree-sitter grammar
+        grammar: Language | None = await self._load_grammar(language)
+        if grammar is None:
+            logger.warning(f"Grammar for language {language} is not available.")
+            return False
+        return True  # grammar 已成功加载
 
-        # 检测文件类型
-        language: SupportedLanguages | None = detect_language_from_extension(file_path)
-        if not language:
-            logger.warning(
-                f"Could not detect language from file extension: {file_path}"
-            )
-            return []  # 无法检测到语言类型
-
+    def sync_scan(self, text: str, language: SupportedLanguages) -> list[Breakpoint]:
+        """
+        扫描输入代码文本，返回断点列表。
+        同步接口：要求 grammar 已经预先加载完成，上层调用者保证
+        """
+        grammar = self._grammar_result_cache[language]
         try:
-            # 载入对应的 tree-sitter grammar
-            grammar: Language | None = await self._load_grammar(language)
-            if grammar is None:
-                logger.warning(f"Grammar for language {language} is not available.")
-                return []
-
             parser = Parser(grammar)
             tree = parser.parse(bytes(text, "utf8"))
             if not tree:
-                logger.warning(f"Failed to parse code for file {file_path}.")
+                logger.warning(f"Failed to parse code for language {language}.")
                 return []
 
             query_cursor = self._get_query_cursor(language, grammar)
-            root_node = tree.root_node
-
-            return self._extract_breakpoints_from_ast(root_node, query_cursor, text)
+            return self._extract_breakpoints_from_ast(
+                tree.root_node, query_cursor, text
+            )
 
         except Exception as e:
-            logger.error(f"Error scanning AST for file {file_path}: {e}")
+            logger.error(f"Error scanning AST for language {language}: {e}")
             return []  # 扫描过程中发生错误，返回空列表

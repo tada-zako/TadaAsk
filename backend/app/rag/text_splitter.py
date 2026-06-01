@@ -1,9 +1,12 @@
 from typing import Protocol, Literal
 from dataclasses import dataclass
+from pathlib import Path
+import asyncio
 
 from loguru import logger
 
 from .utils import (
+    SupportedLanguages,
     MarkdownBreakpointScanner,
     CodeFenceScanner,
     Breakpoint,
@@ -13,6 +16,28 @@ from .utils import (
 
 
 AVG_CHARS_PER_TOKEN_ESTIMATE = 3  # 粗略估计平均每个 token 约为 3 个字符
+
+# 文件后缀对应的语言映射
+EXTENSION_MAP: dict[str, SupportedLanguages] = {
+    ".ts": "typescript",
+    ".tsx": "tsx",
+    ".js": "javascript",
+    ".jsx": "tsx",
+    ".mts": "typescript",
+    ".cts": "typescript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".py": "python",
+    ".go": "go",
+    ".rs": "rust",
+    ".java": "java",
+}
+
+
+def detect_language_from_extension(file_path: str) -> SupportedLanguages | None:
+    """根据文件后缀检测语言类型"""
+    ext = Path(file_path).suffix.lower()
+    return EXTENSION_MAP.get(ext)
 
 
 @dataclass
@@ -248,6 +273,37 @@ class _ASTAwareSplittingEngine:
         # 返回按位置排序的断点列表
         return sorted(bp_seen.values(), key=lambda x: x.pos)
 
+    def _sync_split(
+        self,
+        text: str,
+        chunk_size: int,
+        chunk_overlap: int,
+        window_size: int,
+        language: SupportedLanguages | None = None,
+        splitter_strategy: Literal["ast", "markdown"] | None = None,
+    ) -> list[TextChunk]:
+        """同步版本的 split 方法，供 TokenAwareTextSplitter 内部调用"""
+
+        # 获取预扫描的断点和代码块信息
+        markdown_bps = self.markdown_scanner.scan(text)
+        code_fences = self.code_fence_scanner.scan(text)
+
+        breakpoints = markdown_bps
+        if (
+            splitter_strategy == "ast"
+            and self.ast_scanner is not None
+            and language is not None
+        ):
+            ast_bps = self.ast_scanner.sync_scan(text, language)
+            if ast_bps:
+                # 合并断点
+                breakpoints = self._merge_breakpoints(markdown_bps, ast_bps)
+
+        # 基于断点进行切割
+        return self.breakpoint_engine.split(
+            text, chunk_size, chunk_overlap, window_size, breakpoints, code_fences
+        )
+
     async def split(
         self,
         text: str,
@@ -258,32 +314,33 @@ class _ASTAwareSplittingEngine:
         splitter_strategy: Literal["ast", "markdown"] | None = None,
     ) -> list[TextChunk]:
         """将输入文本切割成多个块，返回切割后的文本块列表"""
+        # 获取文件对应语言
 
         # 覆盖实例级别的切割策略
         splitter_strategy = splitter_strategy or self.splitter_strategy
 
-        # 获取预扫描的断点和代码块信息
-        markdown_breakpoints = self.markdown_scanner.scan(text)
-        code_fences = self.code_fence_scanner.scan(text)
-
-        breakpoints = markdown_breakpoints
-        if splitter_strategy == "ast":
-            if self.ast_scanner is None:
-                raise RuntimeError(
-                    "Engine initialized with strategy='markdown' but split() called with "
-                    "strategy='ast'. Re-initialize _ASTAwareSplittingEngine with strategy='ast'."
+        # 确保 grammar 已加载
+        language: SupportedLanguages | None = None
+        if splitter_strategy == "ast" and self.ast_scanner is not None:
+            language = detect_language_from_extension(file_path)
+            if language is None:
+                logger.warning(
+                    f"Could not detect language from file extension: {file_path}, "
+                    f"AST-based splitting will be skipped."
                 )
-            ast_breakpoints = await self.ast_scanner.scan(text, file_path)
+                splitter_strategy = "markdown"  # 回退到 Markdown 断点扫描
+            else:
+                await self.ast_scanner.ensure_grammar_loaded(language)
 
-            if ast_breakpoints:
-                # 合并断点列表，去重并按位置排序
-                breakpoints = self._merge_breakpoints(
-                    markdown_breakpoints, ast_breakpoints
-                )
-
-        # 基于断点进行切割
-        return self.breakpoint_engine.split(
-            text, chunk_size, chunk_overlap, window_size, breakpoints, code_fences
+        # 线程池调用同步切割
+        return await asyncio.to_thread(
+            self._sync_split,
+            text,
+            chunk_size,
+            chunk_overlap,
+            window_size,
+            language,
+            splitter_strategy,
         )
 
 
