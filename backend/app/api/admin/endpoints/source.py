@@ -1,13 +1,42 @@
 from typing import Annotated
+from pathlib import Path
 import uuid
 import asyncio
 
-from fastapi import APIRouter, UploadFile, Query, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    UploadFile,
+    Query,
+    Depends,
+    Path as FastAPIPath,
+    HTTPException,
+    status,
+    BackgroundTasks,
+)
 from loguru import logger
 
 from ...deps import RAGServiceDeps, SourceCRUDeps, VectorDBDeps
+from app.db.models import Source
 from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead
 from app.parser import FileParser, file_parser_factory
+from app.utils import calculate_file_hash
+from app.core.config import settings
+
+
+# 相关配置
+MAX_FILE_SIZE = settings.max_file_size  # 最大文件大小
+
+DOC_EXTS = {".pdf", ".docx", ".doc"}
+DATA_EXTS = {".json", ".xml", ".yaml", ".yml"}
+TEXT_EXTS = {".txt", ".md", ".html"}
+CODE_EXTS = {".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".sql", ".sh"}
+
+ALLOWED_FILE_TYPES = DOC_EXTS | DATA_EXTS | TEXT_EXTS | CODE_EXTS  # 允许的文件类型集合
+
+UPLOAD_FOLDER = Path(settings.upload_folder_path)  # 文件上传存储路径
+# 确保路径存在
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+
 
 router = APIRouter()
 
@@ -111,6 +140,97 @@ async def list_sources(
 
     sources = await source_crud.list_sources(limit=limit, offset=offset)
     return [SourceRead.model_validate(source) for source in sources]
+
+
+def save_file_to_upload_folder(file_content: bytes, file_hash: str, filename: str):
+    """将文件内容保存到上传目录，文件名使用哈希值加原始扩展名"""
+    try:
+        ext = Path(filename).suffix.lower()
+        # 使用 hash 前两位作为子目录
+        save_path = UPLOAD_FOLDER / file_hash[:2] / f"{file_hash}{ext}"
+        save_path.parent.mkdir(parents=True, exist_ok=True)  # 确保目录存在
+
+        # 同步写入；避免异步阻塞主线程
+        with open(save_path, "wb") as f:
+            f.write(file_content)
+
+        logger.info(f"文件 '{filename}' 已保存到 '{save_path}'")
+    except Exception as e:
+        logger.error(f"保存文件 '{filename}' 失败：{e}")
+
+
+async def valid_source(
+    source_crud: SourceCRUDeps,
+    source_uid: Annotated[str, FastAPIPath(..., description="Project UID")],
+) -> Source:
+    """验证 source UID 是否有效，返回 source 实例或抛出 HTTPException"""
+    source = await source_crud.get_source_by_uid(source_uid=source_uid)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return source
+
+
+@router.post("/{source_uid}/items/upload", response_model=SourceItemRead)
+async def upload_source_item(
+    source: Annotated[Source, Depends(valid_source)],
+    source_crud: SourceCRUDeps,
+    files: list[UploadFile],
+    background_tasks: BackgroundTasks,
+):
+    """文件上传接口；支持单文件和多文件"""
+    validated_files: list[UploadFile] = []
+
+    # 1. 过滤不合法文件
+    for file in files:
+        # 1.1 过滤空文件名
+        if not file.filename:
+            continue
+
+        # 1.2 检验后缀名合法性
+        ext = Path(file.filename).suffix.lower()
+        if ext not in ALLOWED_FILE_TYPES:
+            logger.warning(
+                f"文件 '{file.filename}' 的类型 '{ext}' 不受支持，已被过滤掉"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File type '{ext}' is not supported",
+            )
+
+        # 1.3 校验文件大小
+        file_size = file.size or 0
+        if file_size > MAX_FILE_SIZE:
+            logger.warning(
+                f"文件 '{file.filename}' 的大小 {file_size} 超过限制 {MAX_FILE_SIZE}，已被过滤掉"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File '{file.filename}' exceeds the maximum allowed size of {MAX_FILE_SIZE} bytes",
+            )
+
+        validated_files.append(file)
+
+    if not validated_files:
+        logger.warning("未上传有效文件")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid files uploaded"
+        )
+
+    # 2. 处理合法文件
+    for file in validated_files:
+        # 2.1 计算文件哈希值
+        file_content = await file.read()
+        file_hash = await asyncio.to_thread(calculate_file_hash, file_content)
+
+        # 2.2 添加文件存储到上传目录任务
+        background_tasks.add_task(
+            save_file_to_upload_folder,
+            file_content=file_content,
+            file_hash=file_hash,
+            filename=file.filename,  # type: ignore
+        )
+
+        # 2.3
 
 
 @router.post("/{source_uid}/documents/add", response_model=SourceItemRead)

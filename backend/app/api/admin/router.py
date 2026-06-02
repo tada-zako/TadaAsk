@@ -47,8 +47,8 @@ router.include_router(
 )
 router.include_router(
     source.router,
-    prefix="/knowledge-base",
-    tags=["Knowledge-Base"],
+    prefix="/source",
+    tags=["Source"],
     dependencies=[Depends(get_current_admin)],
 )
 router.include_router(
