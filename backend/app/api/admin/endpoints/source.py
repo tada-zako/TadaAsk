@@ -1,10 +1,11 @@
 from typing import Annotated
 import uuid
+import asyncio
 
-from fastapi import APIRouter, UploadFile, Query, Depends
+from fastapi import APIRouter, UploadFile, Query, Depends, HTTPException, status
 from loguru import logger
 
-from ...deps import RAGServiceDeps, SourceCRUDDeps
+from ...deps import RAGServiceDeps, SourceCRUDeps, VectorDBDeps
 from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead
 from app.parser import FileParser, file_parser_factory
 
@@ -31,49 +32,85 @@ FileParserDeps = Annotated[FileParser, Depends(get_file_parser)]
 @router.post("/new", response_model=SourceRead)
 async def create_source(
     source_data: SourceCreate,
-    rag_service: RAGServiceDeps,
+    source_crud: SourceCRUDeps,
+    vector_db: VectorDBDeps,
 ):
     """
-
-
-    Args:
-
-
-    Returns:
+    创建新的数据源
     """
-    logger.info(f"创建新的向量集合，display_name={payload.source_name}")
 
-    # 将请求体转换为内部使用的模型
-    internal_payload = SourceInternal.model_validate(payload.model_dump())
+    logger.info(
+        f"创建新的数据源，名称：{source_data.source_name}，类型：{source_data.source_type}"
+    )
 
-    # 调用 RAG 业务代码
-    collection = await rag_service.create_collection(internal_payload)
-    return collection
+    # 检查同名数据源是否已存在
+    existing_source = await source_crud.get_source_by_name(
+        source_name=source_data.source_name
+    )
+    if existing_source:
+        logger.warning(
+            f"数据源名称 '{source_data.source_name}' 已存在，无法创建重复名称的数据源"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="source with the same name already exists",
+        )
+
+    # 创建向量集合
+    try:
+        # 生成系统内部使用的数据源模型
+        source_internal = SourceInternal(**source_data.model_dump())
+        await asyncio.to_thread(
+            vector_db.create_collection, collection_name=source_internal.collection_name
+        )
+    except Exception as e:
+        logger.error(f"创建向量集合失败：{e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create vector collection",
+        )
+
+    # 创建数据库记录
+    try:
+        new_source = await source_crud.create_source(source_data=source_internal)
+        logger.info(
+            f"数据源 '{source_data.source_name}' 创建成功，UID：{new_source.uid}"
+        )
+        return SourceRead.model_validate(new_source)
+    except Exception as e:
+        # 回滚向量集合
+        logger.error(f"创建数据源记录失败：{e}，正在回滚向量集合...")
+        try:
+            await asyncio.to_thread(
+                vector_db.delete_collection,
+                collection_name=source_internal.collection_name,
+            )
+            logger.info(f"已回滚向量集合 '{source_internal.collection_name}'")
+        except Exception as rollback_error:
+            logger.error(f"回滚向量集合失败：{rollback_error}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create source and rollback vector collection",
+            ) from rollback_error
 
 
-@router.get("/collections", response_model=list[SourceRead])
-async def list_collections(
-    rag_service: RAGServiceDeps,
+@router.get("list", response_model=list[SourceRead])
+async def list_sources(
+    source_crud: SourceCRUDeps,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
     """
-    获取所有向量集合（知识库）列表
+    获取所有数据源列表，支持分页
 
     Args:
-        session: 数据库会话，通过依赖注入获取
-        rag_service: RAGService 实例，通过依赖注入获取
-        limit: 每页集合数量，默认为 10，范围 1-100
-        offset: 偏移量，用于分页，默认为 0
-
-    Returns:
-        向量集合列表
+        limit: 分页参数，返回结果的最大数量，默认为 10，范围 1-100
+        offset: 分页参数，返回结果的偏移量，默认为 0，必须为非负整数
     """
-    logger.info("获取向量集合列表")
+    logger.info(f"获取数据源列表，limit={limit}, offset={offset}")
 
-    # 调用 RAG 业务代码获取集合列表
-    collections = await rag_service.get_collections(limit=limit, offset=offset)
-    return collections
+    sources = await source_crud.list_sources(limit=limit, offset=offset)
+    return [SourceRead.model_validate(source) for source in sources]
 
 
 @router.post("/{collection_uid}/documents/upsert", response_model=SourceItemRead)

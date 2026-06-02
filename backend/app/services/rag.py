@@ -102,68 +102,6 @@ class RAGService:
         self.fts_provider = fts_provider
         self.file_parser_factory = file_parser_factory
 
-    async def create_collection(self, source_data: SourceInternal) -> SourceRead:
-        """创建新的 self.vector_db 集合"""
-        logger.info(f"创建 self.vector_db 集合 '{source_data.source_name}'")
-
-        # 检查数据库中是否已存在同名集合记录
-        result = await self.session.execute(
-            select(1).where(Source.source_name == source_data.source_name).limit(1)
-        )
-        if result.scalar():
-            logger.warning(f"集合 '{source_data.source_name}' 已存在")
-            raise ValueError(
-                f"Collection with name '{source_data.source_name}' already exists"
-            )
-
-        try:
-            # 创建向量集合
-            await asyncio.to_thread(
-                self.vector_db.create_collection,
-                collection_name=source_data.collection_name,  # 使用内部生成的 collection_name 字段
-            )
-        except ValueError as e:
-            # 集合可能已存在或集合名不合法
-            logger.warning(f"集合 '{source_data.source_name}' 创建失败，错误信息：{e}")
-            raise
-
-        try:
-            # 数据库中创建集合记录
-            new_collection = Source(**source_data.model_dump())
-            self.session.add(new_collection)
-            await self.session.flush()
-
-            logger.info(f"集合 '{source_data.source_name}' 已创建")
-            return SourceRead.model_validate(new_collection)
-        except Exception as e:
-            # 若数据库写入失败，回滚 Chroma 集合
-            logger.error(
-                f"集合 '{source_data.source_name}' 数据库写入失败，准备回滚 Chroma 集合，错误信息：{e}"
-            )
-            try:
-                await asyncio.to_thread(
-                    self.vector_db.delete_collection,
-                    collection_name=source_data.collection_name,
-                )
-            except Exception as rollback_err:
-                logger.error(
-                    f"回滚 Chroma 集合失败，collection_name={source_data.collection_name}, 错误信息：{rollback_err}"
-                )
-            raise
-
-    async def get_collections(
-        self, *, limit: int = 10, offset: int = 0
-    ) -> list[SourceRead]:
-        """获取所有集合列表"""
-        result = await self.session.execute(
-            select(Source)
-            .offset(offset)
-            .limit(limit)
-            .order_by(Source.created_at.desc())
-        )
-        collections = result.scalars().all()
-        return [SourceRead.model_validate(col) for col in collections]
-
     async def process_and_store_document(
         self,
         *,

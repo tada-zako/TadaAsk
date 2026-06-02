@@ -31,6 +31,25 @@ class SourceCRUD:
         )
         return result.scalars().first()
 
+    async def list_sources(
+        self, *, limit: int = 10, offset: int = 0
+    ) -> Sequence[Source]:
+        """获取数据源列表，支持分页"""
+        result = await self.session.execute(
+            select(Source)
+            .offset(offset)
+            .limit(limit)
+            .order_by(Source.created_at.desc())
+        )
+        return result.scalars().all()
+
+    async def get_source_by_name(self, source_name: str) -> Source | None:
+        """根据数据源名称获取数据源详情"""
+        result = await self.session.execute(
+            select(Source).where(Source.source_name == source_name)
+        )
+        return result.scalars().first()
+
     async def get_sources_with_items_count(
         self, *, limit: int = 5, offset: int = 0
     ) -> list[SourceWithItemsCount]:
@@ -70,6 +89,17 @@ class SourceCRUD:
         self.session.add(new_item)
         await self.session.flush()  # 获取新数据项的 ID
         return new_item
+
+    async def delete_source_item_by_id(self, item_id: int) -> bool:
+        """根据数据项 ID 删除数据项，返回是否删除成功"""
+        result = await self.session.execute(
+            select(SourceItem).where(SourceItem.id == item_id)
+        )
+        item = result.scalars().first()
+        if item:
+            await self.session.delete(item)
+            return True
+        return False
 
     async def get_source_items_by_source_id(
         self, *, source_id: int, limit: int = 15, offset: int = 0

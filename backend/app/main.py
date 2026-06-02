@@ -44,14 +44,11 @@ async def valid_or_create_admin():
             )
             if existing_admin:
                 logger.info(f"管理员账号已存在，用户名：{settings.admin_username}")
-
                 # TODO: 检查 ADMIN_PASSWORD 是否与现有管理员密码一致，
                 # 如果不一致则更新密码（不一定要实现）
-
                 return
 
             password_hash = get_password_hash(settings.admin_password)
-
             default_admin_data = AdminCreate(
                 username=settings.admin_username,
                 password_hash=password_hash,
@@ -78,13 +75,12 @@ async def lifespan(app: FastAPI):
     )
     app.state.vector_db = vector_db
 
-    # 挂载 embedding tokenizer 实例
+    # 创建 embedding tokenizer 实例
     embedding_tokenizer: EmbeddingTokenizer = embedding_tokenizer_factory(
         embedding_mode=settings.embedding_backend,
         model_name=settings.embedding_model_name,
         cache_dir=settings.hf_hub_cache,
     )
-    app.state.embedding_tokenizer = embedding_tokenizer
     # 挂载文本分割器实例
     text_splitter: TextSplitter = TokenAwareTextSplitter(
         tokenizer=embedding_tokenizer,
@@ -94,6 +90,7 @@ async def lifespan(app: FastAPI):
         splitter_strategy="ast",
     )
     app.state.text_splitter = text_splitter
+
     # 创建 FTS 分词器实例
     fts_tokenizer: FTSTokenizer = JiebaFTSTokenizer(
         cut_all=False,
