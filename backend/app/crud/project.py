@@ -20,7 +20,7 @@ class ProjectCRUD:
         await self.session.flush()  # 获取新项目的 UID
         return new_project
 
-    async def get_projects(
+    async def list_projects(
         self, *, limit: int = 5, offset: int = 0
     ) -> Sequence[Project]:
         """获取项目列表"""

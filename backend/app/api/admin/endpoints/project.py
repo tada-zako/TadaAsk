@@ -44,7 +44,7 @@ async def list_projects(
         项目列表
     """
 
-    return await project_crud.get_projects(limit=limit, offset=offset)
+    return await project_crud.list_projects(limit=limit, offset=offset)
 
 
 @router.get("/{project_uid}", response_model=ProjectRead)

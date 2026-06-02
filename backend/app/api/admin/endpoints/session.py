@@ -35,7 +35,7 @@ async def list_chat_sessions(
     Returns:
         聊天会话列表
     """
-    return await chat_session_crud.get_chat_sessions(
+    return await chat_session_crud.list_chat_sessions(
         session_type=ChatSessionType.ADMIN, limit=limit, offset=offset
     )
 

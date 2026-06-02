@@ -26,7 +26,7 @@ class ChatSessionCRUD:
         await self.session.flush()  # 获取新对话的 UID
         return new_chat
 
-    async def get_chat_sessions(
+    async def list_chat_sessions(
         self,
         *,
         session_type: ChatSessionType,
