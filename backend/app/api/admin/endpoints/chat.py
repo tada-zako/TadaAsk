@@ -97,6 +97,7 @@ def get_admin_chat_service(
     )
 
 
+# TODO: 后续改成使用 EventSourceResponse，支持 SSE 协议
 @router.post("/project/{project_uid}/chat/stream")
 async def stream_chat(
     chat_request: ChatRequest,

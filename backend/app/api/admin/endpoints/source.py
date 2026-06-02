@@ -94,7 +94,7 @@ async def create_source(
             ) from rollback_error
 
 
-@router.get("list", response_model=list[SourceRead])
+@router.get("/list", response_model=list[SourceRead])
 async def list_sources(
     source_crud: SourceCRUDeps,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
@@ -113,7 +113,7 @@ async def list_sources(
     return [SourceRead.model_validate(source) for source in sources]
 
 
-@router.post("/{collection_uid}/documents/upsert", response_model=SourceItemRead)
+@router.post("/{source_uid}/documents/add", response_model=SourceItemRead)
 async def upsert_document(
     collection_uid: str,
     file: UploadFile,
