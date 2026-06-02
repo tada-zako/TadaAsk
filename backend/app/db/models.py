@@ -122,17 +122,16 @@ class Source(Base):
     collection_name: Mapped[str] = mapped_column(
         String, unique=True, nullable=False
     )  # 每个数据来源对应一个向量集合，便于复用
-
     source_type: Mapped[
         str
     ]  # 数据来源类型，如 "file", "web_sitemap", "web_url", "github_repo" 等
-    status: Mapped[SourceProcessStatus] = mapped_column(
-        Enum(SourceProcessStatus), default=SourceProcessStatus.PENDING
-    )  # 数据来源状态，如 "pending", "processing", "completed", "failed" 等，后期添加自动监听同步和定时同步功能时会用到
-    # 同步周期
+
     sync_interval: Mapped[
         int
     ]  # 同步周期，单位为小时，后期添加自动监听同步和定时同步功能时会用到
+    status: Mapped[SourceProcessStatus] = mapped_column(
+        Enum(SourceProcessStatus), default=SourceProcessStatus.PENDING
+    )  # 数据来源状态，如 "pending", "processing", "completed", "failed" 等，后期添加自动监听同步和定时同步功能时会用到
     synced_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )  # 上次同步时间，后期添加自动监听同步和定时同步功能时会用到

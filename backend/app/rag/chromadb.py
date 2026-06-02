@@ -24,13 +24,9 @@ class VectorDatabase(Protocol):
         """创建新的集合"""
         ...
 
-    def get_collection(self, collection_name: str) -> Any:
-        """获取集合"""
-        ...
-
     def add_data_to_collection(
         self,
-        collection: Any,
+        collection_name: str,
         ids: list[str],
         embeddings: list[NDArray[np.float32]],
         metadatas: list[dict[str, Any]],
@@ -40,7 +36,7 @@ class VectorDatabase(Protocol):
 
     def update_data_in_collection(
         self,
-        collection: Any,
+        collection_name: str,
         ids: list[str],
         embeddings: list[NDArray[np.float32]],
         metadatas: list[dict[str, Any]],
@@ -48,14 +44,14 @@ class VectorDatabase(Protocol):
         """更新集合中的数据"""
         ...
 
-    def delete_data_from_collection(self, collection: Any, ids: list[str]):
+    def delete_data_from_collection(self, collection_name: str, ids: list[str]):
         """从集合中删除数据"""
         ...
 
     def query_collection(
         self,
+        collection_name: str,
         query_embedding: NDArray[np.float32],
-        collection: Any,
         top_k: int = 5,
     ) -> list[VectorQueryResult]:
         """查询集合，返回匹配度最高的 top_k 条结果"""
@@ -78,18 +74,20 @@ class ChromaDB:
         """创建新的集合"""
         self._client.create_collection(name=collection_name)
 
-    def get_collection(self, collection_name: str) -> ChromaCollection:
+    def _get_collection(self, collection_name: str) -> ChromaCollection:
         """获取集合"""
         return self._client.get_collection(name=collection_name)
 
     def add_data_to_collection(
         self,
-        collection: ChromaCollection,
+        collection_name: str,
         ids: list[str],
         embeddings: list[NDArray[np.float32]],
         metadatas: list[dict[str, Any]],
     ):
         """将数据添加到集合中"""
+        collection = self._get_collection(collection_name)
+
         collection.add(
             ids=ids,
             embeddings=embeddings,
@@ -98,29 +96,33 @@ class ChromaDB:
 
     def update_data_in_collection(
         self,
-        collection: ChromaCollection,
+        collection_name: str,
         ids: list[str],
         embeddings: list[NDArray[np.float32]],
         metadatas: list[dict[str, Any]],
     ):
         """更新集合中的数据"""
+        collection = self._get_collection(collection_name)
+
         collection.update(
             ids=ids,
             embeddings=embeddings,
             metadatas=metadatas,
         )
 
-    def delete_data_from_collection(self, collection: ChromaCollection, ids: list[str]):
+    def delete_data_from_collection(self, collection_name: str, ids: list[str]):
         """从集合中删除数据"""
+        collection = self._get_collection(collection_name)
         collection.delete(ids=ids)
 
     def query_collection(
         self,
+        collection_name: str,
         query_embedding: NDArray[np.float32],
-        collection: ChromaCollection,
         top_k: int = 5,
     ) -> list[VectorQueryResult]:
         """查询集合，返回匹配度最高的 top_k 条结果"""
+        collection = self._get_collection(collection_name)
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=top_k,
