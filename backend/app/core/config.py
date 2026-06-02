@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     # 系统配置
     # =======================================
 
+    max_file_size: int = 5 * 1024 * 1024  # 最大文件上传大小
+    upload_folder_path: str = str(
+        PROJECT_ROOT / "storage" / "uploads"
+    )  # 文件上传存储路径
+
     vector_store_perf: str = "chromadb"  # 向量库配置
 
     # 模型缓存路径
@@ -69,8 +74,12 @@ class Settings(BaseSettings):
     llamacpp_model_path: str = ""  # LLaMA.cpp 模型路径
     hf_hub_cache: str = ""  # HuggingFace Hub 模型缓存路径
 
-    chromadb_path: str = ""  # ChromaDB 数据库文件存储路径
-    sqlite_path: str = ""  # SQLite 数据库文件存储路径
+    chromadb_path: str = str(
+        PROJECT_ROOT / "storage" / "chromadb"
+    )  # ChromaDB 数据存储路径
+    sqlite_path: str = str(
+        PROJECT_ROOT / "storage" / "sqlite.db"
+    )  # SQLite FTS 数据库路径
 
     # =======================================
     # 权限配置
