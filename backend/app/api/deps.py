@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, Body, HTTPException, Path
+from fastapi import Depends, Request, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -13,23 +13,43 @@ from app.crud import (
     ChatSessionCRUD,
     SourceCRUD,
 )
-from app.rag import VectorDatabase, vector_db_factory
+from app.rag import (
+    VectorDatabase,
+    TextSplitter,
+    FTSProvider,
+    EmbeddingProvider,
+    RerankProvider,
+)
 from app.services import RAGService
 
 
-def get_vector_db(
-    vector_store_name: Annotated[
-        str | None, Body(embed=True, alias="vectorStoreName")
-    ] = None,
-) -> VectorDatabase:
-    """
-    向量库工厂函数，根据配置返回对应的 VectorDatabase 实例。
-    NOTE: 目前仅支持 ChromaDB。
-    """
-
-    return vector_db_factory(vector_store=vector_store_name)
+# =========== 全局服务依赖注入接口 ============
+def get_vector_db(request: Request) -> VectorDatabase:
+    """返回全局挂载的向量数据库实例"""
+    return request.app.state.vector_db
 
 
+def get_text_splitter(request: Request) -> TextSplitter:
+    """返回全局挂载的文本分割器实例"""
+    return request.app.state.text_splitter
+
+
+def get_fts_provider(request: Request) -> FTSProvider:
+    """返回全局挂载的全文检索服务实例"""
+    return request.app.state.fts_search_provider
+
+
+def get_embedding_provider(request: Request) -> EmbeddingProvider:
+    """返回全局挂载的向量化服务实例"""
+    return request.app.state.embedding_provider
+
+
+def get_rerank_provider(request: Request) -> RerankProvider:
+    """返回全局挂载的重排序服务实例"""
+    return request.app.state.rerank_provider
+
+
+# ============ CRUD 依赖注入接口 ============
 async def get_project_crud(session: "SessionDeps") -> ProjectCRUD:
     """依赖注入接口：提供 ProjectCRUD 实例"""
     return ProjectCRUD(session=session)
@@ -66,16 +86,24 @@ async def valid_project(
     return project
 
 
+# =========== Service 层依赖注入接口 ===========
 def get_rag_service(session: "SessionDeps", vector_db: "VectorDBDeps") -> RAGService:
     """依赖注入接口：提供 RAGService 实例"""
     return RAGService(session=session, vector_db=vector_db)
 
 
-# 数据库会话依赖
-SessionDeps = Annotated[AsyncSession, Depends(get_db)]
-# 向量库依赖
-VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]
+# =========== 组合依赖 ===========
 
+SessionDeps = Annotated[AsyncSession, Depends(get_db)]  # 数据库会话依赖
+VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]  # 向量库依赖
+TextSplitterDeps = Annotated[TextSplitter, Depends(get_text_splitter)]  # 文本分割器依赖
+FTSProviderDeps = Annotated[FTSProvider, Depends(get_fts_provider)]  # 全文检索服务依赖
+EmbeddingProviderDeps = Annotated[
+    EmbeddingProvider, Depends(get_embedding_provider)
+]  # 向量化服务依赖
+RerankProviderDeps = Annotated[
+    RerankProvider, Depends(get_rerank_provider)
+]  # 重排序服务依赖
 
 # CRUD 依赖
 ProjectCRUDeps = Annotated[ProjectCRUD, Depends(get_project_crud)]
@@ -83,7 +111,6 @@ AdminCRUDeps = Annotated[AdminCRUD, Depends(get_admin_crud)]
 ChatMessageCRUDeps = Annotated[ChatMessageCRUD, Depends(get_chat_message_crud)]
 ChatSessionCRUDeps = Annotated[ChatSessionCRUD, Depends(get_chat_session_crud)]
 SourceCRUDeps = Annotated[SourceCRUD, Depends(get_source_crud)]
-
 
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
