@@ -22,7 +22,8 @@ class AdminRead(AdminBase):
     created_at: datetime
     last_login_at: datetime | None = None
     token_version: int = Field(
-        ..., description="Token 版本号，默认为 0，每次密码修改时递增"
+        ...,
+        description="Token version number; defaults to 0, increments with each password change",
     )
 
     model_config = ConfigDict(
@@ -36,7 +37,8 @@ class AdminRead(AdminBase):
 class AdminUpdate(BaseModel):
     password_hash: str | None = None
     token_version: int | None = Field(
-        default=None, description="Token 版本号，必须大于等于 0，每次密码修改时递增"
+        default=None,
+        description="Token version number; defaults to 0, increments with each password change",
     )
 
     model_config = ConfigDict(
@@ -54,10 +56,12 @@ class ProjectBase(BaseModel):
 
 class ProjectCreate(ProjectBase):
     provider: str | None = Field(
-        default=None, description="模型提供商，初次创建可以为空"
+        default=None,
+        description="Model Provider; can be left empty during initial creation",
     )
     model: str | None = Field(
-        default=None, description="使用的模型名称，初次创建可以为空"
+        default=None,
+        description="Model Name; can be left empty during initial creation",
     )
 
     model_config = ConfigDict(
@@ -90,7 +94,13 @@ class SourceBase(BaseModel):
     source_name: str
     source_type: Literal["local_file", "web_scrape", "github_repo"]
     sync_interval: int = Field(
-        default=24, ge=1, description="同步周期，单位为小时，默认值为 24 小时"
+        default=24,
+        ge=1,
+        description="Synchronization interval (in hours); the default value is 24",
+    )
+    is_public: bool = Field(
+        default=False,
+        description="Whether public; if public, the source is accessible to visitors",
     )
 
 
@@ -122,13 +132,15 @@ class SourceRead(SourceBase):
 
 
 class SourceWithItemsCount(SourceRead):
-    items_count: int = Field(default=0, description="数据源中的文档数量")
+    items_count: int = Field(
+        default=0, description="Number of documents associated with the source"
+    )
 
 
 class SourceUpdate(BaseModel):
     status: SourceProcessStatus | None = None
     sync_interval: int | None = Field(
-        default=None, ge=1, description="同步周期，单位为小时，必须大于等于 1"
+        default=None, ge=1, description="Synchronization interval (in hours)"
     )
 
     model_config = ConfigDict(
@@ -140,10 +152,12 @@ class SourceUpdate(BaseModel):
 # ======= Source Items Schemas =======
 class SourceItemBase(BaseModel):
     title: str
-    origin_url_or_path: str
+    local_path: str
+    origin_url: str | None = Field(
+        default=None,
+        description="Original URL of the document; optional for local files",
+    )
     item_hash: str
-    raw_content: str | None = None  # 可选字段，存储原始文本内容，便于后续调试和分析
-    version: int = Field(default=1, description="文档版本号，默认为 1，每次更新时递增")
 
 
 class SourceItemInternal(SourceItemBase):
@@ -167,11 +181,8 @@ class SourceItemRead(SourceItemBase):
 
 class SourceItemUpdate(BaseModel):
     title: str | None = None
-    version: int | None = Field(
-        default=None, ge=1, description="文档版本号，必须大于等于 1，每次更新时递增"
-    )
-    origin_url_or_path: str | None = None
-    raw_content: str | None = None
+    local_path: str | None = None
+    origin_url: str | None = None
     item_hash: str | None = None
     status: SourceProcessStatus | None = None
 
@@ -190,13 +201,15 @@ class DocumentChunkBase(BaseModel):
     source_item_id: int
 
     page_number: int | None = Field(
-        default=None, description="文档页码，针对 PDF 等分页文档可选字段"
+        default=None,
+        description="Document page number (Optional field for pageinated documents such as PDFs)",
     )
     section_header: str | None = Field(
-        default=None, description="文档章节标题，便于后续分析和调试"
+        default=None,
+        description="Document section header (Optional field)",
     )
     metadata_json: dict[str, Any] | None = Field(
-        default=None, description="切片的额外元数据信息，便于后续分析和调试"
+        default=None, description="Additional metadata"
     )
 
 
@@ -219,10 +232,10 @@ class ChatSessionBase(BaseModel):
 
 class ChatSessionInternal(ChatSessionBase):
     visitor_id: str | None = Field(
-        default=None, description="访客 ID，针对匿名用户可选字段，便于后续分析和调试"
+        default=None, description="Visitor ID: An optional field for anonymous users"
     )
     session_type: ChatSessionType
-    project_id: int = Field(..., description="所属项目 ID")
+    project_id: int = Field(..., description="Associated project ID")
 
 
 class ChatSessionRead(ChatSessionBase):
@@ -255,7 +268,8 @@ class ChatMessageInternal(ChatMessageBase):
 
 class ChatMessageRead(ChatMessageBase):
     citations: list[dict[str, Any]] | None = Field(
-        default=None, description="消息中的引用列表，每个引用包含相关文档信息等"
+        default=None,
+        description="List of citations associated with the message, if any",
     )
     created_at: datetime
 

@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     func,
     String,
+    Boolean,
     UniqueConstraint,
     JSON,
     Integer,
@@ -125,6 +126,9 @@ class Source(Base):
     source_type: Mapped[
         str
     ]  # 数据来源类型，如 "file", "web_sitemap", "web_url", "github_repo" 等
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # 公开的来源应用于 visitor 访问
 
     sync_interval: Mapped[
         int
@@ -189,7 +193,8 @@ class SourceItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     title: Mapped[str]  # 项目标题，如文件名、网页标题等
-    origin_url_or_path: Mapped[str]  # 文件路径或 URL
+    local_path: Mapped[str] = mapped_column(String)  # 本地存储路径
+    origin_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 可选 url
     item_hash: Mapped[str]  # 文件或 URL 的哈希值，用于去重和校验
 
     status: Mapped[SourceProcessStatus] = mapped_column(
@@ -260,9 +265,9 @@ class DocumentChunk(Base):
     )  # 向量 ID，切片的唯一标识 = item_hash + chunk_index
     chunk_index: Mapped[int]  # 切片索引：切片在原文档中的排序位置
     chunk_hash: Mapped[str]  # 切片内容的哈希值，用于去重和校验
-    chunk_content: Mapped[str]  # 切片的原始文本内容
+    chunk_content: Mapped[str]  # 切片的原始文本内容：file_parser 处理后的 markdown 文本
     chunk_tokens: Mapped[str]  # 切片内容的分词结果：提供 FTS 支持
-    # chunk_pos: Mapped[int]  # 切片在原始文档中的起始位置
+    chunk_pos: Mapped[int]  # 切片在原始文档中的起始位置
 
     # TODO: 后期来源追溯功能实现预备扩展
     page_number: Mapped[Optional[int]] = mapped_column(
