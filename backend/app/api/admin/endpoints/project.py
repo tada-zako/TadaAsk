@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, HTTPException
 
-from ...deps import ValidProjectDeps, ProjectCRUDDeps
+from ...deps import ValidProjectDeps, ProjectCRUDeps
 from app.db.schemas import ProjectCreate, ProjectRead
 
 router = APIRouter()
@@ -11,7 +11,7 @@ router = APIRouter()
 @router.post("/new", response_model=ProjectRead)
 async def create_project(
     payload: ProjectCreate,
-    project_crud: ProjectCRUDDeps,
+    project_crud: ProjectCRUDeps,
 ):
     """
     创建新的项目
@@ -28,7 +28,7 @@ async def create_project(
 
 @router.get("/list", response_model=list[ProjectRead])
 async def list_projects(
-    project_crud: ProjectCRUDDeps,
+    project_crud: ProjectCRUDeps,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -66,7 +66,7 @@ async def get_project(
 @router.delete("/{project_uid}")
 async def delete_project(
     project: ValidProjectDeps,
-    project_crud: ProjectCRUDDeps,
+    project_crud: ProjectCRUDeps,
 ):
     """
     删除项目

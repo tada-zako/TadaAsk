@@ -8,8 +8,8 @@ from ...deps import (
     SessionDeps,
     ValidProjectDeps,
     RAGServiceDeps,
-    ChatSessionCRUDDeps,
-    ChatMessageCRUDDeps,
+    ChatSessionCRUDeps,
+    ChatMessageCRUDeps,
 )
 from app.core.constants import ChatSessionType
 from app.db.models import ChatSession
@@ -41,7 +41,7 @@ ModelDeps = Annotated[Model[Any], Depends(get_admin_model)]
 
 
 async def valid_or_create_admin_chat_session(
-    chat_session_crud: ChatSessionCRUDDeps,
+    chat_session_crud: ChatSessionCRUDeps,
     model: ModelDeps,
     project: ValidProjectDeps,
     chat_session_uid: Annotated[
@@ -84,7 +84,7 @@ async def valid_or_create_admin_chat_session(
 
 def get_admin_chat_service(
     session: SessionDeps,
-    chat_message_crud: ChatMessageCRUDDeps,
+    chat_message_crud: ChatMessageCRUDeps,
     llm_model: ModelDeps,
     rag_service: RAGServiceDeps,
 ) -> ChatService:

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
 from .endpoints import auth, project, chat, session as session_endpoints, source
-from ..deps import AdminCRUDDeps
+from ..deps import AdminCRUDeps
 from ..schemas import TokenData
 from app.db.models import Admin
 from app.core.security import decode_access_token
@@ -16,7 +16,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin/auth/login")
 
 
 async def get_current_admin(
-    admin_crud: AdminCRUDDeps,
+    admin_crud: AdminCRUDeps,
     token: Annotated[str, Depends(oauth2_scheme)],
 ) -> Admin:
     """获取当前登录的管理员实例，基于 JWT 令牌进行鉴权"""

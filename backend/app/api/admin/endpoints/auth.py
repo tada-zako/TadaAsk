@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 
-from ...deps import AdminCRUDDeps
+from ...deps import AdminCRUDeps
 from ...schemas import Token
 from app.core.security import verify_password, create_access_token
 from app.db.models import Admin
@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 async def authenticate_admin(
-    admin_crud: AdminCRUDDeps,
+    admin_crud: AdminCRUDeps,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Admin | None:
     """验证管理员用户名和密码"""

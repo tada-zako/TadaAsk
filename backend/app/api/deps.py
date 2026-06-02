@@ -78,11 +78,11 @@ VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]
 
 
 # CRUD 依赖
-ProjectCRUDDeps = Annotated[ProjectCRUD, Depends(get_project_crud)]
-AdminCRUDDeps = Annotated[AdminCRUD, Depends(get_admin_crud)]
-ChatMessageCRUDDeps = Annotated[ChatMessageCRUD, Depends(get_chat_message_crud)]
-ChatSessionCRUDDeps = Annotated[ChatSessionCRUD, Depends(get_chat_session_crud)]
-SourceCRUDDeps = Annotated[SourceCRUD, Depends(get_source_crud)]
+ProjectCRUDeps = Annotated[ProjectCRUD, Depends(get_project_crud)]
+AdminCRUDeps = Annotated[AdminCRUD, Depends(get_admin_crud)]
+ChatMessageCRUDeps = Annotated[ChatMessageCRUD, Depends(get_chat_message_crud)]
+ChatSessionCRUDeps = Annotated[ChatSessionCRUD, Depends(get_chat_session_crud)]
+SourceCRUDeps = Annotated[SourceCRUD, Depends(get_source_crud)]
 
 
 # valid project 依赖

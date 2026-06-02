@@ -5,8 +5,8 @@ from loguru import logger
 
 from ...deps import (
     ValidProjectDeps,
-    ChatSessionCRUDDeps,
-    ChatMessageCRUDDeps,
+    ChatSessionCRUDeps,
+    ChatMessageCRUDeps,
 )
 from app.core.constants import ChatSessionType
 from app.db.models import ChatSession
@@ -19,7 +19,7 @@ router = APIRouter()
 @router.get("/project/{project_uid}/sessions", response_model=list[ChatSessionRead])
 async def list_chat_sessions(
     project: ValidProjectDeps,
-    chat_session_crud: ChatSessionCRUDDeps,
+    chat_session_crud: ChatSessionCRUDeps,
     limit: Annotated[int, Query(ge=1, le=100)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
@@ -41,7 +41,7 @@ async def list_chat_sessions(
 
 
 async def valid_admin_chat_session(
-    chat_session_crud: ChatSessionCRUDDeps,
+    chat_session_crud: ChatSessionCRUDeps,
     chat_session_uid: Annotated[
         str,
         Path(
@@ -76,7 +76,7 @@ ChatSessionDeps = Annotated[ChatSession, Depends(valid_admin_chat_session)]
 )
 async def list_chat_messages(
     chat_session: ChatSessionDeps,
-    chat_message_crud: ChatMessageCRUDDeps,
+    chat_message_crud: ChatMessageCRUDeps,
     # 这里会话消息不允许外部分页，内部处理
     # limit: Annotated[int, Query(ge=1, le=100)] = 20,
     # offset: Annotated[int, Query(ge=0)] = 0,
@@ -103,7 +103,7 @@ async def list_chat_messages(
 @router.delete("/session/{chat_session_uid}")
 async def delete_chat_session(
     chat_session: ChatSessionDeps,
-    chat_session_crud: ChatSessionCRUDDeps,
+    chat_session_crud: ChatSessionCRUDeps,
 ):
     """
     删除聊天会话

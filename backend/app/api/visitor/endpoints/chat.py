@@ -8,8 +8,8 @@ from ...deps import (
     SessionDeps,
     ValidProjectDeps,
     RAGServiceDeps,
-    ChatMessageCRUDDeps,
-    ChatSessionCRUDDeps,
+    ChatMessageCRUDeps,
+    ChatSessionCRUDeps,
 )
 from app.core.config import settings
 from app.core.constants import ChatSessionType
@@ -39,7 +39,7 @@ ModelDeps = Annotated[Model[Any], Depends(get_visitor_model)]
 
 
 async def valid_or_create_visitor_chat_session(
-    chat_session_crud: ChatSessionCRUDDeps,
+    chat_session_crud: ChatSessionCRUDeps,
     model: ModelDeps,
     project: ValidProjectDeps,
     visitor_id: Annotated[
@@ -100,7 +100,7 @@ async def valid_or_create_visitor_chat_session(
 
 def get_visitor_chat_service(
     session: SessionDeps,
-    chat_message_crud: ChatMessageCRUDDeps,
+    chat_message_crud: ChatMessageCRUDeps,
     llm_model: ModelDeps,
     rag_service: RAGServiceDeps,
 ) -> ChatService:
