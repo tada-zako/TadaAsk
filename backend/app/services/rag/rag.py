@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from pathlib import Path
 
+from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
@@ -19,6 +20,7 @@ from app.rag import (
     QueryExpander,
 )
 from app.parser import FileParser, ParsedDocument
+from app.storage import FileStorage
 from app.providers import Message
 from app.db.models import Source, SourceItem, DocumentContent, DocumentChunk
 from app.db.schemas import (
@@ -26,6 +28,7 @@ from app.db.schemas import (
     SourceRead,
     SourceItemRead,
 )
+from app.crud import SourceCRUD
 from app.utils.calcu_file_hash import calculate_file_hash
 
 # TODO: 需要完整重构，新增的 Project 模型尚未与 Service 集成
@@ -93,6 +96,7 @@ class RAGService:
         self,
         session: AsyncSession,
         *,
+        file_storage: FileStorage,
         vector_db: VectorDatabase,
         text_splitter: TextSplitter,
         embedding: EmbeddingProvider,
@@ -101,10 +105,9 @@ class RAGService:
         fts_provider: FTSProvider,
         file_parser_factory: FileParserFactory,
     ):
-        """
-        具体的参数由依赖注入传入
-        """
+        """具体的参数由依赖注入"""
         self.session = session
+        self.file_storage = file_storage
         self.vector_db = vector_db
         self.text_splitter = text_splitter
         self.embedding = embedding
@@ -112,6 +115,58 @@ class RAGService:
         self.reranker = reranker
         self.fts_provider = fts_provider
         self.file_parser_factory = file_parser_factory
+
+    async def upload_file(
+        self,
+        *,
+        validated_files: list[UploadFile],
+        source: Source,
+        source_crud: SourceCRUD,
+    ) -> list[SourceItemRead]:
+        source_items = []
+
+        for file in validated_files:
+            # 1. 计算文件哈希值
+            file_content = await file.read()
+            file_hash = calculate_file_hash(
+                file_content
+            )  # NOTE: 假设 calculate_file_hash 处理速度较快
+
+            filename: str = file.filename  # type: ignore
+            ext = Path(filename).suffix.lower()
+            # 使用 hash 前两位作为子目录
+            storage_key = f"{file_hash[:2]}/{file_hash}{ext}"
+
+            # 2. 文件查重
+            file_exists = await self.file_storage.exists(key=storage_key)
+
+            # 3. 文件存储
+            if not file_exists:
+                await self.file_storage.save_file(key=storage_key, content=file_content)
+                logger.info(
+                    f"文件 '{filename}' 已保存到存储系统，存储键：{storage_key}"
+                )
+            else:
+                logger.info(
+                    f"文件 '{filename}' 已存在于存储系统，存储键：{storage_key}，跳过保存"
+                )
+
+            # 4. 创建 SourceItemInternal 实例
+            source_items.append(
+                SourceItemInternal(
+                    title=filename,
+                    storage_key=storage_key,
+                    origin_url=None,
+                    item_hash=file_hash,
+                )
+            )
+
+        # 5. 执行写库操作
+        created_items = await source_crud.add_source_items(
+            source=source, items_data=source_items
+        )
+
+        return [SourceItemRead.model_validate(item) for item in created_items]
 
     async def process_and_store_document(
         self,

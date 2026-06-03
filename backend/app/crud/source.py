@@ -124,3 +124,12 @@ class SourceCRUD:
             .order_by(SourceItem.updated_at.desc())
         )
         return result.scalars().all()
+
+    async def list_source_item_filenames_by_source_id(
+        self, *, source_id: int
+    ) -> Sequence[str]:
+        """根据数据源 ID 获取数据项的文件名列表"""
+        result = await self.session.execute(
+            select(SourceItem.filename).where(SourceItem.source_id == source_id)
+        )
+        return result.scalars().all()

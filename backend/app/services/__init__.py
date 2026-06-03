@@ -1,4 +1,4 @@
 from .chat import ChatService
-from .rag import RAGService
+from .rag import RAGService, SourceItemService
 
-__all__ = ["ChatService", "RAGService"]
+__all__ = ["ChatService", "RAGService", "SourceItemService"]
