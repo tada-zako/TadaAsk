@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     # =======================================
     # 系统配置
     # =======================================
-
+    file_storage_backend: str = "local"  # 文件存储后端，默认为本地存储
     max_file_size: int = 5 * 1024 * 1024  # 最大文件上传大小
     max_file_count: int = 8  # 最大文件上传数量
     upload_folder_path: str = str(

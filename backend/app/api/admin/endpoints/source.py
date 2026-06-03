@@ -1,6 +1,5 @@
-from typing import Annotated
+from typing import Annotated, AsyncIterable
 from pathlib import Path
-import uuid
 import asyncio
 
 from fastapi import (
@@ -13,6 +12,7 @@ from fastapi import (
     status,
     BackgroundTasks,
 )
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 from loguru import logger
 
 from ...deps import RAGServiceDeps, SourceCRUDeps, VectorDBDeps
@@ -250,6 +250,7 @@ async def upload_source_item(
     Returns:
         上传成功的 SourceItemRead 列表
     """
+    # TODO: 缺少文件存在验证，如果用户上传了相同的文件，应该复用已经存在的文件
     source_items = []
 
     for file in validated_files:
@@ -290,35 +291,13 @@ async def upload_source_item(
     return [SourceItemRead.model_validate(item) for item in created_items]
 
 
-@router.post("/{source_uid}/documents/add", response_model=SourceItemRead)
+@router.post("/document/ingest", response_model=EventSourceResponse)
 async def upsert_document(
     collection_uid: str,
     file: UploadFile,
     file_parser: FileParserDeps,
     rag_service: RAGServiceDeps,
-):
+) -> AsyncIterable[ServerSentEvent]:
     """
-    上传文件并将其内容解析后存储为文档
-
-    Args:
-        collection_uid: 目标集合 UID，从路径参数获取
-        file: 上传的文件，通过请求体获取
-        session: 数据库会话，通过依赖注入获取
-        file_parser: 文件解析器实例，通过工厂函数和依赖注入获取
-        rag_service: RAGService 实例，通过依赖注入获取
-
-    Returns:
+    解析文档
     """
-    logger.info(f"上传文件 '{file.filename}' 到集合 UID '{collection_uid}'")
-
-    # 调用 RAG 业务代码处理文件上传和文档存储
-    filename = file.filename or f"unnamed_{uuid.uuid4()}"
-
-    document = await rag_service.process_and_store_document(
-        parser=file_parser,
-        collection_uid=collection_uid,
-        file_content=await file.read(),
-        filename=filename,
-        source="local_file",
-    )
-    return document
