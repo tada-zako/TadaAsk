@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     max_file_size: int = 5 * 1024 * 1024  # 最大文件上传大小
     max_file_count: int = 8  # 最大文件上传数量
     upload_folder_path: str = str(
-        PROJECT_ROOT / "storage" / "uploads"
+        PROJECT_ROOT / "storages" / "uploads"
     )  # 文件上传存储路径
 
     vector_store_perf: str = "chromadb"  # 向量库配置
@@ -76,10 +76,10 @@ class Settings(BaseSettings):
     hf_hub_cache: str = ""  # HuggingFace Hub 模型缓存路径
 
     chromadb_path: str = str(
-        PROJECT_ROOT / "storage" / "chromadb"
+        PROJECT_ROOT / "storages" / "chromadb"
     )  # ChromaDB 数据存储路径
     sqlite_path: str = str(
-        PROJECT_ROOT / "storage" / "sqlite.db"
+        PROJECT_ROOT / "storages" / "sqlite.db"
     )  # SQLite FTS 数据库路径
 
     # =======================================

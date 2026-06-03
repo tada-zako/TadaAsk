@@ -41,12 +41,12 @@ def get_fts_provider(request: Request) -> FTSProvider:
 
 def get_embedding_provider(request: Request) -> EmbeddingProvider:
     """返回全局挂载的向量化服务实例"""
-    return request.app.state.embedding_provider
+    return request.app.state.embedding
 
 
 def get_rerank_provider(request: Request) -> RerankProvider:
     """返回全局挂载的重排序服务实例"""
-    return request.app.state.rerank_provider
+    return request.app.state.rerank
 
 
 # ============ CRUD 依赖注入接口 ============
