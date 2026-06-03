@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     # =======================================
 
     max_file_size: int = 5 * 1024 * 1024  # 最大文件上传大小
+    max_file_count: int = 8  # 最大文件上传数量
     upload_folder_path: str = str(
         PROJECT_ROOT / "storage" / "uploads"
     )  # 文件上传存储路径

@@ -200,7 +200,6 @@ class SourceItem(Base):
     status: Mapped[SourceProcessStatus] = mapped_column(
         Enum(SourceProcessStatus), default=SourceProcessStatus.PENDING
     )  # 处理状态，如 "pending", "processing", "completed", "failed" 等
-
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )  # 上次更新或访问时间

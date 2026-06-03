@@ -161,6 +161,12 @@ class SourceItemBase(BaseModel):
 
 
 class SourceItemInternal(SourceItemBase):
+    """系统内部使用的模型"""
+
+    ...
+
+
+class SourceItemInternalWithSourceID(SourceItemInternal):
     """系统内部使用的模型，包含 source_id 字段"""
 
     source_id: int
