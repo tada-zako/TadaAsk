@@ -83,12 +83,23 @@ class SourceCRUD:
             return True
         return False
 
-    async def create_source_item(self, item_data: SourceItemInternal) -> SourceItem:
-        """创建新的数据项记录"""
-        new_item = SourceItem(**item_data.model_dump())
-        self.session.add(new_item)
-        await self.session.flush()  # 获取新数据项的 ID
-        return new_item
+    async def add_source_items(
+        self,
+        source: Source,
+        items_data: list[SourceItemInternal],
+    ) -> Sequence[SourceItem]:
+        """为指定数据源创建数据项"""
+        new_items = []
+        for item_data in items_data:
+            new_item = SourceItem(
+                **item_data.model_dump(),
+                source_id=source.id,
+            )
+            source.source_items.append(new_item)
+            new_items.append(new_item)
+
+        await self.session.flush()  # 获取新数据项的完整字段
+        return new_items
 
     async def delete_source_item_by_id(self, item_id: int) -> bool:
         """根据数据项 ID 删除数据项，返回是否删除成功"""

@@ -17,7 +17,13 @@ from loguru import logger
 
 from ...deps import RAGServiceDeps, SourceCRUDeps, VectorDBDeps
 from app.db.models import Source
-from app.db.schemas import SourceCreate, SourceRead, SourceInternal, SourceItemRead
+from app.db.schemas import (
+    SourceCreate,
+    SourceRead,
+    SourceInternal,
+    SourceItemRead,
+    SourceItemInternal,
+)
 from app.parser import FileParser, file_parser_factory
 from app.utils import calculate_file_hash
 from app.core.config import settings
@@ -25,6 +31,7 @@ from app.core.config import settings
 
 # 相关配置
 MAX_FILE_SIZE = settings.max_file_size  # 最大文件大小
+MAX_FILE_COUNT = settings.max_file_count  # 最大文件数量
 
 DOC_EXTS = {".pdf", ".docx", ".doc"}
 DATA_EXTS = {".json", ".xml", ".yaml", ".yml"}
@@ -142,12 +149,66 @@ async def list_sources(
     return [SourceRead.model_validate(source) for source in sources]
 
 
-def save_file_to_upload_folder(file_content: bytes, file_hash: str, filename: str):
+def valid_files(files: list[UploadFile]) -> list[UploadFile]:
+    """
+    验证上传的文件列表，过滤掉不合法的文件并返回合法文件列表
+    验证策略：
+        1. 过滤掉文件名为空的文件
+        2. 验证文件类型是否合法（根据扩展名）
+        3. 验证文件大小是否超过限制
+        4. 验证文件数量是否超过限制
+    返回合法的文件列表
+    """
+    validated_files: list[UploadFile] = []
+
+    for file in files:
+        # 1. 过滤空文件名
+        if not file.filename:
+            continue
+
+        # 2. 检验后缀名合法性
+        ext = Path(file.filename).suffix.lower()
+        if ext not in ALLOWED_FILE_TYPES:
+            logger.warning(f"文件 '{file.filename}' 的类型 '{ext}' 不受支持")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File type '{ext}' is not supported",
+            )
+
+        # 3. 校验文件大小
+        file_size = file.size or 0
+        if file_size > MAX_FILE_SIZE:
+            logger.warning(
+                f"文件 '{file.filename}' 的大小 {file_size} 超过限制 {MAX_FILE_SIZE}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File '{file.filename}' exceeds the maximum allowed size of {MAX_FILE_SIZE} bytes",
+            )
+
+        validated_files.append(file)
+
+    # 4. 校验文件数量
+    if len(validated_files) > MAX_FILE_COUNT:
+        logger.warning(f"上传文件数量 {len(validated_files)} 超过限制 {MAX_FILE_COUNT}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Number of uploaded files exceeds the maximum allowed count of {MAX_FILE_COUNT}",
+        )
+
+    # 5. 如果没有合法文件，抛出异常
+    if not validated_files:
+        logger.warning("未上传有效文件")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid files uploaded"
+        )
+
+    return validated_files
+
+
+def save_file_to_upload_folder(file_content: bytes, save_path: Path, filename: str):
     """将文件内容保存到上传目录，文件名使用哈希值加原始扩展名"""
     try:
-        ext = Path(filename).suffix.lower()
-        # 使用 hash 前两位作为子目录
-        save_path = UPLOAD_FOLDER / file_hash[:2] / f"{file_hash}{ext}"
         save_path.parent.mkdir(parents=True, exist_ok=True)  # 确保目录存在
 
         # 同步写入；避免异步阻塞主线程
@@ -174,63 +235,59 @@ async def valid_source(
 async def upload_source_item(
     source: Annotated[Source, Depends(valid_source)],
     source_crud: SourceCRUDeps,
-    files: list[UploadFile],
+    validated_files: Annotated[list[UploadFile], Depends(valid_files)],
     background_tasks: BackgroundTasks,
 ):
-    """文件上传接口；支持单文件和多文件"""
-    validated_files: list[UploadFile] = []
+    """
+    文件上传接口；支持单文件和多文件
 
-    # 1. 过滤不合法文件
-    for file in files:
-        # 1.1 过滤空文件名
-        if not file.filename:
-            continue
+    Args:
+        source: 验证存在的 source 实例
+        source_crud: SourceCRUD 实例
+        validated_files: 已验证文件列表
+        background_tasks: 用于添加后台任务
 
-        # 1.2 检验后缀名合法性
-        ext = Path(file.filename).suffix.lower()
-        if ext not in ALLOWED_FILE_TYPES:
-            logger.warning(
-                f"文件 '{file.filename}' 的类型 '{ext}' 不受支持，已被过滤掉"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File type '{ext}' is not supported",
-            )
+    Returns:
+        上传成功的 SourceItemRead 列表
+    """
+    source_items = []
 
-        # 1.3 校验文件大小
-        file_size = file.size or 0
-        if file_size > MAX_FILE_SIZE:
-            logger.warning(
-                f"文件 '{file.filename}' 的大小 {file_size} 超过限制 {MAX_FILE_SIZE}，已被过滤掉"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File '{file.filename}' exceeds the maximum allowed size of {MAX_FILE_SIZE} bytes",
-            )
-
-        validated_files.append(file)
-
-    if not validated_files:
-        logger.warning("未上传有效文件")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid files uploaded"
-        )
-
-    # 2. 处理合法文件
     for file in validated_files:
-        # 2.1 计算文件哈希值
+        # 1. 计算文件哈希值
         file_content = await file.read()
-        file_hash = await asyncio.to_thread(calculate_file_hash, file_content)
+        file_hash = calculate_file_hash(
+            file_content
+        )  # NOTE: 假设 calculate_file_hash 处理速度较快
 
-        # 2.2 添加文件存储到上传目录任务
+        filename: str = file.filename  # type: ignore
+        ext = Path(filename).suffix.lower()
+        # 使用 hash 前两位作为子目录
+        save_path = UPLOAD_FOLDER / file_hash[:2] / f"{file_hash}{ext}"
+
+        # 2. 添加文件存储到上传目录任务
         background_tasks.add_task(
             save_file_to_upload_folder,
             file_content=file_content,
-            file_hash=file_hash,
-            filename=file.filename,  # type: ignore
+            save_path=save_path,
+            filename=filename,
         )
 
-        # 2.3
+        # 3. 创建 SourceItemInternal 实例
+        source_items.append(
+            SourceItemInternal(
+                title=filename,
+                local_path=str(save_path),
+                origin_url=None,
+                item_hash=file_hash,
+            )
+        )
+
+    # 4. 执行写库操作
+    created_items = await source_crud.add_source_items(
+        source=source, items_data=source_items
+    )
+
+    return [SourceItemRead.model_validate(item) for item in created_items]
 
 
 @router.post("/{source_uid}/documents/add", response_model=SourceItemRead)
