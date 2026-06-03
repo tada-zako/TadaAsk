@@ -152,7 +152,8 @@ class SourceUpdate(BaseModel):
 # ======= Source Items Schemas =======
 class SourceItemBase(BaseModel):
     title: str
-    local_path: str
+    filename: str
+    storage_key: str
     origin_url: str | None = Field(
         default=None,
         description="Original URL of the document; optional for local files",
@@ -187,7 +188,8 @@ class SourceItemRead(SourceItemBase):
 
 class SourceItemUpdate(BaseModel):
     title: str | None = None
-    local_path: str | None = None
+    filename: str | None = None
+    storage_key: str | None = None
     origin_url: str | None = None
     item_hash: str | None = None
     status: SourceProcessStatus | None = None

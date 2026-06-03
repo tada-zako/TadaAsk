@@ -193,7 +193,8 @@ class SourceItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     title: Mapped[str]  # 项目标题，如文件名、网页标题等
-    local_path: Mapped[str] = mapped_column(String)  # 本地存储路径
+    filename: Mapped[str]  # 文件名
+    storage_key: Mapped[str] = mapped_column(String)  # 存储 key
     origin_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 可选 url
     item_hash: Mapped[str]  # 文件或 URL 的哈希值，用于去重和校验
 
