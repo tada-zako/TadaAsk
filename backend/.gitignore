@@ -3,3 +3,5 @@
 # ========================
 storages/
 scripts/chore/
+# 暂不考虑 Agent 相关实现
+agent*
