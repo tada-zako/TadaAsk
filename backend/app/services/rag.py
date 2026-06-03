@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from pathlib import Path
 
 from sqlalchemy import select
@@ -28,6 +29,16 @@ from app.db.schemas import (
 from app.utils.calcu_file_hash import calculate_file_hash
 
 # TODO: 需要完整重构，新增的 Project 模型尚未与 Service 集成
+
+# vector_id 使用 UUIDv5 生成
+RAG_NAMESPACE = uuid.UUID("2fbcbf86-2bb8-4c0c-92b7-c8a4840dbff4")  # 专属命名空间
+
+
+def generate_vector_id(source_item_id: int, chunk_index: int) -> str:
+    """基于 UUIDv5 生成向量 ID"""
+    name = f"{source_item_id}_{chunk_index}"
+    return str(uuid.uuid5(RAG_NAMESPACE, name))
+
 
 # TODO: "chat messages 构建方法后续提升到 Service 层，确保 messages 构建与 Provider 无关"
 # def build_chat_messages(

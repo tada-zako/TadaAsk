@@ -251,6 +251,7 @@ class DocumentContent(Base):
     source_item: Mapped["SourceItem"] = relationship(back_populates="document_content")
 
 
+# TODO: NOTE: 后期 bulk 插入时；首先考虑使用 sqlalchemy 的 session.execute(insert(table), [mapping...]) 方式
 class DocumentChunk(Base):
     """
     文档切片表：管理知识库中切分后的文档信息，每个切片对应一个向量集合中的向量以及其对应的 source_item，
@@ -261,8 +262,9 @@ class DocumentChunk(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     vector_id: Mapped[str] = mapped_column(
-        String, unique=True, nullable=False
-    )  # 向量 ID，切片的唯一标识 = item_hash + chunk_index
+        String, unique=True, index=True, nullable=False
+    )  # 向量 ID，切片的唯一标识 = UUIDv5(NAMESPACE, f"{source_item_id}_{chunk_index}")
+
     chunk_index: Mapped[int]  # 切片索引：切片在原文档中的排序位置
     chunk_hash: Mapped[str]  # 切片内容的哈希值，用于去重和校验
     chunk_content: Mapped[str]  # 切片的原始文本内容：file_parser 处理后的 markdown 文本
