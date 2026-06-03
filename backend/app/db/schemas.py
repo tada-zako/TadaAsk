@@ -174,6 +174,7 @@ class SourceItemInternalWithSourceID(SourceItemInternal):
 
 
 class SourceItemRead(SourceItemBase):
+    uid: str
     status: SourceProcessStatus
     updated_at: datetime
     created_at: datetime

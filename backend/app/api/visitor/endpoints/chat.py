@@ -46,6 +46,7 @@ async def valid_or_create_visitor_chat_session(
         str | None,
         Body(
             default=None,
+            embed=True,
             alias="visitorId",
             description="访客 ID: 针对匿名用户可选字段，便于后续分析和调试",
         ),

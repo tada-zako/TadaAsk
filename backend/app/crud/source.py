@@ -112,7 +112,7 @@ class SourceCRUD:
             return True
         return False
 
-    async def get_source_items_by_source_id(
+    async def list_source_items_by_source_id(
         self, *, source_id: int, limit: int = 15, offset: int = 0
     ) -> Sequence[SourceItem]:
         """根据数据源 ID 获取数据项列表"""
@@ -131,5 +131,17 @@ class SourceCRUD:
         """根据数据源 ID 获取数据项的文件名列表"""
         result = await self.session.execute(
             select(SourceItem.filename).where(SourceItem.source_id == source_id)
+        )
+        return result.scalars().all()
+
+    async def get_source_items_by_uids(
+        self, item_uids: list[str]
+    ) -> Sequence[SourceItem]:
+        """根据数据项 UID 列表获取数据项列表"""
+        if not item_uids:
+            return []
+
+        result = await self.session.execute(
+            select(SourceItem).where(SourceItem.uid.in_(item_uids))
         )
         return result.scalars().all()

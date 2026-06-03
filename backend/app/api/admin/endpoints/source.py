@@ -5,9 +5,10 @@ import asyncio
 from fastapi import (
     APIRouter,
     UploadFile,
-    Query,
     Depends,
+    Query,
     Path as FastAPIPath,
+    Body,
     HTTPException,
     status,
 )
@@ -16,7 +17,7 @@ from loguru import logger
 
 from ...deps import RAGServiceDeps, SourceCRUDeps, VectorDBDeps, FileStorageDeps
 from app.services import SourceItemService
-from app.db.models import Source
+from app.db.models import Source, SourceItem
 from app.db.schemas import (
     SourceCreate,
     SourceRead,
@@ -138,6 +139,9 @@ def get_source_item_service(
     )
 
 
+ValidSourceDeps = Annotated[Source, Depends(valid_source)]
+
+
 # ===============================
 # API 端点实现
 # ===============================
@@ -227,7 +231,7 @@ async def list_sources(
 
 @router.post("/{source_uid}/items/upload", response_model=SourceItemRead)
 async def upload_source_item(
-    source: Annotated[Source, Depends(valid_source)],
+    source: ValidSourceDeps,
     validated_files: Annotated[list[UploadFile], Depends(valid_files)],
     source_item_service: Annotated[SourceItemService, Depends(get_source_item_service)],
 ):
@@ -249,12 +253,32 @@ async def upload_source_item(
     )
 
 
+async def get_source_items(
+    source_crud: SourceCRUDeps,
+    source_item_uids: Annotated[
+        list[str],
+        Body(
+            ...,
+            alias="itemUids",
+            embed=True,
+            description="数据项 UID 列表",
+        ),
+    ],
+) -> list[SourceItem]:
+    """根据数据项 UID 列表获取数据项详情列表"""
+    result = await source_crud.get_source_items_by_uids(item_uids=source_item_uids)
+    return list(result)
+
+
 # TODO: 缺少文件存在验证，如果用户上传了相同的文件，应该复用已经存在的文件
-@router.post("/document/ingest", response_model=EventSourceResponse)
+@router.post("/{source_uid}/document/ingest", response_model=EventSourceResponse)
 async def upsert_document(
-    collection_uid: str,
-    file: UploadFile,
-    file_parser: Annotated[FileParser, Depends(get_file_parser)],
+    source: ValidSourceDeps,
+    source_items: Annotated[
+        list[SourceItem],
+        Depends(get_source_items),
+    ],
+    source_crud: SourceCRUDeps,
     rag_service: RAGServiceDeps,
 ) -> AsyncIterable[ServerSentEvent]:
     """

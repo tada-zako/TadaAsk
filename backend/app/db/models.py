@@ -192,6 +192,14 @@ class SourceItem(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
+    uid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+
     title: Mapped[str]  # 项目标题，如文件名、网页标题等
     filename: Mapped[str]  # 文件名
     storage_key: Mapped[str] = mapped_column(String)  # 存储 key
