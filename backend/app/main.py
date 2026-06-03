@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db import init_db, async_session
 from app.db.schemas import AdminCreate
+from app.storage import FileStorage, file_storage_factory
 from app.rag import (
     vector_db_factory,
     VectorDatabase,
@@ -68,7 +69,13 @@ async def lifespan(app: FastAPI):
     # ======= 初始化数据库连接 =======
     await init_db()
 
-    # ====== 初始化 RAG 组件实例 ======
+    # ======= 初始化文件存储实例 =======
+    file_storage: FileStorage = file_storage_factory(
+        storage_backend=settings.file_storage_backend,
+    )
+    app.state.file_storage = file_storage
+
+    # ======= 初始化 RAG 组件实例 =======
     # 挂载向量库实例
     vector_db: VectorDatabase = vector_db_factory(
         vector_store=settings.vector_store_perf

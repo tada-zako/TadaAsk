@@ -13,6 +13,7 @@ from app.crud import (
     ChatSessionCRUD,
     SourceCRUD,
 )
+from app.storage import FileStorage
 from app.rag import (
     VectorDatabase,
     TextSplitter,
@@ -47,6 +48,11 @@ def get_embedding_provider(request: Request) -> EmbeddingProvider:
 def get_rerank_provider(request: Request) -> RerankProvider:
     """返回全局挂载的重排序服务实例"""
     return request.app.state.rerank
+
+
+def get_file_storage(request: Request) -> FileStorage:
+    """返回全局挂载的文件存储实例"""
+    return request.app.state.file_storage
 
 
 # ============ CRUD 依赖注入接口 ============
@@ -93,8 +99,9 @@ def get_rag_service(session: "SessionDeps", vector_db: "VectorDBDeps") -> RAGSer
 
 
 # =========== 组合依赖 ===========
-
 SessionDeps = Annotated[AsyncSession, Depends(get_db)]  # 数据库会话依赖
+FileStorageDeps = Annotated[FileStorage, Depends(get_file_storage)]  # 文件存储依赖
+
 VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]  # 向量库依赖
 TextSplitterDeps = Annotated[TextSplitter, Depends(get_text_splitter)]  # 文本分割器依赖
 FTSProviderDeps = Annotated[FTSProvider, Depends(get_fts_provider)]  # 全文检索服务依赖
