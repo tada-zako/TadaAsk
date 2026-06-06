@@ -14,6 +14,7 @@ from app.crud import (
     SourceCRUD,
 )
 from app.storage import FileStorage
+from app.parser import FileParserFactory
 from app.rag import (
     VectorDatabase,
     TextSplitter,
@@ -21,7 +22,7 @@ from app.rag import (
     EmbeddingProvider,
     RerankProvider,
 )
-from app.services import RAGService
+from app.services.rag import DocumentIngestService
 
 
 # =========== 全局服务依赖注入接口 ============
@@ -53,6 +54,12 @@ def get_rerank_provider(request: Request) -> RerankProvider:
 def get_file_storage(request: Request) -> FileStorage:
     """返回全局挂载的文件存储实例"""
     return request.app.state.file_storage
+
+
+def get_file_parser_factory(request: Request) -> FileParserFactory:
+    """返回全局挂载的文件解析器工厂实例"""
+    # TODO: 后续将 FileParserFactory 实例化逻辑放到 main.py; 使用注册器模式
+    return request.app.state.file_parser_factory
 
 
 # ============ CRUD 依赖注入接口 ============
@@ -93,9 +100,25 @@ async def valid_project(
 
 
 # =========== Service 层依赖注入接口 ===========
-def get_rag_service(session: "SessionDeps", vector_db: "VectorDBDeps") -> RAGService:
-    """依赖注入接口：提供 RAGService 实例"""
-    return RAGService(session=session, vector_db=vector_db)
+def get_document_ingest_service(
+    source_crud: "SourceCRUDeps",
+    file_storage: "FileStorageDeps",
+    vector_db: "VectorDBDeps",
+    text_splitter: "TextSplitterDeps",
+    embedding: "EmbeddingProviderDeps",
+    fts_provider: "FTSProviderDeps",
+    file_parser_factory: "FileParserFactoryDeps",
+) -> DocumentIngestService:
+    """DocumentIngestService 依赖注入接口"""
+    return DocumentIngestService(
+        source_crud=source_crud,
+        file_storage=file_storage,
+        vector_db=vector_db,
+        text_splitter=text_splitter,
+        embedding=embedding,
+        fts_provider=fts_provider,
+        file_parser_factory=file_parser_factory,
+    )
 
 
 # =========== 组合依赖 ===========
@@ -111,6 +134,9 @@ EmbeddingProviderDeps = Annotated[
 RerankProviderDeps = Annotated[
     RerankProvider, Depends(get_rerank_provider)
 ]  # 重排序服务依赖
+FileParserFactoryDeps = Annotated[
+    FileParserFactory, Depends(get_file_parser_factory)
+]  # 文件解析器工厂依赖
 
 # CRUD 依赖
 ProjectCRUDeps = Annotated[ProjectCRUD, Depends(get_project_crud)]
@@ -121,5 +147,3 @@ SourceCRUDeps = Annotated[SourceCRUD, Depends(get_source_crud)]
 
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
-# RAG 服务依赖
-RAGServiceDeps = Annotated[RAGService, Depends(get_rag_service)]

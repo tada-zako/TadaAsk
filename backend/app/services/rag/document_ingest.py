@@ -13,11 +13,9 @@ from app.rag import (
     TextChunk,
     TextSplitter,
     EmbeddingProvider,
-    RerankProvider,
     FTSProvider,
-    QueryExpander,
 )
-from app.parser import FileParser, ParsedDocument
+from app.parser import FileParserFactory, ParsedDocument
 from app.storage import FileStorage
 from app.db.models import Source, SourceItem
 from app.db.schemas import DocumentChunkInternal
@@ -84,23 +82,15 @@ def generate_vector_id(source_item_id: int, chunk_index: int) -> str:
 #     ]
 
 
-class FileParserFactory:
-    def generate(self, file_type: str) -> FileParser:
-        # 假设有这么个接口
-        ...
-
-
 class DocumentIngestService:
     def __init__(
         self,
-        source_crud: SourceCRUD,
         *,
+        source_crud: SourceCRUD,
         file_storage: FileStorage,
         vector_db: VectorDatabase,
         text_splitter: TextSplitter,
         embedding: EmbeddingProvider,
-        query_expander: QueryExpander,
-        reranker: RerankProvider,
         fts_provider: FTSProvider,
         file_parser_factory: FileParserFactory,
     ):
@@ -110,8 +100,6 @@ class DocumentIngestService:
         self.vector_db = vector_db
         self.text_splitter = text_splitter
         self.embedding = embedding
-        self.query_expander = query_expander
-        self.reranker = reranker
         self.fts_provider = fts_provider
         self.file_parser_factory = file_parser_factory
 
