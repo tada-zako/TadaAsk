@@ -1,37 +1,36 @@
-# OpenKapa Workspace Instructions
+# GitHub Copilot Instructions — OpenKapa
 
-## Project Identity
+All architectural rules, layer boundaries, async patterns, RAG constraints, and roadmap alignment
+are defined in [`AGENTS.md`](../AGENTS.md). Read that file first for full project context.
 
-- This project is an open-source AI knowledge-base assistant with a widget-first integration model.
-- Core stack is FastAPI backend + Vue 3 frontend.
-- Design decisions should preserve extensibility for provider, vector DB, ingestion, and admin workflows.
+The sections below are Copilot-specific supplements.
 
-## Backend Rules (FastAPI)
+---
 
-- Keep HTTP concerns separated from business logic; handlers should stay thin and delegate core workflows to a service layer.
-- Keep LLM/provider abstractions decoupled from specific vendor SDKs and avoid locking new features to one provider.
-- Keep retrieval/vector-store logic behind stable interfaces exposed to upper layers.
-- Use centralized configuration management; avoid hard-coded secrets, model names, and environment paths.
-- Prefer async-first implementations for I/O-heavy flows.
-- Current backend structure is evolving; prioritize clear boundaries and replaceable modules over fixed folder conventions.
+## Code Generation Defaults
 
-## Frontend Rules (Vue)
+- Default to async functions for any new I/O-bound code (DB, file, network).
+- When generating new service methods that wrap sync CPU work, apply `asyncio.to_thread()` at the
+  call site inside the service — not in the router or the leaf module caller.
+- Never emit `import` statements for vendor LLM SDKs (e.g. `google.generativeai`, `openai`) in
+  service or router files; use the existing `Model` / `EmbeddingProvider` / `RerankProvider`
+  Protocol abstractions instead.
+- Prefer `Mapped[T]` column declarations (SQLAlchemy 2.x style) over `Column(T)` for any new ORM
+  model fields.
 
-- Implement UI with Vue 3 + TypeScript and keep framework-level choices consistent within each feature area.
-- Keep UI modules reusable so widget and future admin console can evolve independently.
-- Keep client-server contracts explicit and consistent with backend payload conventions.
-- Frontend structure is expected to change for widget/admin adaptation; avoid coupling rules to fixed directory layouts.
+## Suggestion Scope
 
-## Roadmap Alignment
+- Only suggest changes that are **directly requested** or **clearly necessary** for the task.
+- Do not add docstrings, comments, or type annotations to code that was not part of the change.
+- Do not introduce new dependencies without noting the addition explicitly.
 
-- Favor protocol-oriented abstractions that support multiple LLMs (Gemini/OpenAI/DeepSeek/Ollama).
-- Keep vector DB integration replaceable (current Chroma, future Qdrant/LanceDB).
-- Prefer additive changes that make crawler ingestion, GitHub repo ingestion, and owner-side MCP actions easier.
-- Treat SQLite as the default metadata/config baseline unless a task explicitly changes persistence strategy.
-- For MVP, prioritize grounded answers from known knowledge sources over broad web search.
+## Key File References
 
-## Quality Expectations
-
-- Keep boundaries explicit: router -> service -> provider/rag/core.
-- Avoid shortcut coupling that bypasses existing layers without a documented reason.
-- For architecture-impacting changes, include a brief note on extensibility impact.
+| Purpose | Path |
+|---------|------|
+| Project requirements (Chinese) | `docs/requirements.md` |
+| RAG pipeline implementation notes | `backend/docs/rag-pipeline.md` |
+| ORM models | `backend/app/db/models.py` |
+| Service layer — RAG | `backend/app/services/rag/rag.py` |
+| Service layer — upload | `backend/app/services/rag/source_item.py` |
+| Admin endpoints — source | `backend/app/api/admin/endpoints/source.py` |
