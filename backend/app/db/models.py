@@ -248,7 +248,7 @@ class DocumentContent(Base):
     __tablename__ = "document_contents"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    document_content: Mapped[str] = mapped_column(String)  # 文档的原始文本内容
+    content: Mapped[str] = mapped_column(String)  # 文档的原始文本内容
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -203,11 +203,7 @@ class SourceItemUpdate(BaseModel):
 
 # ======= Document Chunks Schemas =======
 class DocumentChunkBase(BaseModel):
-    vector_id: str
-    chunk_index: int
-    chunk_hash: str
-    chunk_pos: int  # 切片在原始文档中的起始位置
-    source_item_id: int
+    chunk_content: str
 
     page_number: int | None = Field(
         default=None,
@@ -220,6 +216,19 @@ class DocumentChunkBase(BaseModel):
     metadata_json: dict[str, Any] | None = Field(
         default=None, description="Additional metadata"
     )
+
+
+class DocumentChunkInternal(DocumentChunkBase):
+    """系统内部使用的模型"""
+
+    vector_id: str
+    chunk_hash: str
+    chunk_index: int
+    chunk_tokens: str = Field(
+        ..., description="Result of FTS tokenization; used for FTS search"
+    )
+    chunk_pos: int  # 切片在原始文档中的起始位置
+    source_item_id: int  # 关联的 SourceItem ID
 
 
 class DocumentChunkRead(DocumentChunkBase):
