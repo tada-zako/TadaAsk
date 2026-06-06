@@ -39,6 +39,8 @@ CODE_EXTS = {".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".sql", "
 
 ALLOWED_FILE_TYPES = DOC_EXTS | DATA_EXTS | TEXT_EXTS | CODE_EXTS  # 允许的文件类型集合
 
+MAX_INGEST_SOURCE_ITEMS = 10  # 每次 ingest 的最大数据项数量
+
 
 router = APIRouter()
 
@@ -253,8 +255,9 @@ async def upload_source_item(
     )
 
 
-async def get_source_items(
+async def valid_source_items(
     source_crud: SourceCRUDeps,
+    source: ValidSourceDeps,
     source_item_uids: Annotated[
         list[str],
         Body(
@@ -266,7 +269,19 @@ async def get_source_items(
     ],
 ) -> list[SourceItem]:
     """根据数据项 UID 列表获取数据项详情列表"""
-    result = await source_crud.get_source_items_by_uids(item_uids=source_item_uids)
+    if len(source_item_uids) > MAX_INGEST_SOURCE_ITEMS:
+        logger.warning(
+            f"请求 ingest 的数据项数量 {len(source_item_uids)} 超过限制 {MAX_INGEST_SOURCE_ITEMS}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Number of source items to ingest exceeds the maximum allowed count of {MAX_INGEST_SOURCE_ITEMS}",
+        )
+
+    result = await source_crud.get_source_items_by_uids_with_document_for_source(
+        source_id=source.id, item_uids=source_item_uids
+    )
+    # TODO: 提前验证 source_item.status，确保已经完成的 item，不进入 ingest
     return list(result)
 
 
@@ -276,7 +291,7 @@ async def upsert_document(
     source: ValidSourceDeps,
     source_items: Annotated[
         list[SourceItem],
-        Depends(get_source_items),
+        Depends(valid_source_items),
     ],
     source_crud: SourceCRUDeps,
     rag_service: RAGServiceDeps,
