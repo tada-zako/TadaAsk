@@ -3,6 +3,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
+from app.core.constants import SourceProcessStatus, IngestStage, RAGIngestEventType
+
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="用户输入的消息文本")
@@ -39,3 +41,37 @@ class TokenData(BaseModel):
 
     username: str = Field(..., description="管理员用户名")
     token_version: int = Field(..., description="Token 版本号")
+
+
+class IngestProgressEvent(BaseModel):
+    """文档处理进度实事件：SSE data 部分结构"""
+
+    event: RAGIngestEventType
+    source_uid: str
+    source_item_uid: str | None = None
+    ingest_stage: IngestStage
+    process_status: SourceProcessStatus
+    item_progress: float | None = None  # 当前文档处理进度，0.0 - 1.0
+    message: str | None = None  # 可选的进度描述信息
+    error: str | None = None  # 可选的错误信息，仅在 process_status=FAILED 时提供
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class IngestPausedResponse(BaseModel):
+    """文档处理暂停响应结构"""
+
+    source_uid: str
+    source_item_uid: str
+    process_status: SourceProcessStatus
+    message: str
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )

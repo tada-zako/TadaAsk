@@ -1,5 +1,5 @@
-from .document_ingest import RAGService
+from .document_ingest import DocumentIngestService
 from .source_item import SourceItemService
 
 
-__all__ = ["RAGService", "SourceItemService"]
+__all__ = ["DocumentIngestService", "SourceItemService"]

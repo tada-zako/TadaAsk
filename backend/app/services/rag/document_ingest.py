@@ -5,12 +5,10 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import BaseModel, ConfigDict
-from pydantic.alias_generators import to_camel
+
 from loguru import logger
 
 from app.rag import (
-    VectorQueryResult,
     VectorDatabase,
     TextChunk,
     TextSplitter,
@@ -21,54 +19,13 @@ from app.rag import (
 )
 from app.parser import FileParser, ParsedDocument
 from app.storage import FileStorage
-from app.providers import Message
 from app.db.models import Source, SourceItem
 from app.db.schemas import DocumentChunkInternal
 from app.crud import SourceCRUD
+from app.api.schemas import IngestProgressEvent, IngestPausedResponse
 from app.utils.calcu_file_hash import calculate_text_hash
 from app.core.constants import SourceProcessStatus, IngestStage, RAGIngestEventType
-
-# TODO: 需要完整重构，新增的 Project 模型尚未与 Service 集成
-
-
-class DocumentPausedException(Exception):
-    """文档处理被用户请求暂停时抛出的异常，用于触发暂停事件"""
-
-    pass
-
-
-class IngestProgressEvent(BaseModel):
-    """文档处理进度实事件：SSE data 部分结构"""
-
-    event: RAGIngestEventType
-    source_uid: str
-    source_item_uid: str | None = None
-    ingest_stage: IngestStage
-    process_status: SourceProcessStatus
-    item_progress: float | None = None  # 当前文档处理进度，0.0 - 1.0
-    message: str | None = None  # 可选的进度描述信息
-    error: str | None = None  # 可选的错误信息，仅在 process_status=FAILED 时提供
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
-
-
-class IngestPausedResponse(BaseModel):
-    """文档处理暂停响应结构"""
-
-    source_uid: str
-    source_item_uid: str
-    process_status: SourceProcessStatus
-    message: str
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
+from app.core.exceptions import DocumentPausedException
 
 
 # 最大并发量
