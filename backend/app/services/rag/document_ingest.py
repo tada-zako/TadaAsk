@@ -193,7 +193,7 @@ class DocumentIngestService:
         logger.info(f"SourceItem {source_item.uid} 已恢复处理，状态更新为 PROCESSING")
 
         # 主动触发后续 ingest
-        async for event in self.process_and_store_document(
+        async for event in self.ingest_source_items(
             source=source, source_items=[source_item]
         ):
             yield event
@@ -456,7 +456,7 @@ class DocumentIngestService:
                 message=f"Processed chunk batch {batch_index + 1}/{len(batches)}",
             )
 
-    async def process_and_store_document(
+    async def ingest_source_items(
         self, source: Source, source_items: list[SourceItem]
     ) -> AsyncIterable[IngestProgressEvent]:
         """处理文档并存储到数据库中"""

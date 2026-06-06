@@ -147,3 +147,9 @@ SourceCRUDeps = Annotated[SourceCRUD, Depends(get_source_crud)]
 
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
+
+# Service 依赖
+DocumentIngestServiceDeps = Annotated[
+    DocumentIngestService,
+    Depends(get_document_ingest_service),
+]

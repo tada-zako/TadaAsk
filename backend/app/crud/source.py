@@ -99,6 +99,18 @@ class SourceCRUD:
         )
         return result.scalars().first()
 
+    async def get_source_item_by_uid_for_source(
+        self, source_id: int, item_uid: str
+    ) -> SourceItem | None:
+        """根据数据项 UID 和数据源 ID 获取数据项详情"""
+        result = await self.session.execute(
+            select(SourceItem).where(
+                SourceItem.uid == item_uid,
+                SourceItem.source_id == source_id,
+            )
+        )
+        return result.scalars().first()
+
     async def add_source_items(
         self,
         source: Source,

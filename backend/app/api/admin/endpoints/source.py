@@ -15,7 +15,13 @@ from fastapi import (
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from loguru import logger
 
-from ...deps import RAGServiceDeps, SourceCRUDeps, VectorDBDeps, FileStorageDeps
+from ...deps import (
+    SourceCRUDeps,
+    VectorDBDeps,
+    FileStorageDeps,
+    DocumentIngestServiceDeps,
+)
+from ...schemas import IngestPausedResponse
 from app.services import SourceItemService
 from app.db.models import Source, SourceItem
 from app.db.schemas import (
@@ -24,7 +30,6 @@ from app.db.schemas import (
     SourceInternal,
     SourceItemRead,
 )
-from app.parser import FileParser, file_parser_factory
 from app.core.config import settings
 
 
@@ -116,18 +121,65 @@ async def valid_source(
     return source
 
 
-def get_file_parser(file: UploadFile) -> FileParser:
-    """文件解析器工厂：根据请求传输的文件类型返回对应的解析器实例"""
-    file_type = "unknown"
+async def valid_source_item(
+    source_crud: SourceCRUDeps,
+    source: "ValidSourceDeps",
+    source_item_uid: Annotated[
+        str,
+        Body(
+            ...,
+            alias="itemUid",
+            embed=True,
+            description="数据项 UID",
+        ),
+    ],
+) -> SourceItem:
+    """"""
+    result = await source_crud.get_source_item_by_uid_for_source(
+        source_id=source.id, item_uid=source_item_uid
+    )
 
-    content_type = (file.content_type or "").lower()
-    filename = (file.filename or "").lower()
+    if not result:
+        logger.warning(
+            f"数据项 UID '{source_item_uid}' 在数据源 '{source.source_name}' 中未找到"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Source item not found",
+        )
 
-    if content_type in {"application/pdf", "application/x-pdf"} or filename.endswith(
-        ".pdf"
-    ):
-        file_type = "pdf"
-    return file_parser_factory(file_type=file_type)
+    # TODO: 提前验证 source_item.status，确保已经完成的 item，不进入 ingest
+    return result
+
+
+async def valid_source_items(
+    source_crud: SourceCRUDeps,
+    source: "ValidSourceDeps",
+    source_item_uids: Annotated[
+        list[str],
+        Body(
+            ...,
+            alias="itemUids",
+            embed=True,
+            description="数据项 UID 列表",
+        ),
+    ],
+) -> list[SourceItem]:
+    """根据数据项 UID 列表获取数据项详情列表"""
+    if len(source_item_uids) > MAX_INGEST_SOURCE_ITEMS:
+        logger.warning(
+            f"请求 ingest 的数据项数量 {len(source_item_uids)} 超过限制 {MAX_INGEST_SOURCE_ITEMS}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Number of source items to ingest exceeds the maximum allowed count of {MAX_INGEST_SOURCE_ITEMS}",
+        )
+
+    result = await source_crud.get_source_items_by_uids_with_document_for_source(
+        source_id=source.id, item_uids=source_item_uids
+    )
+    # TODO: 提前验证 source_item.status，确保已经完成的 item，不进入 ingest
+    return list(result)
 
 
 def get_source_item_service(
@@ -255,36 +307,6 @@ async def upload_source_item(
     )
 
 
-async def valid_source_items(
-    source_crud: SourceCRUDeps,
-    source: ValidSourceDeps,
-    source_item_uids: Annotated[
-        list[str],
-        Body(
-            ...,
-            alias="itemUids",
-            embed=True,
-            description="数据项 UID 列表",
-        ),
-    ],
-) -> list[SourceItem]:
-    """根据数据项 UID 列表获取数据项详情列表"""
-    if len(source_item_uids) > MAX_INGEST_SOURCE_ITEMS:
-        logger.warning(
-            f"请求 ingest 的数据项数量 {len(source_item_uids)} 超过限制 {MAX_INGEST_SOURCE_ITEMS}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Number of source items to ingest exceeds the maximum allowed count of {MAX_INGEST_SOURCE_ITEMS}",
-        )
-
-    result = await source_crud.get_source_items_by_uids_with_document_for_source(
-        source_id=source.id, item_uids=source_item_uids
-    )
-    # TODO: 提前验证 source_item.status，确保已经完成的 item，不进入 ingest
-    return list(result)
-
-
 # TODO: 缺少文件存在验证，如果用户上传了相同的文件，应该复用已经存在的文件
 @router.post("/{source_uid}/document/ingest", response_model=EventSourceResponse)
 async def upsert_document(
@@ -293,9 +315,59 @@ async def upsert_document(
         list[SourceItem],
         Depends(valid_source_items),
     ],
-    source_crud: SourceCRUDeps,
-    rag_service: RAGServiceDeps,
+    document_ingest_service: DocumentIngestServiceDeps,
 ) -> AsyncIterable[ServerSentEvent]:
     """
     解析文档
     """
+    async for event in document_ingest_service.ingest_source_items(
+        source=source,
+        source_items=source_items,
+    ):
+        yield ServerSentEvent(
+            event=event.event,
+            data=event.model_dump_json(),
+        )
+
+
+@router.post("/{source_uid}/document/pause", response_model=IngestPausedResponse)
+async def pause_ingest(
+    source: ValidSourceDeps,
+    source_item: Annotated[
+        SourceItem,
+        Depends(valid_source_item),
+    ],
+    document_ingest_service: DocumentIngestServiceDeps,
+) -> IngestPausedResponse:
+    """
+    暂停文档解析
+    """
+    return await document_ingest_service.request_pause_ingest(
+        source=source,
+        source_item=source_item,
+    )
+
+
+@router.post("/{source_uid}/document/resume", response_model=EventSourceResponse)
+async def resume_ingest(
+    source: ValidSourceDeps,
+    source_item: Annotated[
+        SourceItem,
+        Depends(valid_source_item),
+    ],
+    document_ingest_service: DocumentIngestServiceDeps,
+) -> AsyncIterable[ServerSentEvent]:
+    """
+    恢复文档解析
+    """
+    async for event in document_ingest_service.resume_ingest(
+        source=source,
+        source_item=source_item,
+    ):
+        yield ServerSentEvent(
+            event=event.event,
+            data=event.model_dump_json(),
+        )
+
+
+# NOTE: 文档检索时，需要注意 status = "completed" 的数据项，才是可以被检索的；
