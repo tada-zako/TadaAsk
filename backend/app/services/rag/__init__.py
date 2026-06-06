@@ -1,4 +1,4 @@
-from .rag import RAGService
+from .document_ingest import RAGService
 from .source_item import SourceItemService
 
 
