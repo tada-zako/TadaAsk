@@ -23,7 +23,6 @@ class FastRerankAdapter:
     """基于 fastembed 的 Rerank 适配器"""
 
     def __init__(self, model_name: str, cache_dir: str | None = None):
-        # TODO: model_name 由顶层 IoC 注入，基于传入 -> 环境变量 -> 默认值的方式确定
         self._model_name = self._map_hf_to_fastembed(model_name)
         self._cache_dir = cache_dir
 

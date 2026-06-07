@@ -259,7 +259,6 @@ class DocumentContent(Base):
     source_item: Mapped["SourceItem"] = relationship(back_populates="document_content")
 
 
-# TODO: NOTE: 后期 bulk 插入时；首先考虑使用 sqlalchemy 的 session.execute(insert(table), [mapping...]) 方式
 class DocumentChunk(Base):
     """
     文档切片表：管理知识库中切分后的文档信息，每个切片对应一个向量集合中的向量以及其对应的 source_item，
