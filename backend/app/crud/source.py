@@ -11,7 +11,7 @@ from app.db.schemas import (
     SourceItemInternal,
     DocumentChunkInternal,
 )
-from app.core.constants import SourceProcessStatus
+from app.core.constants import SourceItemProcessStatus
 
 
 class SourceCRUD:
@@ -185,7 +185,7 @@ class SourceCRUD:
         return result.scalars().all()
 
     async def update_source_item_status(
-        self, source_item: SourceItem, new_status: SourceProcessStatus
+        self, source_item: SourceItem, new_status: SourceItemProcessStatus
     ) -> SourceItem:
         """更新数据项的处理状态"""
         source_item.status = new_status

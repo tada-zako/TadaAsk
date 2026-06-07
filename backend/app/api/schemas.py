@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
-from app.core.constants import SourceProcessStatus, IngestStage, RAGIngestEventType
+from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
 
 
 class ChatRequest(BaseModel):
@@ -50,7 +50,7 @@ class IngestProgressEvent(BaseModel):
     source_uid: str
     source_item_uid: str | None = None
     ingest_stage: IngestStage
-    process_status: SourceProcessStatus
+    process_status: SourceItemProcessStatus
     item_progress: float | None = None  # 当前文档处理进度，0.0 - 1.0
     message: str | None = None  # 可选的进度描述信息
     error: str | None = None  # 可选的错误信息，仅在 process_status=FAILED 时提供
@@ -67,7 +67,7 @@ class IngestPausedResponse(BaseModel):
 
     source_uid: str
     source_item_uid: str
-    process_status: SourceProcessStatus
+    process_status: SourceItemProcessStatus
     message: str
 
     model_config = ConfigDict(

@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
-
 from loguru import logger
 
 from app.rag import (
@@ -22,7 +21,7 @@ from app.db.schemas import DocumentChunkInternal
 from app.crud import SourceCRUD
 from app.api.schemas import IngestProgressEvent, IngestPausedResponse
 from app.utils.calcu_file_hash import calculate_text_hash
-from app.core.constants import SourceProcessStatus, IngestStage, RAGIngestEventType
+from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
 from app.core.exceptions import DocumentPausedException
 
 
@@ -103,40 +102,6 @@ class DocumentIngestService:
         self.fts_provider = fts_provider
         self.file_parser_factory = file_parser_factory
 
-        # async def get_related_documents(
-        #     self,
-        #     *,
-        #     collection_uid: str,
-        #     query_text: str,
-        #     top_k: int = 5,
-        # ) -> list[VectorQueryItem]:
-        #     """
-        #     获取 collection_uid 对应向量集合，
-        #     并执行向量库查询，返回与 query_text 相关文档内容
-        #     """
-        #     logger.info(
-        #         f"进行向量库查询，collection_uid={collection_uid}, query_text='{query_text[:50]}', top_k={top_k}"
-        #     )
-        #     result = await self.session.execute(
-        #         select(Source.collection_name).where(
-        #             Source.uid == collection_uid,
-        #         )
-        #     )
-        #     collection_name = result.scalar_one_or_none()
-
-        #     if not collection_name:
-        #         raise ValueError(
-        #             f"Can not find vector collection for collection_uid={collection_uid}"
-        #         )
-
-        #     # 执行向量库查询，获取相关文档
-        #     return await asyncio.to_thread(
-        #         self.vector_db.query,
-        #         collection_name=collection_name,
-        #         query_text=query_text,
-        #         top_k=top_k,
-        #     )
-
     def _batch_tokenize_for_fts(self, texts: list[str]) -> list[str]:
         """批量 FTS 分词同步函数"""
         return [self.fts_provider.tokenize_for_index(text) for text in texts]
@@ -148,7 +113,7 @@ class DocumentIngestService:
         source_item: SourceItem,
     ) -> IngestPausedResponse:
         """请求暂停文档处理"""
-        if source_item.status != SourceProcessStatus.PROCESSING:
+        if source_item.status != SourceItemProcessStatus.PROCESSING:
             logger.warning(
                 f"SourceItem {source_item.uid} 状态为 {source_item.status}，无法暂停"
             )
@@ -161,7 +126,7 @@ class DocumentIngestService:
 
         # 更新数据库状态，等待处理流程检查点生效
         await self.source_crud.update_source_item_status(
-            source_item, SourceProcessStatus.PAUSE_REQUESTED
+            source_item, SourceItemProcessStatus.PAUSE_REQUESTED
         )
         logger.info(
             f"SourceItem {source_item.uid} 已标记为 PAUSE_REQUESTED，等待处理流程检查点生效"
@@ -169,7 +134,7 @@ class DocumentIngestService:
         return IngestPausedResponse(
             source_uid=source.uid,
             source_item_uid=source_item.uid,
-            process_status=SourceProcessStatus.PAUSE_REQUESTED,
+            process_status=SourceItemProcessStatus.PAUSE_REQUESTED,
             message="Ingest pause requested, waiting for checkpoint",
         )
 
@@ -178,7 +143,7 @@ class DocumentIngestService:
     ) -> AsyncIterable[IngestProgressEvent]:
         """恢复文档处理"""
         # 仅允许从 PAUSED 状态恢复
-        if source_item.status != SourceProcessStatus.PAUSED:
+        if source_item.status != SourceItemProcessStatus.PAUSED:
             logger.warning(
                 f"SourceItem {source_item.uid} 状态为 {source_item.status}，无法恢复"
             )
@@ -188,7 +153,7 @@ class DocumentIngestService:
 
         # 更新 status
         await self.source_crud.update_source_item_status(
-            source_item, SourceProcessStatus.PROCESSING
+            source_item, SourceItemProcessStatus.PROCESSING
         )
         logger.info(f"SourceItem {source_item.uid} 已恢复处理，状态更新为 PROCESSING")
 
@@ -203,10 +168,10 @@ class DocumentIngestService:
         result = await self.source_crud.get_source_item_by_id(source_item_id)
         item = cast(SourceItem, result)  # 内部调用；能够确保结果存在
 
-        if item.status == SourceProcessStatus.PAUSE_REQUESTED:
+        if item.status == SourceItemProcessStatus.PAUSE_REQUESTED:
             # 更新状态为 PAUSED，触发暂停事件
             await self.source_crud.update_source_item_status(
-                item, SourceProcessStatus.PAUSED
+                item, SourceItemProcessStatus.PAUSED
             )
             logger.info(f"SourceItem {item.uid} 已更新状态为 PAUSED，触发暂停")
             # 主动触发暂停事件
@@ -218,9 +183,9 @@ class DocumentIngestService:
         """处理单个文档的完整流程，返回处理进度事件的异步生成器"""
 
         if source_item.status not in [
-            SourceProcessStatus.PENDING,
-            SourceProcessStatus.PAUSED,
-            SourceProcessStatus.FAILED,
+            SourceItemProcessStatus.PENDING,
+            SourceItemProcessStatus.PAUSED,
+            SourceItemProcessStatus.FAILED,
         ]:
             logger.warning(
                 f"SourceItem {source_item.uid} 状态为 {source_item.status}，不执行处理"
@@ -237,7 +202,7 @@ class DocumentIngestService:
 
         # 0. 更新 item 状态
         await self.source_crud.update_source_item_status(
-            source_item, SourceProcessStatus.PROCESSING
+            source_item, SourceItemProcessStatus.PROCESSING
         )
 
         # 0.1 暂停请求检查
@@ -249,7 +214,7 @@ class DocumentIngestService:
             source_uid=source.uid,
             source_item_uid=source_item.uid,
             ingest_stage=IngestStage.LOADING,
-            process_status=SourceProcessStatus.PROCESSING,
+            process_status=SourceItemProcessStatus.PROCESSING,
             item_progress=0.01,
             message="Document ingest started",
         )
@@ -273,7 +238,7 @@ class DocumentIngestService:
                 source_uid=source.uid,
                 source_item_uid=source_item.uid,
                 ingest_stage=IngestStage.PARSING,
-                process_status=SourceProcessStatus.PROCESSING,
+                process_status=SourceItemProcessStatus.PROCESSING,
                 item_progress=0.15,
                 message="Parsing document",
             )
@@ -306,7 +271,7 @@ class DocumentIngestService:
             source_uid=source.uid,
             source_item_uid=source_item.uid,
             ingest_stage=IngestStage.SPLITTING,
-            process_status=SourceProcessStatus.PROCESSING,
+            process_status=SourceItemProcessStatus.PROCESSING,
             item_progress=0.3,
             message="Splitting document into chunks",
         )
@@ -325,7 +290,7 @@ class DocumentIngestService:
             source_uid=source.uid,
             source_item_uid=source_item.uid,
             ingest_stage=IngestStage.PROCESSING_CHUNKS,
-            process_status=SourceProcessStatus.PROCESSING,
+            process_status=SourceItemProcessStatus.PROCESSING,
             item_progress=0.5,
             message="Processing document chunks",
         )
@@ -345,14 +310,14 @@ class DocumentIngestService:
 
         # 6 胜利宣言
         await self.source_crud.update_source_item_status(
-            source_item, SourceProcessStatus.COMPLETED
+            source_item, SourceItemProcessStatus.COMPLETED
         )
         yield IngestProgressEvent(
             event=RAGIngestEventType.INGEST_PROGRESS,
             source_uid=source.uid,
             source_item_uid=source_item.uid,
             ingest_stage=IngestStage.COMPLETED,
-            process_status=SourceProcessStatus.COMPLETED,
+            process_status=SourceItemProcessStatus.COMPLETED,
             item_progress=1.0,
             message="Document ingest completed successfully",
         )
@@ -451,7 +416,7 @@ class DocumentIngestService:
                 source_uid=source.uid,
                 source_item_uid=source_item.uid,
                 ingest_stage=IngestStage.PROCESSING_CHUNKS,
-                process_status=SourceProcessStatus.PROCESSING,
+                process_status=SourceItemProcessStatus.PROCESSING,
                 item_progress=0.5 + (batch_index + 1) / len(batches) * 0.4,
                 message=f"Processed chunk batch {batch_index + 1}/{len(batches)}",
             )
@@ -473,7 +438,7 @@ class DocumentIngestService:
             event=RAGIngestEventType.INGEST_START,
             source_uid=source.uid,
             ingest_stage=IngestStage.LOADING,
-            process_status=SourceProcessStatus.PROCESSING,
+            process_status=SourceItemProcessStatus.PROCESSING,
             item_progress=0.0,
             message="Document ingestion started",
         )
@@ -495,7 +460,7 @@ class DocumentIngestService:
                             source_uid=source.uid,
                             source_item_uid=source_item.uid,
                             ingest_stage=IngestStage.PAUSED,
-                            process_status=SourceProcessStatus.PAUSED,
+                            process_status=SourceItemProcessStatus.PAUSED,
                             message="Document ingest paused",
                         )
                     )
@@ -505,7 +470,7 @@ class DocumentIngestService:
                     logger.error(f"Error processing document {source_item.uid}: {e}")
                     # 更新数据库状态
                     await self.source_crud.update_source_item_status(
-                        source_item, SourceProcessStatus.FAILED
+                        source_item, SourceItemProcessStatus.FAILED
                     )
                     await queue.put(
                         IngestProgressEvent(
@@ -513,7 +478,7 @@ class DocumentIngestService:
                             source_uid=source.uid,
                             source_item_uid=source_item.uid,
                             ingest_stage=IngestStage.FAILED,
-                            process_status=SourceProcessStatus.FAILED,
+                            process_status=SourceItemProcessStatus.FAILED,
                             message="Document ingest failed",
                             error=str(e),
                         )
@@ -527,7 +492,7 @@ class DocumentIngestService:
                             source_uid=source.uid,
                             source_item_uid=source_item.uid,
                             ingest_stage=IngestStage.COMPLETED,
-                            process_status=SourceProcessStatus.COMPLETED,
+                            process_status=SourceItemProcessStatus.COMPLETED,
                             message="Document ingest completed",
                             item_progress=1.0,
                         )
@@ -550,7 +515,7 @@ class DocumentIngestService:
             event=RAGIngestEventType.INGEST_COMPLETE,
             source_uid=source.uid,
             ingest_stage=IngestStage.COMPLETED,
-            process_status=SourceProcessStatus.COMPLETED,
+            process_status=SourceItemProcessStatus.COMPLETED,
             message="All documents ingested",
             item_progress=1.0,
         )

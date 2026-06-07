@@ -5,7 +5,11 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
-from app.core.constants import SourceProcessStatus, ChatSessionType
+from app.core.constants import (
+    SourceProcessStatus,
+    SourceItemProcessStatus,
+    ChatSessionType,
+)
 
 
 # ======= Admin Schemas =======
@@ -175,7 +179,7 @@ class SourceItemInternalWithSourceID(SourceItemInternal):
 
 class SourceItemRead(SourceItemBase):
     uid: str
-    status: SourceProcessStatus
+    status: SourceItemProcessStatus
     updated_at: datetime
     created_at: datetime
 
@@ -193,7 +197,7 @@ class SourceItemUpdate(BaseModel):
     storage_key: str | None = None
     origin_url: str | None = None
     item_hash: str | None = None
-    status: SourceProcessStatus | None = None
+    status: SourceItemProcessStatus | None = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,

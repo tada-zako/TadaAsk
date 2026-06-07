@@ -16,7 +16,11 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.core.constants import SourceProcessStatus, ChatSessionType
+from app.core.constants import (
+    SourceProcessStatus,
+    SourceItemProcessStatus,
+    ChatSessionType,
+)
 
 
 class Base(AsyncAttrs, DeclarativeBase):
@@ -206,8 +210,8 @@ class SourceItem(Base):
     origin_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 可选 url
     item_hash: Mapped[str]  # 文件或 URL 的哈希值，用于去重和校验
 
-    status: Mapped[SourceProcessStatus] = mapped_column(
-        Enum(SourceProcessStatus), default=SourceProcessStatus.PENDING
+    status: Mapped[SourceItemProcessStatus] = mapped_column(
+        Enum(SourceItemProcessStatus), default=SourceItemProcessStatus.PENDING
     )  # 处理状态，如 "pending", "processing", "completed", "failed" 等
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

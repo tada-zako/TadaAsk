@@ -3,6 +3,18 @@ import enum
 
 class SourceProcessStatus(str, enum.Enum):
     """
+    source 数据源处理状态
+    """
+
+    PENDING = "pending"
+    PROCESSING = "processing"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class SourceItemProcessStatus(str, enum.Enum):
+    """
     source_item 文档处理状态
     """
 
