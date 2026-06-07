@@ -32,6 +32,7 @@ class FTSProvider(Protocol):
         session: AsyncSession,
         user_query: str,
         *,
+        source_item_ids: list[int],
         limit: int = 10,
     ) -> list[FTSResult]:
         """执行语义搜索，返回匹配的文档 ID 列表"""
@@ -42,6 +43,7 @@ class FTSProvider(Protocol):
         session: AsyncSession,
         lex_queries: list[str],
         *,
+        source_item_ids: list[int],
         limit: int = 10,
     ) -> list[FTSResult]:
         """基于关键词列表执行 FTS 搜索，返回匹配的文档 ID 列表"""
@@ -81,17 +83,21 @@ class SQLiteFTSProvider:
         session: AsyncSession,
         user_query: str,
         *,
+        source_item_ids: list[int],
         limit: int = 10,
     ) -> list[FTSResult]:
         """执行 FTS 搜索，返回匹配的文档 ID 列表"""
         fts_query = self._tokenizer.tokenize_for_query(user_query)
-        return await self._fts_search(session, fts_query, limit=limit)
+        return await self._fts_search(
+            session, fts_query, source_item_ids=source_item_ids, limit=limit
+        )
 
     async def keywords_search(
         self,
         session: AsyncSession,
         lex_queries: list[str],
         *,
+        source_item_ids: list[int],
         limit: int = 10,
     ) -> list[FTSResult]:
         """基于关键词列表执行 FTS 搜索，返回匹配的文档 ID 列表"""
@@ -100,13 +106,16 @@ class SQLiteFTSProvider:
 
         # 构建 MATCH 表达式
         match_expr = self._tokenizer.build_match_expr_from_expanded_tokens(lex_queries)
-        return await self._fts_search(session, match_expr, limit=limit)
+        return await self._fts_search(
+            session, match_expr, source_item_ids=source_item_ids, limit=limit
+        )
 
     async def _fts_search(
         self,
         session: AsyncSession,
         fts_query: str,
         *,
+        source_item_ids: list[int],
         limit: int = 10,
     ) -> list[FTSResult]:
         """执行 FTS 搜索，返回匹配的文档 ID 列表"""
@@ -116,14 +125,25 @@ class SQLiteFTSProvider:
         rows = await session.execute(
             text(
                 """
-                SELECT rowid, bm25(documents_fts) AS bm25_score
+                SELECT 
+                    document_chunks.id AS chunk_id,
+                    bm25(documents_fts) AS bm25_score
                 FROM documents_fts
+                JOIN document_chunks
+                    ON documents_fts.rowid = document_chunks.id
+                JOIN source_items
+                    ON document_chunks.source_item_id = source_items.id
                 WHERE documents_fts MATCH :query
+                    AND source_items.id IN :source_item_ids
                 ORDER BY bm25_score ASC
                 LIMIT :limit
                 """
             ),
-            {"query": fts_query, "limit": limit},
+            {
+                "query": fts_query,
+                "limit": limit,
+                "source_item_ids": tuple(source_item_ids),
+            },
         )
 
         return [FTSResult(chunk_id=row.rowid, score=row.bm25_score) for row in rows]
