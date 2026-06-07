@@ -56,6 +56,16 @@ class RAGIngestEventType(str, enum.Enum):
     ITEM_RESUMED = "item_resumed"
 
 
+class SearchMode(str, enum.Enum):
+    """
+    搜索模式
+    """
+
+    FAST = "fast"  # 快速模式；raw FTS + raw vector -> rrf rank -> rerank(可选)
+    ADAPTIVE = "adaptive"  # 自适应模式；根据 raw query 结果判断是否 query expansion
+    FULL = "full"  # 全量模式；raw FTS + raw vector -> query expansion -> rrf rank -> rerank(可选)
+
+
 class ChatSessionType(str, enum.Enum):
     """
     会话类型
