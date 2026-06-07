@@ -428,6 +428,7 @@ class DocumentIngestService:
 
         # 异步并发相关
         queue: asyncio.Queue[IngestProgressEvent] = asyncio.Queue()
+        # TODO: 并发控制应该提升到更通用的层面，作为有状态服务的一部分；目前先在这里实现一个简单的 Semaphore 控制并发量
         semaphore = asyncio.Semaphore(RAG_INGEST_MAX_CONCURRENCY)
 
         completed_workers = 0
