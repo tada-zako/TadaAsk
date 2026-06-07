@@ -53,6 +53,7 @@ class VectorDatabase(Protocol):
         collection_name: str,
         query_embedding: NDArray[np.float32],
         top_k: int = 5,
+        where: dict[str, Any] | None = None,
     ) -> list[VectorQueryResult]:
         """查询集合，返回匹配度最高的 top_k 条结果"""
         ...
@@ -120,12 +121,14 @@ class ChromaDB:
         collection_name: str,
         query_embedding: NDArray[np.float32],
         top_k: int = 5,
+        where: dict[str, Any] | None = None,
     ) -> list[VectorQueryResult]:
         """查询集合，返回匹配度最高的 top_k 条结果"""
         collection = self._get_collection(collection_name)
         results = collection.query(
             query_embeddings=[query_embedding],
             n_results=top_k,
+            where=where,
         )
 
         ids = (results["ids"] or [[]])[0]
