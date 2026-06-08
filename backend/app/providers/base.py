@@ -72,3 +72,8 @@ class StructuredCompleter(Protocol):
         """
         raise NotImplementedError()
         yield
+
+    @property
+    def model_name(self) -> str:
+        """返回模型名称，供业务层记录日志等使用"""
+        raise NotImplementedError()
