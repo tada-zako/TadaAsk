@@ -10,6 +10,7 @@ from app.core.constants import (
     SourceProcessStatus,
     SourceItemProcessStatus,
     ChatSessionType,
+    SearchMode,
 )
 
 
@@ -330,3 +331,69 @@ class HybridSearchResult:
 
     rrf_score: float | None = None
     rerank_score: float | None = None
+
+
+class HybridSearchRequest(BaseModel):
+    """混合搜索请求参数"""
+
+    mode: SearchMode = Field(
+        default=SearchMode.ADAPTIVE,
+        description="Search mode; defaults to 'adaptive'",
+    )
+    top_k: int = Field(
+        default=8,
+        ge=1,
+        description="Number of top results to return",
+    )
+
+    # rerank 策略
+    rerank_enabled: bool = Field(
+        default=True,
+        description="Whether to enable reranking; defaults to True",
+    )
+
+    # 召回候选数量
+    fts_k: int = Field(
+        default=30,
+        ge=0,
+        description="Number of candidates to retrieve from FTS search",
+    )
+    vector_k: int = Field(
+        default=20,
+        ge=0,
+        description="Number of candidates to retrieve from vector search",
+    )
+    rerank_k: int = Field(
+        default=12,
+        ge=0,
+        description="Number of candidates to rerank",
+    )
+
+    # expansion 策略
+    max_alternative_queries: int = Field(
+        default=2,
+        ge=0,
+        le=10,
+        description="Maximum number of alternative queries to generate for query expansion",
+    )
+    max_keywords: int = Field(
+        default=5,
+        ge=0,
+        le=20,
+        description="Maximum number of keywords to extract for query expansion",
+    )
+
+
+class HybridSearchOptions(HybridSearchRequest):
+    """混合搜索选项；包含搜索参数和策略配置"""
+
+    rrf_k: int = 60  # RRF 算法中的参数 K
+
+    # 并发限制
+    vector_search_concurrency: int = 6
+
+    # adaptive 判断；判断是否需要进入 FULL 模式
+    min_candidates: int = 5  # 最小候选数量；避免检索结果过窄
+    min_common_overlap: int = 1  # 最小 FTS & vector 重叠数量；
+    min_rerank_overlap: int = 0  # 最小 (FTS & vector) 与 rerank 重叠数量；
+    max_hit_score_gap_threshold: float = 0.75  # 最大命中分数阈值；

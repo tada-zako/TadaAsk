@@ -17,37 +17,9 @@ from app.rag import (
     RerankProvider,
 )
 from app.db.models import Source
-from app.db.schemas import HybridSearchResult
+from app.db.schemas import HybridSearchResult, HybridSearchOptions
 from app.crud import SourceCRUD, RAGSearchCRUD
 from app.core.constants import SearchMode
-
-
-@dataclass
-class HybridSearchOptions:
-    mode: SearchMode = SearchMode.ADAPTIVE  # 搜索模式
-    top_k: int = 10
-
-    # 召回候选数量
-    fts_k: int = 30
-    vector_k: int = 20
-    rrf_k: int = 60  # RRF 算法中的参数 K
-    rerank_k: int = 12
-
-    # expansion 策略
-    max_alternative_queries: int = 2  # 最大改写查询扩展数量
-    max_keywords: int = 5  # 最大关键词扩展数量
-
-    # rerank 策略
-    rerank_enabled: bool = False
-
-    # 并发限制
-    vector_search_concurrency: int = 6
-
-    # adaptive 判断；判断是否需要进入 FULL 模式
-    min_candidates: int = 5  # 最小候选数量；避免检索结果过窄
-    min_common_overlap: int = 1  # 最小 FTS & vector 重叠数量；
-    min_rerank_overlap: int = 0  # 最小 (FTS & vector) 与 rerank 重叠数量；
-    max_hit_score_gap_threshold: float = 0.75  # 最大命中分数阈值；
 
 
 @dataclass
