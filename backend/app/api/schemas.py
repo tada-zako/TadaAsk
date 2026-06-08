@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
+from app.db.schemas import HybridSearchResult
+from app.services import SearchDebugInfo
 
 
 class ChatRequest(BaseModel):
@@ -75,3 +77,11 @@ class IngestPausedResponse(BaseModel):
         validate_by_alias=True,
         validate_by_name=True,
     )
+
+
+class HybridSearchResponse(BaseModel):
+    """混合搜索响应结构体"""
+
+    raw_query: str
+    results: list[HybridSearchResult] = Field(default_factory=list)
+    debug_info: SearchDebugInfo | None = None
