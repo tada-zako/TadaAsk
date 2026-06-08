@@ -31,23 +31,41 @@ class QueryExpander:
     def __init__(self, completer: StructuredCompleter):
         self._completer = completer
 
-    async def expand_query(self, query: str) -> ExpandedQuery:
+    async def expand_query(
+        self,
+        query: str,
+        *,
+        max_keywords: int = 5,
+        max_alternative_queries: int = 2,
+    ) -> ExpandedQuery:
         """
         生成扩展查询
 
         Args:
             query (str): 原始用户查询
+            max_keywords (int): 关键词扩展的最大数量
+            max_alternative_queries (int): 改写查询的最大数量
 
         Returns:
             ExpandedQuery: 包含关键词、改写查询和假设文档的扩展查询结果
         """
+        if max_keywords < 1:
+            raise ValueError("max_keywords must be greater than 0")
+        if max_alternative_queries < 1:
+            raise ValueError("max_alternative_queries must be greater than 0")
+
         messages = [
             Message(
                 role="system",
                 content=QUERY_EXPAND_SYSTEM_PROMPT,
             ),
             Message(
-                role="user", content=QUERY_EXPAND_USER_TEMPLATE.format(query=query)
+                role="user",
+                content=QUERY_EXPAND_USER_TEMPLATE.format(
+                    query=query,
+                    max_keywords=max_keywords,
+                    max_alternative_queries=max_alternative_queries,
+                ),
             ),
         ]
 
@@ -55,4 +73,8 @@ class QueryExpander:
             messages=messages,
             schema=ExpandedQuery,
         )
-        return result
+        return ExpandedQuery(
+            keywords=result.keywords[:max_keywords],
+            alternative_queries=result.alternative_queries[:max_alternative_queries],
+            hypothetical_document=result.hypothetical_document,
+        )
