@@ -4,15 +4,14 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import BaseModel, Field, ConfigDict
-from pydantic.alias_generators import to_camel
 from loguru import logger
 
+from ..schemas import RawSearchConfidence, SearchDebugInfo
+from ..utils import track_latency
 from app.rag import (
     VectorDatabase,
     VectorQueryResult,
     QueryExpander,
-    ExpandedQuery,
     FTSProvider,
     EmbeddingProvider,
     RerankProvider,
@@ -35,7 +34,6 @@ class HybridSearchOptions:
     rerank_k: int = 12
 
     # expansion 策略
-    # expansion_enabled: bool = True
     max_alternative_queries: int = 2  # 最大改写查询扩展数量
     max_keywords: int = 5  # 最大关键词扩展数量
 
@@ -53,19 +51,6 @@ class HybridSearchOptions:
 
 
 @dataclass
-class RawSearchConfidence:
-    """raw search 结果的质量评估结构体"""
-
-    hit_count: int
-    fts_count: int
-    vector_count: int
-    common_overlap_count: int  # FTS & vector 的重叠结果
-    rerank_overlap_count: int  # (FTS & vector) 与 rerank 结果的重叠数量
-    hit_top_score: float | None = None
-    hit_gap: float | None = None
-
-
-@dataclass
 class RankedItem:
     """RRF rank 传递内部 item 数据结构"""
 
@@ -80,29 +65,6 @@ class RankedList:
     name: str
     items: list[RankedItem]
     weight: float = 1.0
-
-
-class SearchDebugInfo(BaseModel):
-    """搜索调试信息结构体"""
-
-    expanded_queries: ExpandedQuery | None = None
-    candidate_counts: dict[str, int] = Field(default_factory=dict)
-    latency_ms: dict[str, float] = Field(default_factory=dict)
-    confidence: RawSearchConfidence | None = None
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
-
-
-class HybridSearchResponse(BaseModel):
-    """混合搜索响应结构体"""
-
-    raw_query: str
-    results: list[HybridSearchResult] = Field(default_factory=list)
-    debug_info: SearchDebugInfo | None = None
 
 
 class HybridSearchService:
@@ -152,6 +114,10 @@ class HybridSearchService:
 
         for ranked_list in ranked_lists:
             for rank, item in enumerate(ranked_list.items):
+                # 过滤无效 chunk_id
+                if item.chunk_id == -1:
+                    continue
+
                 chunk_scores[item.chunk_id] = chunk_scores.get(item.chunk_id, 0.0) + (
                     ranked_list.weight / (k + rank + 1)
                 )
@@ -218,7 +184,7 @@ class HybridSearchService:
         # 1. 执行 RRF 合并
         rrf_results = self._rrf_merge(
             ranked_lists,
-            k=options.fts_k,
+            k=options.rrf_k,
             # 使用 rerank_k 作为 RRF 候选数量；减少 rerank 计算量
             limit=options.rerank_k,
         )
@@ -240,12 +206,15 @@ class HybridSearchService:
 
         documents = [result.content for result in ranked_hits]
 
-        # 4. 执行 rerank 操作
-        rerank_scores = await asyncio.to_thread(
-            self.rerank_provider.rerank,
-            query=query,
-            documents=documents,
-        )
+        if options.rerank_enabled:
+            # 4. 执行 rerank 操作
+            rerank_scores = await asyncio.to_thread(
+                self.rerank_provider.rerank,
+                query=query,
+                documents=documents,
+            )
+        else:
+            rerank_scores = [None] * len(ranked_hits)
 
         # 5. 附加 RRF score 和 rerank score 到结果中
         for hit, rerank_score in zip(ranked_hits, rerank_scores):
@@ -381,7 +350,8 @@ class HybridSearchService:
         )
 
         # 1.3 等待 embedding 结果，创建 raw vector search 任务
-        embedding_result = await embedding_task
+        async with track_latency(debug, "raw_embedding"):
+            embedding_result = await embedding_task
 
         vector_search_task = asyncio.create_task(
             self._vector_search_sources(
@@ -394,7 +364,8 @@ class HybridSearchService:
 
         # 2. 等待搜索结果
         fts_results = await fts_task
-        vector_results = await vector_search_task
+        async with track_latency(debug, "raw_vector_search"):
+            vector_results = await vector_search_task
 
         # 3.0 构建 vector_id -> chunk_id 的映射
         vector_id_to_chunk_id = await self.rag_search_crud.get_chunk_ids_by_vector_ids(
@@ -500,7 +471,8 @@ class HybridSearchService:
         )
 
         # 3.2 等待 embedding 结果，创建 expanded query vector search 任务
-        embedding_results = await asyncio.gather(*embedding_tasks)
+        async with track_latency(debug, "full_embedding"):
+            embedding_results = await asyncio.gather(*embedding_tasks)
 
         vector_search_tasks = [
             asyncio.create_task(
@@ -518,9 +490,10 @@ class HybridSearchService:
         fts_results = await fts_task
         # NOTE: 这里的 vector_results 依赖于 asyncio.gather 中任务的传入顺序，
         # 与 search_texts 顺序一致，不一定安全
-        vector_results: list[list[VectorQueryResult]] = await asyncio.gather(
-            *vector_search_tasks
-        )
+        async with track_latency(debug, "full_vector_search"):
+            vector_results: list[list[VectorQueryResult]] = await asyncio.gather(
+                *vector_search_tasks
+            )
 
         # 4.1 构建 FTS search 的 ranked list
         fts_ranked_list = RankedList(
@@ -537,14 +510,14 @@ class HybridSearchService:
 
         # 4.2 构建 vector search 的 ranked list
         vector_ranked_lists = []
-        for index, vector_result_list in enumerate(vector_results):
-            # 4.2.1 创建 vector_id -> chunk_id 的映射
-            vector_id_to_chunk_id = (
-                await self.rag_search_crud.get_chunk_ids_by_vector_ids(
-                    vector_ids=[r.vector_id for r in vector_result_list],
-                )
-            )
 
+        # 4.2.1 创建 vector_id -> chunk_id 的映射
+        all_vector_ids = [r.vector_id for sublist in vector_results for r in sublist]
+        vector_id_to_chunk_id = await self.rag_search_crud.get_chunk_ids_by_vector_ids(
+            vector_ids=all_vector_ids,
+        )
+
+        for index, vector_result_list in enumerate(vector_results):
             # 4.2.2 构建 ranked list
             if index == 0:
                 # hyde 查询

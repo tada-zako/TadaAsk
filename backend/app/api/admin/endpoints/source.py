@@ -22,7 +22,7 @@ from ...deps import (
     DocumentIngestServiceDeps,
 )
 from ...schemas import IngestPausedResponse
-from app.services import SourceItemService
+from app.services.rag import SourceItemService
 from app.db.models import Source, SourceItem
 from app.db.schemas import (
     SourceCreate,
