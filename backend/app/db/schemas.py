@@ -1,5 +1,6 @@
 import uuid
 from typing import Literal, Any
+from dataclasses import dataclass
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -301,3 +302,31 @@ class ChatMessageRead(ChatMessageBase):
         validate_by_alias=True,
         validate_by_name=True,
     )
+
+
+# ======= RAG Schemas =======
+@dataclass
+class HybridSearchResult:
+    """混合搜索结果数据结构"""
+
+    chunk_id: int
+    vector_id: str
+    chunk_index: int
+    content: str
+
+    source_id: int
+    source_uid: str
+    source_name: str
+
+    source_item_id: int
+    source_item_uid: str
+    title: str
+    filename: str
+    origin_url: str | None = None
+
+    page_number: int | None = None
+    section_header: str | None = None
+    metadata: dict[str, Any] | None = None
+
+    rrf_score: float | None = None
+    rerank_score: float | None = None
