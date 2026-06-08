@@ -6,6 +6,7 @@ from app.providers import (
     QUERY_EXPAND_USER_TEMPLATE,
     QUERY_EXPAND_SYSTEM_PROMPT,
 )
+from app.utils import TTLCache, normalize_text, stable_hash
 
 
 class ExpandedQuery(BaseModel):
@@ -28,8 +29,38 @@ class ExpandedQuery(BaseModel):
 class QueryExpander:
     """查询扩展器"""
 
-    def __init__(self, completer: StructuredCompleter):
+    def __init__(
+        self,
+        completer: StructuredCompleter,
+        *,
+        prompt_version: str = "prompt_v1",
+        cache_enabled: bool = True,
+        cache_size: int = 512,
+        ttl_seconds: int = 3600,
+    ):
         self._completer = completer
+        self._prompt_version = prompt_version
+        self._cache_enabled = cache_enabled
+
+        if self._cache_enabled:
+            self._cache = TTLCache[str, ExpandedQuery](
+                max_size=cache_size, ttl_seconds=ttl_seconds
+            )
+
+    def _cache_key(
+        self, query: str, max_keywords: int, max_alternative_queries: int
+    ) -> str:
+        """生成缓存键；基于查询文本和参数的规范化和稳定哈希"""
+        return stable_hash(
+            {
+                "kind": "expanded_query",
+                "model": self._completer.model_name,
+                "prompt_version": self._prompt_version,
+                "query": normalize_text(query),
+                "max_keywords": max_keywords,
+                "max_alternative_queries": max_alternative_queries,
+            }
+        )
 
     async def expand_query(
         self,
@@ -54,6 +85,13 @@ class QueryExpander:
         if max_alternative_queries < 1:
             raise ValueError("max_alternative_queries must be greater than 0")
 
+        if self._cache_enabled:
+            # 检查缓存结果
+            key = self._cache_key(query, max_keywords, max_alternative_queries)
+            cached_result = self._cache.get(key)
+            if cached_result is not None:
+                return cached_result
+
         messages = [
             Message(
                 role="system",
@@ -73,8 +111,15 @@ class QueryExpander:
             messages=messages,
             schema=ExpandedQuery,
         )
-        return ExpandedQuery(
+
+        expanded = ExpandedQuery(
             keywords=result.keywords[:max_keywords],
             alternative_queries=result.alternative_queries[:max_alternative_queries],
             hypothetical_document=result.hypothetical_document,
         )
+
+        # 设置缓存结果
+        if self._cache_enabled:
+            self._cache.set(key, expanded)  # type: ignore
+
+        return expanded

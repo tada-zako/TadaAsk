@@ -4,6 +4,8 @@ from fastembed import TextEmbedding
 from numpy.typing import NDArray
 import numpy as np
 
+from app.utils import TTLCache, normalize_text, stable_hash
+
 
 class EmbeddingProvider(Protocol):
     """文档嵌入协议"""
@@ -34,12 +36,37 @@ class EmbeddingProvider(Protocol):
 class FastEmbeddingAdapter:
     """基于 fastembed 的文本嵌入适配器"""
 
-    def __init__(self, model_name: str, cache_dir: str | None = None):
+    def __init__(
+        self,
+        model_name: str,
+        cache_dir: str | None = None,
+        *,
+        cache_enabled: bool = True,
+        cache_size: int = 1024,
+        ttl_seconds: int = 1800,
+    ):
         self._model_name = self._map_hf_to_fastembed(model_name)
         self._cache_dir = cache_dir
+        self._cache_enabled = cache_enabled
+
+        if self._cache_enabled:
+            # TTL Cache 缓存嵌入结果：文本 -> 向量
+            self._cache = TTLCache[str, NDArray[np.float32]](
+                max_size=cache_size, ttl_seconds=ttl_seconds
+            )
 
         self.embedding = TextEmbedding(
             model_name=self._model_name, cache_dir=self._cache_dir
+        )
+
+    def _cache_key(self, text: str) -> str:
+        """生成缓存键；基于文本的规范化和稳定哈希"""
+        return stable_hash(
+            {
+                "kind": "query_embedding",
+                "model": self._model_name,  # 模型名称确定不同的嵌入结果
+                "text": normalize_text(text),
+            }
         )
 
     def _map_hf_to_fastembed(self, model_name: str) -> str:
@@ -63,13 +90,26 @@ class FastEmbeddingAdapter:
 
     def embed_documents(self, documents: list[str]) -> list[NDArray[np.float32]]:
         """将文档列表转换为嵌入向量列表"""
+        # 长文档不设置缓存
         return [e.astype(np.float32) for e in self.embedding.embed(documents)]
 
     def embed_query(self, query: str) -> NDArray[np.float32]:
         """将查询文本转换为嵌入向量"""
+        if self._cache_enabled:
+            # 检查缓存结果
+            key = self._cache_key(query)
+            cached_embedding = self._cache.get(key)
+            if cached_embedding is not None:
+                return cached_embedding.copy()
+
         try:
             first_item = next(iter(self.embedding.query_embed([query])))
-            return first_item.astype(np.float32)
+            result = first_item.astype(np.float32)
         except StopIteration:
-            # 处理空迭代器的情况
-            return np.array([], dtype=np.float32)
+            result = np.array([], dtype=np.float32)
+
+        # 设置缓存结果
+        if self._cache_enabled:
+            self._cache.set(key, result.copy())  # type: ignore
+
+        return result
