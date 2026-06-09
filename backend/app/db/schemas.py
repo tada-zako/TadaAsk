@@ -1,4 +1,3 @@
-import uuid
 from typing import Literal, Any
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,6 +11,7 @@ from app.core.constants import (
     ChatSessionType,
     SearchMode,
 )
+from app.utils import generate_collection_name
 
 
 # ======= Admin Schemas =======
@@ -91,11 +91,6 @@ class ProjectRead(ProjectBase):
 
 
 # ======= Source Schemas =======
-def generate_collection_name() -> str:
-    """pydantic schema 内部函数：生成唯一且符合 ChromaDB 标准的 collection_name"""
-    return f"c_{uuid.uuid4().hex[:16]}"
-
-
 class SourceBase(BaseModel):
     source_name: str
     source_type: Literal["local_file", "web_scrape", "github_repo"]
@@ -250,7 +245,7 @@ class DocumentChunkRead(DocumentChunkBase):
 
 # ======= Chat Sessions Schemas =======
 class ChatSessionBase(BaseModel):
-    chat_session_name: str
+    title: str
     model: str
 
 
