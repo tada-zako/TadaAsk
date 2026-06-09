@@ -98,6 +98,7 @@ def get_admin_chat_service(
 
 
 # TODO: 后续改成使用 EventSourceResponse，支持 SSE 协议
+# TODO: opencode 设计：每个 new session 都会在上下文顶部插入一条“自动聊天会话标签生成”的要求
 @router.post("/project/{project_uid}/chat/stream")
 async def stream_chat(
     chat_request: ChatRequest,

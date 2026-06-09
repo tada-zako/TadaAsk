@@ -3,7 +3,6 @@ from typing import Annotated
 from fastapi import Depends, Request, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 from app.db import get_db
 from app.db.models import Project
 from app.crud import (
@@ -12,7 +11,9 @@ from app.crud import (
     ChatMessageCRUD,
     ChatSessionCRUD,
     SourceCRUD,
+    RAGSearchCRUD,
 )
+from app.providers import completer_factory, StructuredCompleter
 from app.storage import FileStorage
 from app.parser import FileParserFactory
 from app.rag import (
@@ -21,8 +22,10 @@ from app.rag import (
     FTSProvider,
     EmbeddingProvider,
     RerankProvider,
+    QueryExpander,
 )
-from app.services.rag import DocumentIngestService
+from app.services.rag import DocumentIngestService, HybridSearchService
+from app.core.config import settings
 
 
 # =========== 全局服务依赖注入接口 ============
@@ -88,6 +91,11 @@ async def get_source_crud(session: "SessionDeps") -> SourceCRUD:
     return SourceCRUD(session=session)
 
 
+async def get_rag_search_crud(session: "SessionDeps") -> RAGSearchCRUD:
+    """依赖注入接口：提供 RAGSearchCRUD 实例"""
+    return RAGSearchCRUD(session=session)
+
+
 async def valid_project(
     project_crud: Annotated[ProjectCRUD, Depends(get_project_crud)],
     project_uid: Annotated[str, Path(..., description="Project UID")],
@@ -97,6 +105,49 @@ async def valid_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+# =========== Provider 依赖注入接口 ============
+def get_completer(
+    provider_name: Annotated[
+        str,
+        Path(
+            ...,
+            description="Provider name, e.g. 'openai', 'google', 'deepseek', 'ollama'",
+        ),
+    ],
+    model_name: Annotated[
+        str,
+        Path(
+            ...,
+            description="Model name, e.g. 'gpt-3.5-turbo', 'gemini-1.5-pro', 'ollama-mistral-7b-v0.1.Q4_0.gguf'",
+        ),
+    ],
+) -> StructuredCompleter:
+    """依赖注入接口：根据 provider_name 和 model_name 返回对应的 FullCompleter 实例"""
+    p_name = provider_name or settings.llm_provider_admin or "google"
+
+    if p_name == "google":
+        m_name = model_name or settings.gemini_model_perf or "gemini-2.5-flash"
+    elif p_name == "deepseek":
+        m_name = model_name or settings.deepseek_model_perf or "DeepSeek-V4-Flash"
+    else:
+        m_name = model_name
+
+    return completer_factory(provider=p_name, model=m_name)
+
+
+def get_query_expander(
+    completer: Annotated[StructuredCompleter, Depends(get_completer)],
+) -> QueryExpander:
+    """依赖注入接口：提供 QueryExpander 实例"""
+    return QueryExpander(
+        completer=completer,
+        prompt_version="prompt_v1",
+        cache_enabled=True,
+        cache_size=512,
+        ttl_seconds=3600,
+    )
 
 
 # =========== Service 层依赖注入接口 ===========
@@ -118,6 +169,29 @@ def get_document_ingest_service(
         embedding=embedding,
         fts_provider=fts_provider,
         file_parser_factory=file_parser_factory,
+    )
+
+
+def get_hybrid_search_service(
+    session: "SessionDeps",
+    source_crud: "SourceCRUDeps",
+    rag_search_crud: "RAGSearchCRUDeps",
+    vector_db: "VectorDBDeps",
+    query_expander: "QueryExpanderDeps",
+    embedding: "EmbeddingProviderDeps",
+    fts_provider: "FTSProviderDeps",
+    rerank_provider: "RerankProviderDeps",
+) -> HybridSearchService:
+    """HybridSearchService 依赖注入接口"""
+    return HybridSearchService(
+        session=session,
+        source_crud=source_crud,
+        rag_search_crud=rag_search_crud,
+        vector_db=vector_db,
+        query_expander=query_expander,
+        embedding=embedding,
+        fts_provider=fts_provider,
+        rerank_provider=rerank_provider,
     )
 
 
@@ -144,9 +218,13 @@ AdminCRUDeps = Annotated[AdminCRUD, Depends(get_admin_crud)]
 ChatMessageCRUDeps = Annotated[ChatMessageCRUD, Depends(get_chat_message_crud)]
 ChatSessionCRUDeps = Annotated[ChatSessionCRUD, Depends(get_chat_session_crud)]
 SourceCRUDeps = Annotated[SourceCRUD, Depends(get_source_crud)]
+RAGSearchCRUDeps = Annotated[RAGSearchCRUD, Depends(get_rag_search_crud)]
 
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
+
+# Provider 依赖
+QueryExpanderDeps = Annotated[QueryExpander, Depends(get_query_expander)]
 
 # Service 依赖
 DocumentIngestServiceDeps = Annotated[
