@@ -73,7 +73,7 @@ async def valid_or_create_admin_chat_session(
     # 如果没有提供有效的 chat_session_uid，则创建新的聊天会话
     new_chat_session = await chat_session_crud.create_chat_session(
         chat_session_data=ChatSessionInternal(
-            chat_session_name="New Chat Session",
+            title="New Chat Session",
             model=model.model_name,
             session_type=ChatSessionType.ADMIN,
             project_id=project.id,

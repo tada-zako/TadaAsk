@@ -13,6 +13,10 @@ from app.core.constants import (
 )
 from app.utils import generate_collection_name
 
+# =========================
+# System Schemas 设计
+# =========================
+
 
 # ======= Admin Schemas =======
 class AdminBase(BaseModel):
@@ -59,15 +63,15 @@ class ProjectBase(BaseModel):
     description: str | None = None
     site_url: str
 
+    visitor_rag_enabled: bool = True
+    # TODO: 具体的 RAG 策略配置后续完善
+    rag_policy_json: "HybridSearchRequest | None" = None
+
 
 class ProjectCreate(ProjectBase):
-    provider: str | None = Field(
+    visitor_default_model_profile_uid: str | None = Field(
         default=None,
-        description="Model Provider; can be left empty during initial creation",
-    )
-    model: str | None = Field(
-        default=None,
-        description="Model Name; can be left empty during initial creation",
+        description="Default model profile UID for visitors",
     )
 
     model_config = ConfigDict(
@@ -79,8 +83,10 @@ class ProjectCreate(ProjectBase):
 class ProjectRead(ProjectBase):
     uid: str
     created_at: datetime
-    provider: str
-    model: str
+
+    visitor_default_model_profile: "ModelProfileRead | None" = None
+
+    # TODO: 具体的 chat sessions 传递数据后续完善
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -88,6 +94,11 @@ class ProjectRead(ProjectBase):
         validate_by_alias=True,
         validate_by_name=True,
     )
+
+
+# =========================
+# RAG Schemas 设计
+# =========================
 
 
 # ======= Source Schemas =======
@@ -243,23 +254,76 @@ class DocumentChunkRead(DocumentChunkBase):
     )
 
 
+# =========================
+# LLM Chat Schemas 设计
+# =========================
+
+
+# ======= Model Profile Schemas =======
+class ModelProfileBase(BaseModel):
+    provider: str
+    model: str
+    display_name: str | None = None
+
+    context_window_tokens: int | None = Field(
+        default=None,
+        gt=0,
+        description="Model context window size in tokens",
+    )
+    max_output_tokens: int | None = Field(
+        default=None,
+        gt=0,
+        description="Maximum output tokens allowed for the model",
+    )
+
+    supports_stream: bool = True
+    supports_structured: bool = True
+    is_enabled: bool = True
+
+
+class ModelProfileCreate(ModelProfileBase):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+    )
+
+
+class ModelProfileRead(ModelProfileBase):
+    uid: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 # ======= Chat Sessions Schemas =======
 class ChatSessionBase(BaseModel):
     title: str
-    model: str
+    owner_type: ChatSessionType
+
+
+class ChatSessionCreate(ChatSessionBase):
+    active_model_profile_uid: str | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+    )
 
 
 class ChatSessionInternal(ChatSessionBase):
     visitor_id: str | None = Field(
         default=None, description="Visitor ID: An optional field for anonymous users"
     )
-    session_type: ChatSessionType
-    project_id: int = Field(..., description="Associated project ID")
 
 
 class ChatSessionRead(ChatSessionBase):
     uid: str
-    session_type: ChatSessionType
     created_at: datetime
     updated_at: datetime
 
