@@ -23,12 +23,26 @@ class ChatRequest(BaseModel):
     )
 
 
-class AgentRequest(ChatRequest):
-    # 额外字段，指定 Agent 运行支持的功能
-    mode: Literal["rag_search", "web_search"] = Field(
-        default="rag_search",
-        description="Agent 运行模式，决定使用哪个工具集，目前支持 'rag_search' 和 'web_search'",
+class ModelSelection(BaseModel):
+    """模型选择请求结构体"""
+
+    model_profile_uid: str | None = Field(
+        default=None,
+        description="模型配置 UID",
     )
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+    )
+
+
+# class AgentRequest(ChatRequest):
+#     # 额外字段，指定 Agent 运行支持的功能
+#     mode: Literal["rag_search", "web_search"] = Field(
+#         default="rag_search",
+#         description="Agent 运行模式，决定使用哪个工具集，目前支持 'rag_search' 和 'web_search'",
+#     )
 
 
 class Token(BaseModel):

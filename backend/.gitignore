@@ -3,5 +3,6 @@
 # ========================
 storages/
 scripts/chore/
+**.local**
 # 暂不考虑 Agent 相关实现
 agent*
