@@ -20,6 +20,9 @@ from app.core.constants import (
     SourceProcessStatus,
     SourceItemProcessStatus,
     ChatSessionType,
+    SearchMode,
+    ChatMessageRole,
+    ChatMessageType,
 )
 
 
@@ -75,34 +78,26 @@ class Project(Base):
         default=lambda: str(uuid.uuid4()),
     )
 
-    # RAG 相关配置
-    visitor_rag_enabled: Mapped[bool] = mapped_column(
-        Boolean, default=True
-    )  # visitor 是否启用 RAG
-    rag_policy_json: Mapped[Optional[dict]] = mapped_column(
-        JSON, nullable=True
-    )  # RAG 策略配置
-
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     site_url: Mapped[str] = mapped_column(
         String, unique=True, nullable=False
     )  # 项目对应的站点 URL
-    description: Mapped[str]
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-
-    # visitor 默认模型配置
-    visitor_default_model_profile_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("model_profiles.id", ondelete="SET NULL"),
-        nullable=True,
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    visitor_default_model_profile: Mapped[Optional["ModelProfile"]] = relationship(
-        foreign_keys=[visitor_default_model_profile_id]
-    )
-
+    # 关系字段
+    chat_setting: Mapped[Optional["ProjectChatSetting"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,  # 一对一关系
+    )  # 项目的对话设置
     chat_sessions: Mapped[list["ChatSession"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
@@ -120,6 +115,63 @@ class Project(Base):
         back_populates="projects",
         viewonly=True,  # 多对多关系只通过 ProjectSourceLink 进行维护
     )  # 项目下的数据来源列表
+
+
+class ProjectChatSetting(Base):
+    """
+    项目设置表：存储项目的配置信息，如 RAG 策略等
+    """
+
+    __tablename__ = "project_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # RAG 相关配置
+    visitor_rag_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True
+    )  # visitor 是否启用 RAG
+    visitor_system_prompt: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # visitor 的 system prompt 配置
+
+    # RAG 策略配置
+    rag_mode: Mapped[SearchMode] = mapped_column(
+        Enum(SearchMode),
+        default=SearchMode.FAST,
+    )
+    rag_top_k: Mapped[int] = mapped_column(Integer, default=8)
+
+    rag_rerank_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    rag_fts_k: Mapped[int] = mapped_column(Integer, default=30)
+    rag_vector_k: Mapped[int] = mapped_column(Integer, default=20)
+    rag_rerank_k: Mapped[int] = mapped_column(Integer, default=12)
+
+    rag_max_alternative_queries: Mapped[int] = mapped_column(Integer, default=2)
+    rag_max_keywords: Mapped[int] = mapped_column(Integer, default=5)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # visitor 默认模型配置
+    visitor_default_model_profile_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("model_profiles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )  # 一对一关系，外键关联到项目表
+
+    visitor_default_model_profile: Mapped[Optional["ModelProfile"]] = relationship(
+        foreign_keys=[visitor_default_model_profile_id]
+    )
+    project: Mapped["Project"] = relationship(back_populates="chat_settings")
 
 
 # =========================
@@ -353,12 +405,11 @@ class ModelProfile(Base):
     )
 
     provider: Mapped[str] = mapped_column(String, nullable=False)
-    model_name: Mapped[str] = mapped_column(String, nullable=False)
-    display_name: Mapped[Optional[str]]  # 模型展示名称，如 "GPT-3.5 Turbo"
+    model: Mapped[str] = mapped_column(String, nullable=False)
 
-    # TODO: 如果没有设置模型的窗口大小，如果配置默认值
-    context_window_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
-    max_output_tokens: Mapped[int] = mapped_column(Integer, default=2048)
+    # 允许不设置 token 限制，上下文窗口/最大输出由 service 层配置默认值控制
+    context_window_tokens: Mapped[Optional[int]]
+    max_output_tokens: Mapped[Optional[int]]
 
     supports_stream: Mapped[bool] = mapped_column(Boolean, default=True)
     supports_structured: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -402,8 +453,15 @@ class ChatSession(Base):
         String, nullable=True
     )  # 访客标识，后续可以基于 IP 地址或其他方式生成访客 ID，实现对话的归属和分析
     # TODO: 考虑是否需要记录访客 IP 字段，实现更加细致的访问分析
-
     title: Mapped[str]
+    provider: Mapped[str] = mapped_column(String, nullable=False)
+    model: Mapped[str] = mapped_column(String, nullable=False)
+
+    tokens_input: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_output: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_total: Mapped[int] = mapped_column(Integer, default=0)
+
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -412,25 +470,10 @@ class ChatSession(Base):
     )
 
     # 外键关联到项目表
-    active_model_profile_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("model_profiles.id", ondelete="SET NULL"),
-        nullable=True,
-    )  # 当前对话使用的模型配置
-    active_message_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("chat_messages.id", ondelete="SET NULL"),
-        nullable=True,
-    )  # 当前 session 最新消息的 ID；用于实现对话回退
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE")
     )
 
-    active_model_profile: Mapped[Optional["ModelProfile"]] = relationship(
-        foreign_keys=[active_model_profile_id]
-    )
-    active_message: Mapped[Optional["ChatMessage"]] = relationship(
-        foreign_keys=[active_message_id],
-        post_update=True,  # 解决 ChatSession 和 ChatMessage 之间的循环依赖问题
-    )
     project: Mapped["Project"] = relationship(back_populates="chat_sessions")
     chat_messages: Mapped[list["ChatMessage"]] = relationship(
         back_populates="chat_session",
@@ -447,18 +490,27 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    uid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    )
 
-    sequence_index: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )  # 消息在对话中的顺序索引
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)  # 消息在对话中的顺序
 
-    role: Mapped[str]
+    role: Mapped[ChatMessageRole] = mapped_column(Enum(ChatMessageRole))
     message: Mapped[str]
+    type: Mapped[ChatMessageType] = mapped_column(
+        Enum(ChatMessageType), default=ChatMessageType.MESSAGE
+    )
+
     # NOTE: 如果修改 JSON 字典内部的某个值，SQLAlchemy 默认无法检测到这种变化（如果后期需要修改引用，大概率用不到）
-    citations_json: Mapped[Optional[dict]] = mapped_column(
+    citations: Mapped[Optional[dict]] = mapped_column(
         JSON, nullable=True
     )  # 引用信息，包含来源、相关文档等元数据
-    rag_snapshot_json: Mapped[Optional[dict]] = mapped_column(
+    rag_snapshot: Mapped[Optional[dict]] = mapped_column(
         JSON, nullable=True
     )  # RAG 快照信息，包含当时使用的向量、相关文档等元数据
 
@@ -467,25 +519,24 @@ class ChatMessage(Base):
     )  # 消息生成使用的模型提供商
     model: Mapped[str] = mapped_column(String, nullable=False)  # 消息生成使用的模型名称
 
-    prompt_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    completion_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    total_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
-    parent_message_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("chat_messages.id", ondelete="SET NULL"), nullable=True
-    )  # 父消息 ID；用于实现对话的回退机制
+    # 关联字段
     chat_session_id: Mapped[int] = mapped_column(
         ForeignKey("chat_sessions.id", ondelete="CASCADE")
     )  # 外键关联到对话表
 
-    parent_message: Mapped[Optional["ChatMessage"]] = relationship(
-        remote_side=[id], foreign_keys=[parent_message_id]
-    )  # 自引用关系，建立消息之间的父子关系
     chat_session: Mapped["ChatSession"] = relationship(back_populates="chat_messages")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "chat_session_id",
+            "sequence",
+            name="_session_sequence_uc",
+        ),
+    )
 
 
 # TODO: 目前对于实际的业务逻辑还是有些不太清楚：
