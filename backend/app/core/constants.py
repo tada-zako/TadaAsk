@@ -73,3 +73,22 @@ class ChatSessionType(str, enum.Enum):
 
     ADMIN = "admin"
     VISITOR = "visitor"
+
+
+class ChatMessageRole(str, enum.Enum):
+    """
+    消息角色
+    """
+
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+class ChatMessageType(str, enum.Enum):
+    """
+    消息类型
+    """
+
+    MESSAGE = "message"
+    SUMMARY = "summary"  # 系统生成的对话总结消息
