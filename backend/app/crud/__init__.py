@@ -4,6 +4,7 @@ from .chat_message import ChatMessageCRUD
 from .project import ProjectCRUD
 from .source import SourceCRUD
 from .rag_search import RAGSearchCRUD
+from .model_profile import ModelProfileCRUD
 
 __all__ = [
     "AdminCRUD",
@@ -12,4 +13,5 @@ __all__ = [
     "ProjectCRUD",
     "SourceCRUD",
     "RAGSearchCRUD",
+    "ModelProfileCRUD",
 ]

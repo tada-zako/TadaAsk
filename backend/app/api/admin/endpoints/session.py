@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Path, Depends, HTTPException
-from loguru import logger
 
 from ...deps import (
     ValidProjectDeps,
@@ -35,9 +34,13 @@ async def list_chat_sessions(
     Returns:
         聊天会话列表
     """
-    return await chat_session_crud.list_chat_sessions(
-        session_type=ChatSessionType.ADMIN, limit=limit, offset=offset
+    sessions = await chat_session_crud.list_chat_sessions_by_type_and_project_id(
+        project_id=project.id,
+        owner_type=ChatSessionType.ADMIN,
+        limit=limit,
+        offset=offset,
     )
+    return [ChatSessionRead.model_validate(session) for session in sessions]
 
 
 async def valid_admin_chat_session(
@@ -59,13 +62,11 @@ async def valid_admin_chat_session(
     chat_session = await chat_session_crud.get_chat_session_by_uid(
         chat_session_uid=chat_session_uid
     )
-    if chat_session:
-        return chat_session
-    else:
-        logger.warning(
-            f"Invalid chat_session_uid: {chat_session_uid}, creating new chat session"
-        )
-        raise ValueError("Invalid chat_session_uid, creating new chat session")
+
+    if not chat_session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    return chat_session
 
 
 ChatSessionDeps = Annotated[ChatSession, Depends(valid_admin_chat_session)]
@@ -94,7 +95,7 @@ async def list_chat_messages(
         消息列表
     """
     # TODO: 这里的分页逻辑暂时固定为内部设置
-    messages = await chat_message_crud.get_messages_by_session_id(
+    messages = await chat_message_crud.list_messages_for_display(
         chat_session_id=chat_session.id, limit=20, offset=0
     )
     return [ChatMessageRead.model_validate(message) for message in messages]
