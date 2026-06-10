@@ -10,6 +10,8 @@ from app.core.constants import (
     SourceItemProcessStatus,
     ChatSessionType,
     SearchMode,
+    ChatMessageType,
+    ChatMessageRole,
 )
 from app.utils import generate_collection_name
 
@@ -63,15 +65,10 @@ class ProjectBase(BaseModel):
     description: str | None = None
     site_url: str
 
-    visitor_rag_enabled: bool = True
-    # TODO: 具体的 RAG 策略配置后续完善
-    rag_policy_json: "HybridSearchRequest | None" = None
-
 
 class ProjectCreate(ProjectBase):
-    visitor_default_model_profile_uid: str | None = Field(
-        default=None,
-        description="Default model profile UID for visitors",
+    chat_setting: "ProjectChatSettingCreate" = Field(
+        default_factory=lambda: ProjectChatSettingCreate(),
     )
 
     model_config = ConfigDict(
@@ -87,6 +84,45 @@ class ProjectRead(ProjectBase):
     visitor_default_model_profile: "ModelProfileRead | None" = None
 
     # TODO: 具体的 chat sessions 传递数据后续完善
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+# ======= Project Chat Setting Schemas =======
+class ProjectChatSettingBase(BaseModel):
+    """项目对话设置基类"""
+
+    visitor_default_model_profile_uid: str | None = None
+    visitor_rag_enabled: bool = True
+    visitor_system_prompt: str | None = None
+
+    rag_mode: SearchMode = SearchMode.FULL
+    rag_top_k: int = Field(default=8, ge=1)
+
+    rag_rerank_enabled: bool = True
+    rag_fts_k: int = Field(default=30, ge=0)
+    rag_vector_k: int = Field(default=20, ge=0)
+    rag_rerank_k: int = Field(default=12, ge=0)
+
+    rag_max_alternative_queries: int = Field(default=2, ge=0, le=10)
+    rag_max_keywords: int = Field(default=5, ge=0, le=20)
+
+
+class ProjectChatSettingCreate(ProjectChatSettingBase):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class ProjectChatSettingRead(ProjectChatSettingBase):
+    visitor_default_model_profile: "ModelProfileRead | None" = None
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -263,7 +299,6 @@ class DocumentChunkRead(DocumentChunkBase):
 class ModelProfileBase(BaseModel):
     provider: str
     model: str
-    display_name: str | None = None
 
     context_window_tokens: int | None = Field(
         default=None,
@@ -279,6 +314,7 @@ class ModelProfileBase(BaseModel):
     supports_stream: bool = True
     supports_structured: bool = True
     is_enabled: bool = True
+    default_params_json: dict[str, Any] | None = None
 
 
 class ModelProfileCreate(ModelProfileBase):
@@ -306,17 +342,12 @@ class ChatSessionBase(BaseModel):
     title: str
     owner_type: ChatSessionType
 
-
-class ChatSessionCreate(ChatSessionBase):
-    active_model_profile_uid: str | None = None
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-    )
+    provider: str
+    model: str
 
 
 class ChatSessionInternal(ChatSessionBase):
+    project_id: int
     visitor_id: str | None = Field(
         default=None, description="Visitor ID: An optional field for anonymous users"
     )
@@ -337,24 +368,37 @@ class ChatSessionRead(ChatSessionBase):
 
 # ======= Chat Message Schemas =======
 class ChatMessageBase(BaseModel):
-    role: Literal["user", "assistant"]
+    role: ChatMessageRole
     message: str
+    type: ChatMessageType = ChatMessageType.MESSAGE
+
+    provider: str
+    model: str
+
+    citations: dict[str, Any] | None = None
+    rag_snapshot: dict[str, Any] | None = None
 
 
 class ChatMessageInternal(ChatMessageBase):
     """系统内部使用的模型，包含 created_at 字段"""
 
+    chat_session_id: int
+    sequence: int  # 消息在会话中的顺序
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ChatMessageRead(ChatMessageBase):
-    citations: list[dict[str, Any]] | None = Field(
-        default=None,
-        description="List of citations associated with the message, if any",
-    )
+    uid: str
+    sequence: int
+
+    tokens_input: int = 0
+    tokens_output: int = 0
+    tokens_total: int = 0
+
     created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(
         from_attributes=True,
