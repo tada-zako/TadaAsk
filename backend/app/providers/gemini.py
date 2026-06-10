@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from .base import StreamedResponse, Message
 from app.core.config import settings
+from app.core.constants import ChatMessageRole
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -31,7 +32,7 @@ class GeminiStreamedResponse(StreamedResponse):
     async def close_stream(self) -> None:
         if hasattr(self.stream_iter, "aclose"):
             try:
-                await self.stream_iter.aclose()
+                await self.stream_iter.aclose()  # type: ignore
             except RuntimeError as exc:
                 if "asynchronous generator is already running" not in str(exc):
                     # 如果是因为生成器正在运行而无法关闭，则忽略该错误；否则，重新抛出异常
@@ -66,11 +67,16 @@ class GeminiModel:
     ) -> tuple[list[ContentUnionDict], GenerateContentConfigDict]:
         """将通用 Message 转换为 Gemini LLM 请求接口需要的内容格式和配置格式"""
         system_prompt = next(
-            (msg.content for msg in reversed(messages) if msg.role == "system"), ""
+            (
+                msg.content
+                for msg in reversed(messages)
+                if msg.role == ChatMessageRole.SYSTEM
+            ),
+            "",
         )
 
         last_user_msg = messages[-1]
-        if last_user_msg.role != "user":
+        if last_user_msg.role != ChatMessageRole.USER:
             raise ValueError("The last message must be a user message.")
         user_content = types.Content(
             role="user", parts=[types.Part(text=last_user_msg.content)]
@@ -79,9 +85,9 @@ class GeminiModel:
         # 历史对话构建，过滤掉 system 消息和 user_message
         history_contents: list[types.ContentOrDict] = []
         for msg in messages[:-1]:
-            if msg.role == "system":
+            if msg.role == ChatMessageRole.SYSTEM:
                 continue
-            role = "model" if msg.role == "assistant" else "user"
+            role = "model" if msg.role == ChatMessageRole.ASSISTANT else "user"
             history_contents.append(
                 types.Content(role=role, parts=[types.Part(text=msg.content)])
             )

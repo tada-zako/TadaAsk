@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from .base import StreamedResponse, Message
 from .openai_compatible import OpenAIEndpoint
 from app.core.config import settings
+from app.core.constants import ChatMessageRole
 
 
 DEFAULT_RESPONSE_FORMAT_NAME = "response_format"
@@ -96,19 +97,19 @@ class OpenAIChatModel:
         """将通用 Message 转换为 OpenAI SDK 兼容的 ChatCompletionMessageParam 列表"""
         openai_messages: list[ChatCompletionMessageParam] = []
         for msg in messages:
-            if msg.role == "system":
+            if msg.role == ChatMessageRole.SYSTEM:
                 openai_messages.append(
                     chat.ChatCompletionDeveloperMessageParam(
                         role="developer", content=msg.content
                     )
                 )
-            elif msg.role == "user":
+            elif msg.role == ChatMessageRole.USER:
                 openai_messages.append(
                     chat.ChatCompletionUserMessageParam(
                         role="user", content=msg.content
                     )
                 )
-            elif msg.role == "assistant":
+            elif msg.role == ChatMessageRole.ASSISTANT:
                 openai_messages.append(
                     chat.ChatCompletionAssistantMessageParam(
                         role="assistant", content=msg.content

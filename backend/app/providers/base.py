@@ -1,14 +1,16 @@
-from typing import Protocol, runtime_checkable, Literal, AsyncIterator, TypeVar
+from typing import Protocol, runtime_checkable, AsyncIterator, TypeVar
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from pydantic import BaseModel
 
+from app.core.constants import ChatMessageRole
+
 
 @dataclass
 class Message:
-    role: Literal["system", "user", "assistant"]
+    role: ChatMessageRole
     content: str
 
 
