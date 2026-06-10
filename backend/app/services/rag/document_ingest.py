@@ -151,12 +151,6 @@ class DocumentIngestService:
                 f"SourceItem {source_item.uid} is not in PAUSED status, cannot resume"
             )
 
-        # 更新 status
-        await self.source_crud.update_source_item_status(
-            source_item, SourceItemProcessStatus.PROCESSING
-        )
-        logger.info(f"SourceItem {source_item.uid} 已恢复处理，状态更新为 PROCESSING")
-
         # 主动触发后续 ingest
         async for event in self.ingest_source_items(
             source=source, source_items=[source_item]
