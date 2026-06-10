@@ -3,9 +3,9 @@ from typing import Sequence
 from sqlalchemy import select, not_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.constants import ChatSessionType
 from app.db.models import ChatSession
 from app.db.schemas import ChatSessionInternal
+from app.core.constants import ChatSessionType
 
 
 class ChatSessionCRUD:

@@ -384,7 +384,6 @@ class ChatMessageInternal(ChatMessageBase):
 
     chat_session_id: int
     sequence: int  # 消息在会话中的顺序
-    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -398,7 +397,6 @@ class ChatMessageRead(ChatMessageBase):
     tokens_total: int = 0
 
     created_at: datetime
-    updated_at: datetime
 
     model_config = ConfigDict(
         from_attributes=True,
