@@ -1,6 +1,7 @@
 from typing import AsyncIterable, Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 from loguru import logger
 
 from ...schemas import ChatRequest
@@ -99,13 +100,13 @@ def get_admin_chat_service(
 
 # TODO: 后续改成使用 EventSourceResponse，支持 SSE 协议
 # TODO: opencode 设计：每个 new session 都会在上下文顶部插入一条“自动聊天会话标签生成”的要求
-@router.post("/project/{project_uid}/chat/stream")
+@router.post("/project/{project_uid}/chat/stream", response_model=EventSourceResponse)
 async def stream_chat(
     chat_request: ChatRequest,
     project: ValidProjectDeps,
     chat_session: Annotated[ChatSession, Depends(valid_or_create_admin_chat_session)],
     chat_service: Annotated[ChatService, Depends(get_admin_chat_service)],
-) -> AsyncIterable[str]:
+) -> AsyncIterable[ServerSentEvent]:
     """
     流式调用 LLM 生成聊天回复（无 Agent）
 
