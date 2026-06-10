@@ -28,6 +28,20 @@ class GeminiStreamedResponse(StreamedResponse):
             if chunk.text:
                 yield chunk.text
 
+    async def close_stream(self) -> None:
+        if hasattr(self.stream_iter, "aclose"):
+            try:
+                await self.stream_iter.aclose()
+            except RuntimeError as exc:
+                if "asynchronous generator is already running" not in str(exc):
+                    # 如果是因为生成器正在运行而无法关闭，则忽略该错误；否则，重新抛出异常
+                    raise
+
+        # 避免底层 SDK 不支持显式关闭流式连接时
+        raise NotImplementedError(
+            "The underlying stream does not support explicit closure."
+        )
+
 
 class GeminiModel:
     def __init__(self, model_perf: str):

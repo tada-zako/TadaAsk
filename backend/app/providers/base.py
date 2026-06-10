@@ -20,6 +20,7 @@ class StreamedResponse(ABC):
 
     def __init__(self):
         self._stream_iter: AsyncIterator[str] | None = None
+        self._cancelled: bool = False
 
     def __aiter__(self):
         if self._stream_iter is None:
@@ -35,6 +36,22 @@ class StreamedResponse(ABC):
         """
         raise NotImplementedError()
         yield
+
+    async def cancel(self) -> None:
+        """
+        取消流式响应输出；确保底层 client 连接正确关闭
+        """
+        if self._cancelled:
+            return
+        self._cancelled = True
+        await self.close_stream()
+
+    async def close_stream(self) -> None:
+        """
+        关闭底层流式连接，释放资源
+        具体实现由子类完成，封装具体 LLM 的流式响应接口的连接关闭逻辑
+        """
+        raise NotImplementedError()
 
 
 @runtime_checkable

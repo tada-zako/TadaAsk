@@ -71,6 +71,9 @@ class OpenAIStreamedResponse(StreamedResponse):
             if content:
                 yield content
 
+    async def close_stream(self) -> None:
+        await self.stream_iter.close()
+
 
 class OpenAIChatModel:
     def __init__(self, model_perf: str, endpoint: OpenAIEndpoint):
