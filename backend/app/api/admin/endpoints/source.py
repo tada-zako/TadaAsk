@@ -326,7 +326,10 @@ async def upsert_document(
     ):
         yield ServerSentEvent(
             event=event.event,
-            data=event.model_dump_json(),
+            data=event.model_dump_json(
+                exclude={"event"},
+                by_alias=True,
+            ),
         )
 
 
@@ -366,7 +369,10 @@ async def resume_ingest(
     ):
         yield ServerSentEvent(
             event=event.event,
-            data=event.model_dump_json(),
+            data=event.model_dump_json(
+                exclude={"event"},
+                by_alias=True,
+            ),
         )
 
 
