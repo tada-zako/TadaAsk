@@ -39,48 +39,6 @@ def generate_vector_id(source_item_id: int, chunk_index: int) -> str:
     return str(uuid.uuid5(RAG_NAMESPACE, name))
 
 
-# TODO: "chat messages 构建方法后续提升到 Service 层，确保 messages 构建与 Provider 无关"
-# def build_chat_messages(
-#     self,
-#     document: list[VectorQueryItem],
-#     user_message: str,
-#     chat_history: list[ChatMessageInternal] | None = None,
-# ) -> list[Message]:
-#     """
-#     构建符合 Gemini LLM 请求接口格式的消息实例
-#     """
-#     history_contents: list[types.ContentOrDict] | None = None
-#     if chat_history:
-#         history_contents = [
-#             types.Content(
-#                 role="model" if entry.role == "assistant" else "user",
-#                 parts=[types.Part(text=entry.message)],
-#             )
-#             for entry in chat_history
-#         ]
-
-#     # NOTE: 目前只提供静态系统提示词
-#     system_prompt = DEFAULT_SYSTEM_PROMPT
-
-#     if document:
-#         # 允许 document 为空
-#         context = "\n<Context>\n"
-#         for doc in document:
-#             context += (
-#                 f"[context{doc.id}]:\n{doc.document}\n"
-#                 + f"Metadata: {doc.metadata}\n\n"
-#             )
-#         context += "</Context>\n"
-
-#         user_message = (
-#             context + "\n<user_message>\n" + user_message + "\n</user_message>\n"
-#         )
-
-#     return [
-#         Message(role="system", content=system_prompt),
-#     ]
-
-
 class DocumentIngestService:
     def __init__(
         self,
