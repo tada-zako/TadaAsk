@@ -25,6 +25,7 @@ from app.rag import (
     RerankProvider,
     QueryExpander,
 )
+from app.utils import EmbeddingTokenizer
 from app.services.rag import DocumentIngestService, HybridSearchService
 from app.core.config import settings
 
@@ -38,6 +39,11 @@ def get_vector_db(request: Request) -> VectorDatabase:
 def get_text_splitter(request: Request) -> TextSplitter:
     """返回全局挂载的文本分割器实例"""
     return request.app.state.text_splitter
+
+
+def get_embedding_tokenizer(request: Request) -> EmbeddingTokenizer:
+    """返回全局挂载的 embedding tokenizer 实例"""
+    return request.app.state.embedding_tokenizer
 
 
 def get_fts_provider(request: Request) -> FTSProvider:
@@ -207,6 +213,9 @@ FileStorageDeps = Annotated[FileStorage, Depends(get_file_storage)]  # 文件存
 
 VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]  # 向量库依赖
 TextSplitterDeps = Annotated[TextSplitter, Depends(get_text_splitter)]  # 文本分割器依赖
+EmbeddingTokenizerDeps = Annotated[
+    EmbeddingTokenizer, Depends(get_embedding_tokenizer)
+]  # Embedding Tokenizer 依赖
 FTSProviderDeps = Annotated[FTSProvider, Depends(get_fts_provider)]  # 全文检索服务依赖
 EmbeddingProviderDeps = Annotated[
     EmbeddingProvider, Depends(get_embedding_provider)

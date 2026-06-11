@@ -24,12 +24,8 @@ from app.rag import (
     FTSProvider,
     SQLiteFTSProvider,
 )
-from app.rag.utils import (
-    EmbeddingTokenizer,
-    embedding_tokenizer_factory,
-    FTSTokenizer,
-    JiebaFTSTokenizer,
-)
+from app.rag.utils import FTSTokenizer, JiebaFTSTokenizer
+from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer
 from app.crud import AdminCRUD
 from app.api import admin, visitor
 
@@ -82,12 +78,14 @@ async def lifespan(app: FastAPI):
     )
     app.state.vector_db = vector_db
 
-    # 创建 embedding tokenizer 实例
+    # 挂载 embedding tokenizer 实例
     embedding_tokenizer: EmbeddingTokenizer = embedding_tokenizer_factory(
         embedding_mode=settings.embedding_backend,
         model_name=settings.embedding_model_name,
         cache_dir=settings.hf_hub_cache,
     )
+    app.state.embedding_tokenizer = embedding_tokenizer
+
     # 挂载文本分割器实例
     text_splitter: TextSplitter = TokenAwareTextSplitter(
         tokenizer=embedding_tokenizer,
