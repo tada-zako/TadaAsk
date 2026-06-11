@@ -505,6 +505,9 @@ class ChatMessage(Base):
     type: Mapped[ChatMessageType] = mapped_column(
         Enum(ChatMessageType), default=ChatMessageType.MESSAGE
     )
+    tail_start_sequence: Mapped[
+        Optional[int]
+    ]  # ChatMessageType.COMPACTION 类型消息需要记录被压缩对话末尾的开始位置
 
     # NOTE: 如果修改 JSON 字典内部的某个值，SQLAlchemy 默认无法检测到这种变化（如果后期需要修改引用，大概率用不到）
     citations: Mapped[Optional[dict]] = mapped_column(

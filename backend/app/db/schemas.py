@@ -372,6 +372,11 @@ class ChatMessageBase(BaseModel):
     message: str
     type: ChatMessageType = ChatMessageType.MESSAGE
 
+    sequence: int  # 消息在会话中的顺序
+    tail_start_sequence: int | None = (
+        None  # 仅在 type=COMPACTION 时使用，表示被压缩对话的起始位置
+    )
+
     provider: str
     model: str
 
@@ -383,19 +388,12 @@ class ChatMessageInternal(ChatMessageBase):
     """系统内部使用的模型，包含 created_at 字段"""
 
     chat_session_id: int
-    sequence: int  # 消息在会话中的顺序
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ChatMessageRead(ChatMessageBase):
     uid: str
-    sequence: int
-
-    tokens_input: int = 0
-    tokens_output: int = 0
-    tokens_total: int = 0
-
     created_at: datetime
 
     model_config = ConfigDict(
@@ -483,6 +481,8 @@ class HybridSearchRequest(BaseModel):
         le=20,
         description="Maximum number of keywords to extract for query expansion",
     )
+
+    standalone_enabled: bool = False  # 是否执行 standalone 操作
 
 
 class HybridSearchOptions(HybridSearchRequest):
