@@ -1,9 +1,11 @@
+from typing import Literal, Union
 from dataclasses import dataclass
 
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from app.rag import ExpandedQuery
+from app.db.schemas import ChatMessageRead
 
 
 @dataclass
@@ -32,3 +34,55 @@ class SearchDebugInfo(BaseModel):
         validate_by_alias=True,
         validate_by_name=True,
     )
+
+
+# ========= Chat 流式对话 SSE 事件数据结构定义 =========
+class GenerationStartData(BaseModel):
+    event: Literal["generation_start"] = Field(default="generation_start")
+    generation_uid: str
+    session_uid: str
+    user_message: ChatMessageRead
+    assistant_message: ChatMessageRead
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class TextDeltaData(BaseModel):
+    event: Literal["delta", "cancelled"]
+    message_uid: str
+    delta: str
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class MessageDoneData(BaseModel):
+    event: Literal["message_done"] = Field(default="message_done")
+    message: ChatMessageRead
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class ErrorData(BaseModel):
+    event: Literal["error"] = Field(default="error")
+    message: str
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+ChatStreamEvent = Union[GenerationStartData, TextDeltaData, MessageDoneData, ErrorData]
