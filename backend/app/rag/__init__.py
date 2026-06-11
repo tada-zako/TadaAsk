@@ -9,6 +9,7 @@ from .embedding import EmbeddingProvider
 from .rerank import RerankProvider
 from .query_expand import QueryExpander, ExpandedQuery
 from .fts import FTSProvider, SQLiteFTSProvider, FTSResult
+from .standalone_rewriter import StandaloneQueryRewriter
 from app.core.config import Settings
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "FTSResult",
     "FTSProvider",
     "SQLiteFTSProvider",
+    "StandaloneQueryRewriter",
 ]
 
 

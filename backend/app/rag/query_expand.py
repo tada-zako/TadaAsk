@@ -7,6 +7,7 @@ from app.providers import (
     QUERY_EXPAND_SYSTEM_PROMPT,
 )
 from app.utils import TTLCache, normalize_text, stable_hash
+from app.core.constants import ChatMessageRole
 
 
 class ExpandedQuery(BaseModel):
@@ -94,11 +95,11 @@ class QueryExpander:
 
         messages = [
             Message(
-                role="system",
+                role=ChatMessageRole.SYSTEM,
                 content=QUERY_EXPAND_SYSTEM_PROMPT,
             ),
             Message(
-                role="user",
+                role=ChatMessageRole.USER,
                 content=QUERY_EXPAND_USER_TEMPLATE.format(
                     query=query,
                     max_keywords=max_keywords,

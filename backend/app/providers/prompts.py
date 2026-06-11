@@ -19,7 +19,7 @@ Respect all maximum item counts provided by the user message.
 Prefer preserving the user's original intent over broadening the query.
 """
 
-# 根据是否启用 HYDE 生成假设文档的提示词模板
+# 生成假设文档的提示词模板
 QUERY_EXPAND_USER_TEMPLATE = """
 Analyze the following query and generate retrieval expansions.
 
@@ -34,4 +34,11 @@ Requirements:
 - keywords: Extract important entities, terms, synonyms, and domain phrases suitable for keyword/BM25 search. Keep each item short.
 - alternative_queries: Rephrase the original query in semantically equivalent ways for vector search. Do not invent new constraints or unrelated topics.
 - hypothetical_document: Write 2-4 sentences that resemble a relevant source passage answering the query. Keep it factual in tone and avoid unsupported specifics.
+"""
+
+
+# standalone query 改写提示词
+STANDALONE_QUERY_REWRITE_PROMPT = """
+Rewrite the user's latest question into a standalone search query.
+Preserve entities, constraints, and intent. Do not answer the question.
 """
