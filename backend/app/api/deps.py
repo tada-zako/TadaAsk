@@ -12,6 +12,7 @@ from app.crud import (
     ChatSessionCRUD,
     SourceCRUD,
     RAGSearchCRUD,
+    ModelProfileCRUD,
 )
 from app.providers import completer_factory, StructuredCompleter
 from app.storage import FileStorage
@@ -94,6 +95,11 @@ async def get_source_crud(session: "SessionDeps") -> SourceCRUD:
 async def get_rag_search_crud(session: "SessionDeps") -> RAGSearchCRUD:
     """依赖注入接口：提供 RAGSearchCRUD 实例"""
     return RAGSearchCRUD(session=session)
+
+
+async def get_model_profile_crud(session: "SessionDeps") -> ModelProfileCRUD:
+    """依赖注入接口：提供 ModelProfileCRUD 实例"""
+    return ModelProfileCRUD(session=session)
 
 
 async def valid_project(
@@ -219,6 +225,7 @@ ChatMessageCRUDeps = Annotated[ChatMessageCRUD, Depends(get_chat_message_crud)]
 ChatSessionCRUDeps = Annotated[ChatSessionCRUD, Depends(get_chat_session_crud)]
 SourceCRUDeps = Annotated[SourceCRUD, Depends(get_source_crud)]
 RAGSearchCRUDeps = Annotated[RAGSearchCRUD, Depends(get_rag_search_crud)]
+ModelProfileCRUDeps = Annotated[ModelProfileCRUD, Depends(get_model_profile_crud)]
 
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]

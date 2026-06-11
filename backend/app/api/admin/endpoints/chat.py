@@ -8,37 +8,48 @@ from ...schemas import ChatRequest
 from ...deps import (
     SessionDeps,
     ValidProjectDeps,
-    RAGServiceDeps,
     ChatSessionCRUDeps,
     ChatMessageCRUDeps,
+    ModelProfileCRUDeps,
 )
-from app.core.constants import ChatSessionType
+from app.providers import TextCompleter, completer_factory
 from app.db.models import ChatSession
 from app.db.schemas import ChatSessionInternal
-from app.providers import Model, model_factory
 from app.services import ChatService
 from app.core.config import settings
+from app.core.constants import ChatSessionType
 
 
 router = APIRouter()
 
 
-def get_admin_model(
-    provider_name: Annotated[str | None, Body(embed=True, alias="providerName")] = None,
-    model_name: Annotated[str | None, Body(embed=True, alias="modelName")] = None,
-) -> Model[Any]:
-    """
-    model 工厂: 根据 provider_name 返回对应的 Model 实例。
-    不验证会话级 model 字段，这里认为前端会基于会话级字段正确传递 providerName 和 modelName。
-    NOTE: 目前仅支持 GeminiModel。
-    """
-    provider_name = provider_name or settings.llm_provider_admin or "google"
-    # TODO: 模型字段的获取逻辑，后期重新处理；
-    model_name = model_name or settings.gemini_model_perf or None
-    return model_factory(provider=provider_name, model=model_name)
+async def get_admin_model(
+    model_profile_crud: ModelProfileCRUDeps,
+    model_profile_uid: Annotated[
+        str,
+        Body(
+            embed=True,
+            alias="modelProfileUid",
+            description="前端传递的 model_profile_uid；禁止为空",
+        ),
+    ],
+) -> TextCompleter:
+    """依赖注入接口：根据前端传递的 model_profile_uid 获取对应的 TextCompleter 实例"""
+    model_profile = await model_profile_crud.get_enabled_model_profile_by_uid(
+        profile_uid=model_profile_uid
+    )
+    if not model_profile:
+        logger.error(f"Invalid model_profile_uid: {model_profile_uid}")
+        raise ValueError("Invalid model_profile_uid")
+
+    completer = completer_factory(
+        provider=model_profile.provider,
+        model=model_profile.model,
+    )
+    return completer
 
 
-ModelDeps = Annotated[Model[Any], Depends(get_admin_model)]
+ModelDeps = Annotated[TextCompleter, Depends(get_admin_model)]
 
 
 async def valid_or_create_admin_chat_session(
