@@ -91,4 +91,4 @@ class ChatMessageType(str, enum.Enum):
     """
 
     MESSAGE = "message"
-    SUMMARY = "summary"  # 系统生成的对话总结消息
+    COMPACTION = "compaction"
