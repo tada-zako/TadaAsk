@@ -510,9 +510,6 @@ class ChatMessage(Base):
     ]  # ChatMessageType.COMPACTION 类型消息需要记录被压缩对话末尾的开始位置
 
     # NOTE: 如果修改 JSON 字典内部的某个值，SQLAlchemy 默认无法检测到这种变化（如果后期需要修改引用，大概率用不到）
-    citations: Mapped[Optional[dict]] = mapped_column(
-        JSON, nullable=True
-    )  # 引用信息，包含来源、相关文档等元数据
     rag_snapshot: Mapped[Optional[dict]] = mapped_column(
         JSON, nullable=True
     )  # RAG 快照信息，包含当时使用的向量、相关文档等元数据

@@ -380,7 +380,7 @@ class ChatMessageBase(BaseModel):
     provider: str
     model: str
 
-    citations: dict[str, Any] | None = None
+    # TODO: 类型声明之后改成 RAGSnapshot 类型
     rag_snapshot: dict[str, Any] | None = None
 
 
