@@ -1,25 +1,39 @@
-from typing import Literal
-
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
-from app.db.schemas import HybridSearchResult
+from app.db.schemas import HybridSearchResult, HybridSearchRequest
 from app.services import SearchDebugInfo
 
 
-class ChatRequest(BaseModel):
+class AdminChatRequest(BaseModel):
+    """Admin chat 请求结构体"""
+
     message: str = Field(..., description="用户输入的消息文本")
-    doc_top_k: int = Field(
-        default=3,
-        ge=1,
-        le=20,
-        description="RAG 检索相关文档的数量",
-    )
+    chat_session_uid: str | None = None
+    model_profile_uid: str
+
+    rag_enabled: bool = True
+    source_uids: list[str] | None = None  # 可选的文档来源过滤条件
+    rag_options: HybridSearchRequest | None = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class VisitorChatRequest(BaseModel):
+    """Visitor chat 请求结构体"""
+
+    message: str = Field(..., description="用户输入的消息文本")
+    chat_session_uid: str | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
     )
 
 
