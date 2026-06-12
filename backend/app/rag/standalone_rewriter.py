@@ -16,14 +16,14 @@ class StandaloneQueryRewriter:
     def __init__(self, completer: StructuredCompleter):
         self._completer = completer
 
-    async def rewrite(self, query: str, recent_messages: list[Message]) -> str:
+    async def rewrite(self, query: str, standalone_context: list[Message]) -> str:
         """
         根据用户查询和最近的对话消息，生成改写后的查询文本。
 
         TODO: 后续增加上下文大小限制，限制用于改写的上下文最大 token 量
         """
         # 格式化对话历史
-        history_text = self._format_history(recent_messages)
+        history_text = self._format_history(standalone_context)
 
         # 构建提示词消息列表
         messages = [
@@ -53,4 +53,7 @@ class StandaloneQueryRewriter:
         for msg in messages:
             if msg.role in (ChatMessageRole.USER, ChatMessageRole.ASSISTANT):
                 lines.append(f"{msg.role.value}: {msg.content}")
+            elif msg.role == ChatMessageRole.SYSTEM:
+                # Compaction 消息
+                lines.append(f"[Compaction]: {msg.content}")
         return "\n".join(lines)

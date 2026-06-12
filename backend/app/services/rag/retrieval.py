@@ -1,11 +1,14 @@
 from pydantic import BaseModel, Field
 
 from .hybrid_search import HybridSearchService
+from ..utils import TokenBudget
 from app.rag import StandaloneQueryRewriter
 from app.crud import RAGSearchCRUD
 from app.providers import Message
 from app.db.models import Source, ChatMessage
 from app.db.schemas import HybridSearchOptions
+from app.core.constants import ChatMessageRole
+from app.utils import TokenCounter
 
 
 class RAGSnapshotItem(BaseModel):
@@ -51,18 +54,79 @@ class RAGRetrievalService:
         rag_search_crud: RAGSearchCRUD,
         hybrid_search_service: HybridSearchService,
         standalone_rewriter: StandaloneQueryRewriter,
+        token_counter: TokenCounter,
     ):
         self.rag_search_crud = rag_search_crud
         self.hybrid_search_service = hybrid_search_service
         self.standalone_rewriter = standalone_rewriter
+        self.token_counter = token_counter
+
+    def _build_standalone_context(
+        self,
+        *,
+        user_query: str,
+        recent_messages: list[ChatMessage],
+        compaction_message: ChatMessage | None,
+        token_budget: TokenBudget,
+    ) -> list[Message]:
+        """构建 standalone 查询改写的上下文"""
+        max_tokens = int(
+            token_budget.max_input_tokens * token_budget.standalone_context_ratio
+        )
+
+        messages: list[Message] = []
+        used = self.token_counter.count_message(user_query)
+
+        # 上下文装入 compaction message
+        if compaction_message:
+            tokens = self.token_counter.count_message(compaction_message.message)
+            if used + tokens <= max_tokens:
+                messages.append(
+                    Message(
+                        role=ChatMessageRole.SYSTEM,
+                        content=compaction_message.message,
+                    )
+                )
+                used += tokens
+
+        # 上下文装入 recent messages
+        selected_recent: list[ChatMessage] = []
+        for message in reversed(recent_messages):
+            if message.role not in (
+                ChatMessageRole.USER,
+                ChatMessageRole.ASSISTANT,
+            ):
+                continue
+
+            tokens = self.token_counter.count_message(message.message)
+            if used + tokens > max_tokens:
+                break
+
+            selected_recent.append(message)
+            used += tokens
+
+        # 反转选中的 recent message
+        for message in reversed(selected_recent):
+            messages.append(Message(role=message.role, content=message.message))
+
+        messages.append(
+            Message(
+                role=ChatMessageRole.USER,
+                content=user_query,
+            )
+        )
+        return messages
 
     async def retrieve_for_chat(
         self,
         *,
         sources: list[Source],
         user_query: str,
+        # TODO: recent_messages 需要内部处理；包括限制数量等
         recent_messages: list[ChatMessage],
+        compaction_message: ChatMessage | None,
         rag_options: HybridSearchOptions,
+        token_budget: TokenBudget,
     ) -> RAGRetrievalResult:
         """
         处理 Chat 场景的 RAG 检索请求
@@ -72,10 +136,17 @@ class RAGRetrievalService:
 
         # 判断是否需要进行独立查询改写
         if rag_options.standalone_enabled:
+            # 构建改写上下文
+            standalone_context = self._build_standalone_context(
+                user_query=user_query,
+                recent_messages=recent_messages,
+                compaction_message=compaction_message,
+                token_budget=token_budget,
+            )
+
             standalone_query = await self.standalone_rewriter.rewrite(
                 query=user_query,
-                # TODO: recent_messages 需要内部处理；包括限制数量等
-                recent_messages=recent_messages,
+                standalone_context=standalone_context,
             )
             retrieval_query = standalone_query
 
