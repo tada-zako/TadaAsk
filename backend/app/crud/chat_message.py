@@ -61,6 +61,56 @@ class ChatMessageCRUD:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
+    async def get_lastest_compaction_message(
+        self,
+        *,
+        chat_session_id: int,
+    ) -> ChatMessage | None:
+        """获取最新的压缩消息；允许没有则返回 None"""
+        stmt = (
+            select(ChatMessage)
+            .where(
+                ChatMessage.chat_session_id == chat_session_id,
+                ChatMessage.type == ChatMessageType.COMPACTION,
+            )
+            .order_by(ChatMessage.sequence.desc(), ChatMessage.id.desc())
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def load_recent_messages(
+        self,
+        *,
+        chat_session_id: int,
+        current_message: ChatMessage,
+        compaction_message: ChatMessage | None = None,
+    ) -> Sequence[ChatMessage]:
+        """
+        加载当前消息之前的最近消息；
+        如果提供了 compaction_message
+        则只加载 compaction_message.tail_start_sequence 之后的消息
+        并且过滤掉 compaction_message 本身；
+        """
+        stmt = (
+            select(ChatMessage)
+            .where(
+                ChatMessage.chat_session_id == chat_session_id,
+                ChatMessage.sequence < current_message.sequence,
+            )
+            .order_by(ChatMessage.sequence.desc(), ChatMessage.id.desc())
+        )
+
+        if compaction_message is not None:
+            stmt = stmt.where(
+                ChatMessage.sequence >= compaction_message.tail_start_sequence,
+                ChatMessage.id != compaction_message.id,
+            )
+
+        result = await self.session.execute(stmt)
+        messages = result.scalars().all()
+        return list(reversed(messages))  # 将消息列表反转为正序，便于构建对话上下文
+
     async def create_message(
         self,
         message_data: ChatMessageInternal,
@@ -82,7 +132,6 @@ class ChatMessageCRUD:
         provider: str,
         model: str,
         type: ChatMessageType = ChatMessageType.MESSAGE,
-        citations: dict[str, Any] | None = None,
         rag_snapshot: dict[str, Any] | None = None,
     ) -> ChatMessage:
         """在指定 chat_session 追加新的 chat_message"""
@@ -97,10 +146,25 @@ class ChatMessageCRUD:
                 type=type,
                 provider=provider,
                 model=model,
-                citations=citations,
                 rag_snapshot=rag_snapshot,
             )
         )
+
+    async def update_assistant_message(
+        self,
+        *,
+        assistant_message: ChatMessage,
+        new_message: str,
+        new_rag_snapshot: dict[str, Any] | None = None,
+    ) -> ChatMessage:
+        """更新 assistant 消息内容"""
+        assistant_message.message = new_message
+
+        if new_rag_snapshot is not None:
+            assistant_message.rag_snapshot = new_rag_snapshot
+
+        await self.session.flush()
+        return assistant_message
 
     async def delete_messages_after_sequence(
         self,
