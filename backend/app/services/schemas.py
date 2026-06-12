@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from app.rag import ExpandedQuery
-from app.db.schemas import ChatMessageRead
+from app.db.schemas import ChatMessageRead, ChatSessionRead
 
 
 @dataclass
@@ -37,6 +37,18 @@ class SearchDebugInfo(BaseModel):
 
 
 # ========= Chat 流式对话 SSE 事件数据结构定义 =========
+class SessionReadyData(BaseModel):
+    event: Literal["session_ready"] = Field(default="session_ready")
+    session: ChatSessionRead
+    created: bool = False
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 class GenerationStartData(BaseModel):
     event: Literal["generation_start"] = Field(default="generation_start")
     generation_uid: str
@@ -85,4 +97,6 @@ class ErrorData(BaseModel):
     )
 
 
-ChatStreamEvent = Union[GenerationStartData, TextDeltaData, MessageDoneData, ErrorData]
+ChatStreamEvent = Union[
+    SessionReadyData, GenerationStartData, TextDeltaData, MessageDoneData, ErrorData
+]
