@@ -11,8 +11,8 @@ from .utils import (
     CodeFenceScanner,
     Breakpoint,
     CodeFence,
-    EmbeddingTokenizer,
 )
+from app.utils import EmbeddingTokenizer
 
 
 AVG_CHARS_PER_TOKEN_ESTIMATE = 3  # 粗略估计平均每个 token 约为 3 个字符
