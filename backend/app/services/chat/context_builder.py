@@ -74,7 +74,7 @@ class ContextBuilder:
             - rag_context 可截断，并且总比率不超过 token_budget.rag_context_ratio
             - recent_messages 优先保留靠近 current_message 的消息
             - recent_messages 占比基于 RAG context 是否存在调整：
-                - RAG 内容不存在： recent_messages 最多占用 recent_tail_max_ratio 比例的剩余空间，此时 compaction 被截断
+                - RAG 内容不存在： recent_messages 最多占用 recent_max_ratio 比例的剩余空间，此时 compaction 被截断
                 - RAG 内容存在： recent_messages 最多占用 rag_context_ratio 比例的剩余空间，此时 compaction 可以抛弃
             - compaction 可截断或丢弃
         """
@@ -107,9 +107,7 @@ class ContextBuilder:
                 int(max_input_tokens * token_budget.rag_context_ratio),
             )
         else:
-            recent_max_tokens = int(
-                remaining_after_rag * token_budget.recent_tail_max_ratio
-            )
+            recent_max_tokens = int(remaining_after_rag * token_budget.recent_max_ratio)
 
         selected_recent, recent_tokens = self._select_recent_messages(
             recent_messages=recent_messages,

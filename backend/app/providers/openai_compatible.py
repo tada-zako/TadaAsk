@@ -144,6 +144,7 @@ class OpenAIChatModel:
         openai_messages = self._map_messages(messages)
 
         stream_iter = await self._client.chat.completions.create(
+            # TODO: 后续添加更多参数支持
             model=self._model,
             messages=openai_messages,
             stream=True,

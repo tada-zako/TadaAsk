@@ -19,7 +19,10 @@ class TokenBudget:
     # 存在 RAG 时，recent_messages 最大占用比率
     rag_recent_max_ratio: float = 0.50
     # 不使用 RAG 时，recent_messages 最大占用比率
-    recent_tail_max_ratio: float = 0.75
+    recent_max_ratio: float = 0.75
+
+    # compact 后，保留的 recent_messages 比率
+    recent_tail_keep_ratio: float = 0.20
 
     # RAG context 允许的最大占用
     rag_context_ratio: float = 0.30
