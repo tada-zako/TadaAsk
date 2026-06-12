@@ -3,6 +3,8 @@ from .ttl_cache import TTLCache
 from .cache_keys import normalize_text, stable_hash
 from .gen_collection_name import generate_collection_name
 from .tokenizer import EmbeddingTokenizer
+from .token_counter import TokenCounter
+
 from app.core.config import EmbeddingBackend
 
 
@@ -12,6 +14,8 @@ __all__ = [
     "normalize_text",
     "stable_hash",
     "generate_collection_name",
+    "EmbeddingTokenizer",
+    "TokenCounter",
 ]
 
 
