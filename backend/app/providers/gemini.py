@@ -36,11 +36,10 @@ class GeminiStreamedResponse(StreamedResponse):
     def _update_usage(self, metadata: GenerateContentResponseUsageMetadata) -> None:
         """更新 token 用量统计"""
         self._usage.input_tokens = metadata.prompt_token_count or 0
-        self._usage.cache_write_tokens = metadata.cached_content_token_count or 0
+        self._usage.cache_read_tokens = metadata.cached_content_token_count or 0
         self._usage.reasoning_tokens = metadata.thoughts_token_count or 0
-        self._usage.output_tokens = (metadata.total_token_count or 0) - (
-            metadata.prompt_token_count or 0
-        )
+        self._usage.output_tokens = metadata.candidates_token_count or 0
+        self._usage.raw_usage = metadata
 
     async def _get_stream_iter(self) -> AsyncIterator[str]:
         async for chunk in self._response:
@@ -49,6 +48,9 @@ class GeminiStreamedResponse(StreamedResponse):
                 self._update_usage(chunk.usage_metadata)
 
             if chunk.text:
+                # 保存生成文本到缓冲区
+                self._text_buffer.append(chunk.text)
+
                 yield chunk.text
 
     async def close_stream(self) -> None:
@@ -86,13 +88,15 @@ class GeminiModel:
 
     def _translate_thinking(self, thinking: ThinkingLevel) -> ThinkingConfigDict | None:
         if thinking is False:
-            return ThinkingConfigDict(include_thoughts=False)
+            return ThinkingConfigDict(thinking_budget=0)
 
         # TODO: 需要基于不同模型实际的可选配置进行验证；
         # 这里先不做后端验证，相信一手前端...
 
         if thinking is True:
-            return ThinkingConfigDict(include_thoughts=True)
+            return ThinkingConfigDict(
+                include_thoughts=True, thinking_level=cast(Any, "MEDIUM")
+            )
 
         level_map: dict[ThinkingLevel, str] = {
             "minimal": "MINIMAL",
@@ -121,17 +125,24 @@ class GeminiModel:
             role="user", parts=[types.Part(text=last_user_msg.content)]
         )
 
-        # 历史对话构建，过滤掉 system 消息和 user_message
+        # 历史对话构建，system 消息统一由 _map_system_instruction 处理
         history_contents: list[types.ContentOrDict] = []
         for msg in messages[:-1]:
             if msg.role == ChatMessageRole.SYSTEM:
                 continue
             role = "model" if msg.role == ChatMessageRole.ASSISTANT else "user"
+
             history_contents.append(
                 types.Content(role=role, parts=[types.Part(text=msg.content)])
             )
 
         return [*history_contents, user_content]
+
+    def _map_system_instruction(self, messages: list[Message]) -> str:
+        """将明确的 system 消息映射为 Gemini system_instruction。"""
+        return "\n\n".join(
+            msg.content for msg in messages if msg.role == ChatMessageRole.SYSTEM
+        )
 
     def _map_config(
         self,
@@ -141,15 +152,7 @@ class GeminiModel:
         schema: type[T] | None = None,
     ) -> GenerateContentConfigDict:
         """将通用 ModelSettings 转换为 Gemini LLM 请求接口需要的配置格式"""
-        # 提取 system prompt
-        system_prompt = next(
-            (
-                msg.content
-                for msg in reversed(messages)
-                if msg.role == ChatMessageRole.SYSTEM
-            ),
-            "",
-        )
+        system_instruction = self._map_system_instruction(messages)
 
         # 构建 Gemini 请求配置
         response_mime_type = None
@@ -165,7 +168,7 @@ class GeminiModel:
 
         config = GenerateContentConfigDict(
             http_options=http_options,
-            system_instruction=system_prompt,
+            system_instruction=system_instruction,
             temperature=model_settings.temperature,
             top_p=model_settings.top_p,
             max_output_tokens=model_settings.max_tokens,
@@ -186,10 +189,10 @@ class GeminiModel:
             text=response.text or "",
             usage=TokenUsage(
                 input_tokens=usage.prompt_token_count or 0,
-                cache_write_tokens=usage.cached_content_token_count or 0,
+                cache_read_tokens=usage.cached_content_token_count or 0,
                 reasoning_tokens=usage.thoughts_token_count or 0,
-                output_tokens=(usage.total_token_count or 0)
-                - (usage.prompt_token_count or 0),
+                output_tokens=usage.candidates_token_count or 0,
+                raw_usage=usage,
             )
             if usage
             else TokenUsage(),
@@ -250,7 +253,7 @@ class GeminiModel:
         Gemini LLM 结构化输出接口：按照指定的 Pydantic 模型 schema 对 LLM 输出进行解析和校验，
         返回一个符合 schema 定义的 Pydantic 模型实例
         """
-        contents, config = self._map_messages(messages)
+        contents = self._map_messages(messages)
         config = self._map_config(
             messages=messages,
             model_settings=model_settings,
