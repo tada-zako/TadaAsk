@@ -261,6 +261,13 @@ class ChatOrchestratorService:
                 recent_messages=recent_messages,
                 compaction_message=compaction_message,
                 rag_options=rag_options,
+                token_budget=token_budget,
+            )
+
+            # 2.2.1 RAG 检索结果写库
+            await self.chat_message_crud.update_assistant_message(
+                assistant_message=assistant_message,
+                new_rag_snapshot=rag_result.snapshot,
             )
 
             # 2.3 构建对话上下文
