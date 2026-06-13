@@ -87,6 +87,7 @@ class GeminiModel:
         return self._model
 
     def _translate_thinking(self, thinking: ThinkingLevel) -> ThinkingConfigDict | None:
+        """通用的 thinking 配置转换为 Gemini LLM 内部 thinking_config 格式"""
         if thinking is False:
             return ThinkingConfigDict(thinking_budget=0)
 
