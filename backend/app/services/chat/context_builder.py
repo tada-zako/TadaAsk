@@ -61,11 +61,11 @@ class ContextBuilder:
         构建 LLM 对话上下文消息列表
 
         Context 结构：
-        - system prompt
-        - compaction_message（如果存在）
-        - recent_messages
-        - rag_context（如果存在）
-        - current_message
+            - system prompt
+            - compaction_message（如果存在，以 user context 形式提供）
+            - recent_messages
+            - rag_context（如果存在，以 user context 形式提供）
+            - current_message
 
         约束条件：
             - 确保构建的上下文在 token_budget.max_input_tokens 限制内
@@ -135,8 +135,10 @@ class ContextBuilder:
         if compaction_content:
             context_messages.append(
                 Message(
-                    role=ChatMessageRole.SYSTEM,
-                    content=compaction_content,
+                    role=ChatMessageRole.USER,
+                    content="[Conversation Summary]\n"
+                    + compaction_content
+                    + "\n[/Conversation Summary]",
                 )
             )
 
@@ -151,8 +153,10 @@ class ContextBuilder:
         if rag_context:
             context_messages.append(
                 Message(
-                    role=ChatMessageRole.SYSTEM,
-                    content=rag_context,
+                    role=ChatMessageRole.USER,
+                    content="[Knowledge Context]\n"
+                    + rag_context
+                    + "\n[/Knowledge Context]",
                 )
             )
 
