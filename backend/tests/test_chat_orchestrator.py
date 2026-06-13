@@ -109,7 +109,9 @@ class FakeChatMessageCRUD:
     async def get_lastest_compaction_message(self, *, chat_session_id: int):
         return None
 
-    async def load_recent_messages(self, *, chat_session_id, current_message, compaction_message=None):
+    async def load_recent_messages(
+        self, *, chat_session_id, current_message, compaction_message=None
+    ):
         return []
 
     async def update_assistant_message(
@@ -139,7 +141,7 @@ class FakeRAGRetrieval:
     async def retrieve_for_chat(self, *, user_query: str, **kwargs):
         return RAGRetrievalResult(
             snapshot=RAGSnapshot(query=user_query),
-            context_block=None,
+            context_content=None,
         )
 
 
@@ -347,7 +349,7 @@ def test_rag_retrieval_returns_no_context_block_when_search_has_no_hits():
             token_budget=TokenBudget(context_window_tokens=100, max_output_tokens=0),
         )
 
-        assert result.context_block is None
+        assert result.context_content is None
 
     _run(run_test())
 
@@ -369,4 +371,3 @@ class FakeCompactionMessageCRUD:
             type=kwargs["type"],
             tail_start_sequence=kwargs["tail_start_sequence"],
         )
-
