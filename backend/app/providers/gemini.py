@@ -1,4 +1,4 @@
-from typing import AsyncIterator, TypeVar
+from typing import AsyncIterator, TypeVar, cast, Any
 from contextlib import asynccontextmanager
 
 import google.genai as genai
@@ -7,10 +7,20 @@ from google.genai.types import (
     GenerateContentResponse,
     ContentUnionDict,
     GenerateContentConfigDict,
+    HttpOptionsDict,
+    ThinkingConfigDict,
+    GenerateContentResponseUsageMetadata,
 )
 from pydantic import BaseModel
 
-from .base import StreamedResponse, Message
+from .base import (
+    StreamedResponse,
+    Message,
+    TokenUsage,
+    ModelSettings,
+    ModelResponse,
+    ThinkingLevel,
+)
 from app.core.config import settings
 from app.core.constants import ChatMessageRole
 
@@ -19,21 +29,32 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class GeminiStreamedResponse(StreamedResponse):
-    def __init__(self, stream_iter: AsyncIterator[GenerateContentResponse]):
+    def __init__(self, response: AsyncIterator[GenerateContentResponse]):
         super().__init__()
-        self.stream_iter = stream_iter
+        self._response = response
+
+    def _update_usage(self, metadata: GenerateContentResponseUsageMetadata) -> None:
+        """更新 token 用量统计"""
+        self._usage.input_tokens = metadata.prompt_token_count or 0
+        self._usage.cache_write_tokens = metadata.cached_content_token_count or 0
+        self._usage.reasoning_tokens = metadata.thoughts_token_count or 0
+        self._usage.output_tokens = (metadata.total_token_count or 0) - (
+            metadata.prompt_token_count or 0
+        )
 
     async def _get_stream_iter(self) -> AsyncIterator[str]:
-        async for chunk in self.stream_iter:
-            # TODO: 这里先简单实现，直接返回文本内容，
-            # 未来扩展更多的中间操作，例如过滤、清洗、统计 token 使用量等
+        async for chunk in self._response:
+            # 更新 token 用量统计
+            if chunk.usage_metadata:
+                self._update_usage(chunk.usage_metadata)
+
             if chunk.text:
                 yield chunk.text
 
     async def close_stream(self) -> None:
-        if hasattr(self.stream_iter, "aclose"):
+        if hasattr(self._response, "aclose"):
             try:
-                await self.stream_iter.aclose()  # type: ignore
+                await self._response.aclose()  # type: ignore
                 return
             except RuntimeError as exc:
                 if "asynchronous generator is already running" not in str(exc):
@@ -63,20 +84,36 @@ class GeminiModel:
         """返回模型名称，供业务层记录日志等使用"""
         return self._model
 
-    def _map_messages_and_config(
-        self,
-        messages: list[Message],
-    ) -> tuple[list[ContentUnionDict], GenerateContentConfigDict]:
-        """将通用 Message 转换为 Gemini LLM 请求接口需要的内容格式和配置格式"""
-        system_prompt = next(
-            (
-                msg.content
-                for msg in reversed(messages)
-                if msg.role == ChatMessageRole.SYSTEM
-            ),
-            "",
+    def _translate_thinking(self, thinking: ThinkingLevel) -> ThinkingConfigDict | None:
+        if thinking is False:
+            return ThinkingConfigDict(include_thoughts=False)
+
+        # TODO: 需要基于不同模型实际的可选配置进行验证；
+        # 这里先不做后端验证，相信一手前端...
+
+        if thinking is True:
+            return ThinkingConfigDict(include_thoughts=True)
+
+        level_map: dict[ThinkingLevel, str] = {
+            "minimal": "MINIMAL",
+            "low": "LOW",
+            "medium": "MEDIUM",
+            "high": "HIGH",
+            "xhigh": "HIGH",  # 没有更高的等级
+        }
+
+        return ThinkingConfigDict(
+            include_thoughts=True,
+            thinking_level=cast(
+                Any, level_map.get(thinking, "MEDIUM")
+            ),  # 默认为 MEDIUM
         )
 
+    def _map_messages(
+        self,
+        messages: list[Message],
+    ) -> list[ContentUnionDict]:
+        """将通用 Message 列表转换为 Gemini LLM 请求接口需要的内容列表和配置字典"""
         last_user_msg = messages[-1]
         if last_user_msg.role != ChatMessageRole.USER:
             raise ValueError("The last message must be a user message.")
@@ -94,43 +131,131 @@ class GeminiModel:
                 types.Content(role=role, parts=[types.Part(text=msg.content)])
             )
 
-        config = GenerateContentConfigDict(system_instruction=system_prompt)
-        return [*history_contents, user_content], config
+        return [*history_contents, user_content]
 
-    def _map_json_schema(
-        self, config: GenerateContentConfigDict, schema: type[T]
+    def _map_config(
+        self,
+        *,
+        model_settings: ModelSettings,
+        messages: list[Message],
+        schema: type[T] | None = None,
     ) -> GenerateContentConfigDict:
-        """将 Pydantic 模型的 JSON Schema 转换为 Gemini LLM 请求接口需要的配置格式"""
-        config["response_schema"] = schema.model_json_schema()
-        config["response_mime_type"] = "application/json"
+        """将通用 ModelSettings 转换为 Gemini LLM 请求接口需要的配置格式"""
+        # 提取 system prompt
+        system_prompt = next(
+            (
+                msg.content
+                for msg in reversed(messages)
+                if msg.role == ChatMessageRole.SYSTEM
+            ),
+            "",
+        )
+
+        # 构建 Gemini 请求配置
+        response_mime_type = None
+        response_schema = None
+
+        if schema:
+            response_mime_type = "application/json"
+            response_schema = schema.model_json_schema()
+
+        http_options: HttpOptionsDict | None = None
+        if timeout := model_settings.timeout:
+            http_options = {"timeout": int(timeout * 1000)}  # 转换为毫秒
+
+        config = GenerateContentConfigDict(
+            http_options=http_options,
+            system_instruction=system_prompt,
+            temperature=model_settings.temperature,
+            top_p=model_settings.top_p,
+            max_output_tokens=model_settings.max_tokens,
+            thinking_config=self._translate_thinking(model_settings.thinking),
+            response_mime_type=response_mime_type,
+            response_schema=response_schema,
+        )
+
         return config
+
+    def _process_response(self, response: GenerateContentResponse) -> ModelResponse:
+        """
+        将 Gemini LLM 的响应转换为通用 ModelResponse 格式；
+        主要是统计 token 用量
+        """
+        usage = response.usage_metadata
+        return ModelResponse(
+            text=response.text or "",
+            usage=TokenUsage(
+                input_tokens=usage.prompt_token_count or 0,
+                cache_write_tokens=usage.cached_content_token_count or 0,
+                reasoning_tokens=usage.thoughts_token_count or 0,
+                output_tokens=(usage.total_token_count or 0)
+                - (usage.prompt_token_count or 0),
+            )
+            if usage
+            else TokenUsage(),
+        )
+
+    async def chat(
+        self,
+        *,
+        messages: list[Message],
+        model_settings: ModelSettings,
+    ) -> ModelResponse:
+        """
+        Gemini LLM 文本生成接口: 通过对 google.genai 的封装，提供简洁的文本生成接口,
+        返回一个 ModelResponse 对象，包含生成文本内容和 token 用量等信息
+        """
+        contents = self._map_messages(messages)
+        config = self._map_config(model_settings=model_settings, messages=messages)
+
+        response = await self._client.aio.models.generate_content(
+            model=self._model,
+            config=config,
+            contents=contents,
+        )
+
+        return self._process_response(response)
 
     @asynccontextmanager
     async def stream_chat(
-        self, messages: list[Message]
+        self,
+        *,
+        messages: list[Message],
+        model_settings: ModelSettings,
     ) -> AsyncIterator[GeminiStreamedResponse]:
         """
         Gemini LLM 流式对话接口: 通过对 google.genai 的封装，提供简洁的流式对话接口,
         返回一个 GeminiStreamedResponse 对象，供业务层异步迭代获取流式响应内容
         """
 
-        contents, config = self._map_messages_and_config(messages)
+        contents = self._map_messages(messages)
+        config = self._map_config(model_settings=model_settings, messages=messages)
 
-        stream_iter = await self._client.aio.models.generate_content_stream(
+        response = await self._client.aio.models.generate_content_stream(
             model=self._model,
             config=config,
             contents=contents,
         )
 
-        yield GeminiStreamedResponse(stream_iter=stream_iter)
+        yield GeminiStreamedResponse(response=response)
 
-    async def complete_structured(self, messages: list[Message], schema: type[T]) -> T:
+    async def complete_structured(
+        self,
+        *,
+        messages: list[Message],
+        model_settings: ModelSettings,
+        schema: type[T],
+    ) -> T:
         """
         Gemini LLM 结构化输出接口：按照指定的 Pydantic 模型 schema 对 LLM 输出进行解析和校验，
         返回一个符合 schema 定义的 Pydantic 模型实例
         """
-        contents, config = self._map_messages_and_config(messages)
-        config = self._map_json_schema(config, schema)
+        contents, config = self._map_messages(messages)
+        config = self._map_config(
+            messages=messages,
+            model_settings=model_settings,
+            schema=schema,
+        )
 
         response = await self._client.aio.models.generate_content(
             model=self._model,
