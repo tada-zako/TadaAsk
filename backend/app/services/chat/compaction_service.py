@@ -131,6 +131,7 @@ class CompactionService:
         """
         构建 compaction 输入文本
         """
+        # TODO: 添加一定 token 限制，确保输入文本不会过长
         blocks: list[str] = []
 
         # 压入上一次的 compaction 消息
@@ -199,6 +200,8 @@ class CompactionService:
                 Message(role=ChatMessageRole.USER, content=summary_input),
             ]
         )
+
+        # TODO: 确保 new_compaction_content 不超过一定 token
 
         # 保存新的 compaction 消息到数据库
         return await self.chat_message_crud.append_message(

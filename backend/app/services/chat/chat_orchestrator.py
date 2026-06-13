@@ -17,7 +17,7 @@ from ..schemas import (
 )
 from ..utils import TokenBudget
 from app.api.schemas import AdminChatRequest, VisitorChatRequest
-from app.providers import TextCompleter
+from app.providers import TextCompleter, StreamedResponse
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
 from app.db.models import Project, ChatSession, ChatMessage, ModelProfile, Source
 from app.db.schemas import (
@@ -240,7 +240,7 @@ class ChatOrchestratorService:
         )
 
         # 2.0 预备参数
-        assistant_buffer: list[str] = []
+        stream_response: StreamedResponse | None = None
 
         try:
             # 2.1 预构建对话上下文
@@ -280,17 +280,18 @@ class ChatOrchestratorService:
             )
 
             # 3. 调用 TextCompleter 进行文本生成
-            async with self.text_completer.stream_chat(context) as stream_response:
-                async for chunk in stream_response:
-                    # 3.0 处理生成的文本块
-                    assistant_buffer.append(chunk)
+            async with self.text_completer.stream_chat(
+                messages=context, model_settings=xx
+            ) as response:
+                stream_response = response
 
+                async for chunk in stream_response:
                     # 3.1 监听生成取消事件
                     if generation.cancel_event.is_set():
                         await stream_response.cancel()
 
                         # 更新 Assistant 消息内容和 RAG 快照
-                        final_message = "".join(assistant_buffer)
+                        final_message = stream_response.text
                         await self.chat_message_crud.update_assistant_message(
                             assistant_message=assistant_message,
                             new_message=final_message,
@@ -311,7 +312,7 @@ class ChatOrchestratorService:
                     )
 
             # 4 生成完成；更新数据库并 yield 事件
-            final_message = "".join(assistant_buffer)
+            final_message = stream_response.text
             await self.chat_message_crud.update_assistant_message(
                 assistant_message=assistant_message,
                 new_message=final_message,
@@ -322,7 +323,7 @@ class ChatOrchestratorService:
 
         except asyncio.CancelledError:
             # 4.1 生成过程中被取消
-            final_message = "".join(assistant_buffer)
+            final_message = stream_response.text if stream_response else ""
             if final_message:
                 await self.chat_message_crud.update_assistant_message(
                     assistant_message=assistant_message,
@@ -338,7 +339,7 @@ class ChatOrchestratorService:
 
         except Exception as e:
             # 4.2 生成过程中发生错误
-            final_message = "".join(assistant_buffer)
+            final_message = stream_response.text if stream_response else ""
 
             if final_message:
                 await self.chat_message_crud.update_assistant_message(
