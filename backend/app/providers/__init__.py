@@ -1,6 +1,13 @@
 from typing import Protocol
 
-from .base import Message, StreamedResponse, TextCompleter, StructuredCompleter
+from .base import (
+    Message,
+    StreamedResponse,
+    TextCompleter,
+    StructuredCompleter,
+    ThinkingLevel,
+    ModelSettings,
+)
 from .prompts import (
     DEFAULT_SYSTEM_PROMPT,
     QUERY_EXPAND_SYSTEM_PROMPT,
@@ -10,6 +17,8 @@ from .prompts import (
 
 __all__ = [
     "Message",
+    "ThinkingLevel",
+    "ModelSettings",
     "StreamedResponse",
     "TextCompleter",
     "StructuredCompleter",

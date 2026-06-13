@@ -1,17 +1,161 @@
-from typing import Protocol, runtime_checkable, AsyncIterator, TypeVar
+from typing import Protocol, runtime_checkable, AsyncIterator, TypeVar, Literal
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
 from app.core.constants import ChatMessageRole
 
 
+# LLM 思考等级定义
+type ThinkingEffort = Literal["minimal", "low", "medium", "high", "xhigh"]
+type ThinkingLevel = bool | ThinkingEffort
+
+
+def _now_utc() -> datetime:
+    """获取当前 UTC 时间"""
+    return datetime.now(tz=timezone.utc)
+
+
 @dataclass
 class Message:
     role: ChatMessageRole
     content: str
+
+
+@dataclass
+class TokenUsage:
+    """Token 用量封装结构"""
+
+    input_tokens: int = 0
+
+    cache_write_tokens: int = 0
+    cache_read_tokens: int = 0
+
+    output_tokens: int = 0
+
+    reasoning_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        """总 token 用量"""
+        return self.input_tokens + self.output_tokens + self.reasoning_tokens
+
+
+@dataclass
+class ModelSettings:
+    """
+    LLM API 请求参数配置
+    """
+
+    max_tokens: int
+    """
+    最大生成 token
+
+    Supported by:
+
+    * Gemini
+    * Anthropic
+    * OpenAI
+    * Groq
+    * Cohere
+    * Mistral
+    * Bedrock
+    * MCP Sampling
+    * Outlines (all providers)
+    * xAI
+    """
+
+    temperature: float
+    """Amount of randomness injected into the response.
+
+    Use `temperature` closer to `0.0` for analytical / multiple choice, and closer to a model's
+    maximum `temperature` for creative and generative tasks.
+
+    Note that even with `temperature` of `0.0`, the results will not be fully deterministic.
+
+    Supported by:
+
+    * Gemini
+    * Anthropic
+    * OpenAI
+    * Groq
+    * Cohere
+    * Mistral
+    * Bedrock
+    * Outlines (Transformers, LlamaCpp, SgLang, VLLMOffline)
+    * xAI
+    """
+
+    top_p: float
+    """An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.
+
+    So 0.1 means only the tokens comprising the top 10% probability mass are considered.
+
+    You should either alter `temperature` or `top_p`, but not both.
+
+    Supported by:
+
+    * Gemini
+    * Anthropic
+    * OpenAI
+    * Groq
+    * Cohere
+    * Mistral
+    * Bedrock
+    * Outlines (Transformers, LlamaCpp, SgLang, VLLMOffline)
+    * xAI
+    """
+
+    timeout: float
+    """Override the client-level default timeout for a request, in seconds.
+
+    Supported by:
+
+    * Gemini
+    * Anthropic
+    * OpenAI
+    * Groq
+    * Mistral
+    * xAI
+    """
+
+    thinking: ThinkingLevel
+    """Enable or configure thinking/reasoning for the model.
+
+    - `True`: Enable thinking with the provider's default effort level.
+    - `False`: Disable thinking (silently ignored if the model always thinks).
+    - `'minimal'`/`'low'`/`'medium'`/`'high'`/`'xhigh'`: Enable thinking at a specific effort level.
+
+    When omitted, the model uses its default behavior (which may include thinking
+    for reasoning models).
+
+    Provider-specific thinking settings (e.g., `anthropic_thinking`,
+    `openai_reasoning_effort`) take precedence over this unified field.
+
+    Supported by:
+
+    * Anthropic
+    * OpenAI
+    * Gemini
+    * Groq
+    * Bedrock
+    * OpenRouter
+    * Cerebras
+    * xAI
+    """
+
+
+@dataclass
+class ModelResponse:
+    """
+    LLM SDK 异步响应结果封装（非流式）
+    """
+
+    text: str
+    usage: TokenUsage = field(default_factory=TokenUsage)
 
 
 class StreamedResponse(ABC):
@@ -23,6 +167,8 @@ class StreamedResponse(ABC):
     def __init__(self):
         self._stream_iter: AsyncIterator[str] | None = None
         self._cancelled: bool = False
+
+        self._usage: TokenUsage = TokenUsage()
 
     def __aiter__(self):
         if self._stream_iter is None:
@@ -60,9 +206,25 @@ class StreamedResponse(ABC):
 class TextCompleter(Protocol):
     """流式文本生成"""
 
+    async def chat(
+        self,
+        *,
+        messages: list[Message],
+        model_settings: ModelSettings,
+    ) -> ModelResponse:
+        """
+        LLM 文本生成接口：通过对具体 LLM 的封装，提供简洁的文本生成接口，
+        返回一个 ModelResponse 对象，包含生成文本内容和 token 用量等信息
+        """
+        raise NotImplementedError()
+        yield
+
     @asynccontextmanager
     async def stream_chat(
-        self, messages: list[Message]
+        self,
+        *,
+        messages: list[Message],
+        model_settings: ModelSettings,
     ) -> AsyncIterator[StreamedResponse]:
         """
         LLM 流式对话接口：通过对具体 LLM 的封装，提供简洁的流式对话接口，
