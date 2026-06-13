@@ -101,6 +101,15 @@ class ProjectChatSettingBase(BaseModel):
     visitor_rag_enabled: bool = True
     visitor_system_prompt: str | None = None
 
+    # visitor 模型请求参数配置
+    visitor_max_output_tokens: int = Field(default=1536, gt=0)
+    visitor_temperature: float = Field(default=0.3, ge=0, le=2)
+    visitor_top_p: float = Field(default=0.9, gt=0, le=1)
+    visitor_timeout: float = Field(default=45.0, gt=0)
+    visitor_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"] = (
+        "low"
+    )
+
     rag_mode: SearchMode = SearchMode.FULL
     rag_top_k: int = Field(default=8, ge=1)
 

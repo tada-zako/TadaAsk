@@ -10,6 +10,7 @@ from sqlalchemy import (
     UniqueConstraint,
     JSON,
     Integer,
+    Float,
     Enum,
     DateTime,
 )
@@ -133,6 +134,13 @@ class ProjectChatSetting(Base):
     visitor_system_prompt: Mapped[Optional[str]] = mapped_column(
         String, nullable=True
     )  # visitor 的 system prompt 配置
+
+    # visitor 模型请求参数配置
+    visitor_max_output_tokens: Mapped[int] = mapped_column(Integer, default=1536)
+    visitor_temperature: Mapped[float] = mapped_column(Float, default=0.3)
+    visitor_top_p: Mapped[float] = mapped_column(Float, default=0.9)
+    visitor_timeout: Mapped[float] = mapped_column(Float, default=45.0)
+    visitor_thinking: Mapped[bool | str] = mapped_column(JSON, default="low")
 
     # RAG 策略配置
     rag_mode: Mapped[SearchMode] = mapped_column(
