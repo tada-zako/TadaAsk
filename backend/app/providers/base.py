@@ -1,4 +1,12 @@
-from typing import Protocol, runtime_checkable, AsyncIterator, TypeVar, Literal
+from typing import (
+    Any,
+    TYPE_CHECKING,
+    Protocol,
+    runtime_checkable,
+    AsyncIterator,
+    TypeVar,
+    Literal,
+)
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -6,12 +14,21 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.core.constants import ChatMessageRole
+
+if TYPE_CHECKING:
+    # 避免循环导入
+    from app.api.schemas import AdminChatRequest
+    from app.db.models import ModelProfile
 
 
 # LLM 思考等级定义
 type ThinkingEffort = Literal["minimal", "low", "medium", "high", "xhigh"]
 type ThinkingLevel = bool | ThinkingEffort
+
+# LLM 响应状态定义
+type ModelResponseState = Literal["complete", "incomplete", "interrupted"]
 
 
 def _now_utc() -> datetime:
@@ -27,7 +44,16 @@ class Message:
 
 @dataclass
 class TokenUsage:
-    """Token 用量封装结构"""
+    """
+    Token 用量封装结构。
+
+    - input_tokens: 本次请求发送给模型的输入 token 数。
+    - cache_write_tokens: 本次请求写入 provider 缓存的 token 数。
+    - cache_read_tokens: 本次请求从 provider 缓存命中的输入 token 数。
+    - output_tokens: 返回给业务层的可见模型输出 token 数。
+    - reasoning_tokens: 模型内部推理/思考消耗的 token 数，不应重复计入 output_tokens。
+    - raw_usage: provider SDK 返回的原始 usage 对象，供排查 provider 差异时使用。
+    """
 
     input_tokens: int = 0
 
@@ -37,6 +63,7 @@ class TokenUsage:
     output_tokens: int = 0
 
     reasoning_tokens: int = 0
+    raw_usage: Any | None = None
 
     @property
     def total_tokens(self) -> int:
@@ -147,6 +174,63 @@ class ModelSettings:
     * xAI
     """
 
+    @classmethod
+    def from_profile_and_request(
+        cls,
+        *,
+        profile: ModelProfile,
+        request: AdminChatRequest | None = None,
+        default_max_tokens: int | None = None,
+        default_temperature: float | None = None,
+        default_top_p: float | None = None,
+        default_timeout: float | None = None,
+        default_thinking: ThinkingLevel | None = None,
+    ) -> "ModelSettings":
+        """
+        从模型配置和 API 请求构建完整 ModelSettings。
+
+        - 优先级：API 请求参数 > 传入参数 > 模型配置参数 > 后端默认值
+        - 后端默认值来源于全局配置 settings
+        """
+        max_tokens = (
+            default_max_tokens
+            if default_max_tokens is not None
+            else profile.max_output_tokens or settings.llm_default_max_output_tokens
+        )
+        temperature = (
+            default_temperature
+            if default_temperature is not None
+            else settings.llm_default_temperature
+        )
+        top_p = (
+            default_top_p if default_top_p is not None else settings.llm_default_top_p
+        )
+        timeout = (
+            default_timeout
+            if default_timeout is not None
+            else settings.llm_default_timeout
+        )
+        thinking = (
+            default_thinking
+            if default_thinking is not None
+            else settings.llm_default_thinking
+        )
+
+        if request:
+            if request.temperature is not None:
+                temperature = request.temperature
+            if request.top_p is not None:
+                top_p = request.top_p
+            thinking = request.thinking
+
+        return cls(
+            max_tokens=int(max_tokens),
+            temperature=float(temperature),
+            top_p=float(top_p),
+            timeout=float(timeout),
+            thinking=thinking,
+        )
+
 
 @dataclass
 class ModelResponse:
@@ -156,6 +240,7 @@ class ModelResponse:
 
     text: str
     usage: TokenUsage = field(default_factory=TokenUsage)
+    state: ModelResponseState = "complete"
 
 
 class StreamedResponse(ABC):
@@ -169,12 +254,23 @@ class StreamedResponse(ABC):
         self._cancelled: bool = False
 
         self._usage: TokenUsage = TokenUsage()
+        self._text_buffer: list[str] = []
 
     def __aiter__(self):
         if self._stream_iter is None:
             # 由子类决定内部迭代器如何实现
             self._stream_iter = self._get_stream_iter()
         return self._stream_iter
+
+    @property
+    def text(self) -> str:
+        """返回 buffer 中已经生成的文本内容"""
+        return "".join(self._text_buffer)
+
+    @property
+    def usage(self) -> TokenUsage:
+        """返回当前的 token 用量统计信息"""
+        return self._usage
 
     @abstractmethod
     async def _get_stream_iter(self) -> AsyncIterator[str]:
@@ -201,6 +297,20 @@ class StreamedResponse(ABC):
         """
         raise NotImplementedError()
 
+    def get(self) -> ModelResponse:
+        """流式调用完成或中断后，将完整内容和 token 用量封装成 ModelResponse 对象返回"""
+        if self._cancelled:
+            state: ModelResponseState = "interrupted"
+        # TODO: 暂不设置 "incomplete"
+        else:
+            state = "complete"
+
+        return ModelResponse(
+            text=self.text,
+            usage=self.usage,
+            state=state,
+        )
+
 
 @runtime_checkable
 class TextCompleter(Protocol):
@@ -217,7 +327,6 @@ class TextCompleter(Protocol):
         返回一个 ModelResponse 对象，包含生成文本内容和 token 用量等信息
         """
         raise NotImplementedError()
-        yield
 
     @asynccontextmanager
     async def stream_chat(
@@ -246,13 +355,18 @@ T = TypeVar("T", bound=BaseModel)
 class StructuredCompleter(Protocol):
     """结构化输出"""
 
-    async def complete_structured(self, messages: list[Message], schema: type[T]) -> T:
+    async def complete_structured(
+        self,
+        *,
+        messages: list[Message],
+        model_settings: ModelSettings,
+        schema: type[T],
+    ) -> T:
         """
         LLM 结构化输出接口：按照指定的 Pydantic 模型 schema 对 LLM 输出进行解析和校验，
         返回一个符合 schema 定义的 Pydantic 模型实例
         """
         raise NotImplementedError()
-        yield
 
     @property
     def model_name(self) -> str:
