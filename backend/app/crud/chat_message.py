@@ -1,10 +1,10 @@
-from typing import Sequence, Any
+from typing import Sequence
 
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ChatMessage
-from app.db.schemas import ChatMessageInternal
+from app.db.schemas import ChatMessageInternal, RAGSnapshot
 from app.core.constants import ChatMessageRole, ChatMessageType
 
 
@@ -132,7 +132,7 @@ class ChatMessageCRUD:
         provider: str,
         model: str,
         type: ChatMessageType = ChatMessageType.MESSAGE,
-        rag_snapshot: dict[str, Any] | None = None,
+        rag_snapshot: RAGSnapshot | None = None,
     ) -> ChatMessage:
         """在指定 chat_session 追加新的 chat_message"""
         sequence = await self.get_next_sequence(chat_session_id=chat_session_id)
@@ -154,14 +154,18 @@ class ChatMessageCRUD:
         self,
         *,
         assistant_message: ChatMessage,
-        new_message: str,
-        new_rag_snapshot: dict[str, Any] | None = None,
+        new_message: str | None = None,
+        new_rag_snapshot: RAGSnapshot | None = None,
     ) -> ChatMessage:
         """更新 assistant 消息内容"""
-        assistant_message.message = new_message
+        if new_message is None and new_rag_snapshot is None:
+            return assistant_message
+
+        if new_message is not None:
+            assistant_message.message = new_message
 
         if new_rag_snapshot is not None:
-            assistant_message.rag_snapshot = new_rag_snapshot
+            assistant_message.rag_snapshot = new_rag_snapshot.model_dump()
 
         await self.session.flush()
         return assistant_message
