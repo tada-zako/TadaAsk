@@ -155,7 +155,6 @@ class ChatOrchestratorService:
         if need_compaction:
             new_compaction_message = await self.compaction_service.compact(
                 chat_session_id=chat_session.id,
-                system_prompt=system_prompt,
                 recent_messages=recent_messages,
                 old_compaction_message=compaction_message,
                 text_completer=text_completer,

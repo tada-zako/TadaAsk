@@ -2,7 +2,12 @@ from typing import cast
 from dataclasses import dataclass
 
 from ..utils import TokenBudget
-from app.providers import TextCompleter, Message
+from app.providers import (
+    TextCompleter,
+    Message,
+    SUMMARIZATION_PROMPT,
+    UPDATE_SUMMARIZATION_PROMPT,
+)
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
 from app.db.models import ChatMessage, ModelProfile
 from app.core.constants import ChatMessageRole, ChatMessageType
@@ -150,7 +155,6 @@ class CompactionService:
         self,
         *,
         chat_session_id: int,
-        system_prompt: str,
         recent_messages: list[ChatMessage],
         old_compaction_message: ChatMessage | None,
         text_completer: TextCompleter,
@@ -184,15 +188,17 @@ class CompactionService:
         )
 
         # 调用 TextCompleter 进行文本生成，获取新的 compaction 消息内容
-        messages = [
-            Message(role=ChatMessageRole.SYSTEM, content=system_prompt),
-            Message(role=ChatMessageRole.USER, content=summary_input),
-        ]
-        chunks: list[str] = []
-        async with text_completer.stream_chat(messages) as stream_response:
-            async for chunk in stream_response:
-                chunks.append(chunk)
-        new_compaction_content = "".join(chunks)
+        system_prompt = (
+            UPDATE_SUMMARIZATION_PROMPT
+            if old_compaction_message
+            else SUMMARIZATION_PROMPT
+        )
+        new_compaction_content = await self.text_completer.chat(
+            messages=[
+                Message(role=ChatMessageRole.SYSTEM, content=system_prompt),
+                Message(role=ChatMessageRole.USER, content=summary_input),
+            ]
+        )
 
         # 保存新的 compaction 消息到数据库
         return await self.chat_message_crud.append_message(
