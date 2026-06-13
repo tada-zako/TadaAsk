@@ -150,6 +150,7 @@ class ChatMessageCRUD:
         provider: str,
         model: str,
         type: ChatMessageType = ChatMessageType.MESSAGE,
+        tail_start_sequence: int | None = None,
         rag_snapshot: RAGSnapshot | None = None,
     ) -> ChatMessage:
         """在指定 chat_session 追加新的 chat_message"""
@@ -164,6 +165,7 @@ class ChatMessageCRUD:
                 type=type,
                 provider=provider,
                 model=model,
+                tail_start_sequence=tail_start_sequence,
                 rag_snapshot=rag_snapshot,
             )
         )

@@ -98,9 +98,7 @@ class CompactionService:
         # 累计 recent_messages 的 token 数量，找到 tail_start_sequence
         for msg in reversed(recent_messages):
             msg_tokens = self.token_counter.count_message(msg.message)
-            used_tokens += msg_tokens
-
-            if used_tokens > tail_keep_tokens:
+            if used_tokens + msg_tokens > tail_keep_tokens:
                 break
 
             used_tokens += msg_tokens
@@ -186,12 +184,15 @@ class CompactionService:
         )
 
         # 调用 TextCompleter 进行文本生成，获取新的 compaction 消息内容
-        new_compaction_content = await self.text_completer.achat(
-            messages=[
-                Message(role=ChatMessageRole.SYSTEM, content=system_prompt),
-                Message(role=ChatMessageRole.USER, content=summary_input),
-            ]
-        )
+        messages = [
+            Message(role=ChatMessageRole.SYSTEM, content=system_prompt),
+            Message(role=ChatMessageRole.USER, content=summary_input),
+        ]
+        chunks: list[str] = []
+        async with text_completer.stream_chat(messages) as stream_response:
+            async for chunk in stream_response:
+                chunks.append(chunk)
+        new_compaction_content = "".join(chunks)
 
         # 保存新的 compaction 消息到数据库
         return await self.chat_message_crud.append_message(
@@ -201,4 +202,5 @@ class CompactionService:
             type=ChatMessageType.COMPACTION,
             provider=model_profile.provider,
             model=model_profile.model,
+            tail_start_sequence=plan.tail_start_sequence,
         )
