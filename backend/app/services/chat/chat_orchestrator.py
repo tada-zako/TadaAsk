@@ -276,7 +276,7 @@ class ChatOrchestratorService:
                 compaction_message=compaction_message,
                 recent_messages=recent_messages,
                 current_message=user_message,
-                rag_context=rag_result.context_block,
+                rag_context=rag_result.context_content,
                 token_budget=token_budget,
             )
 

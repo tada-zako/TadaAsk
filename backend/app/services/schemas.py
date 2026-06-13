@@ -40,7 +40,7 @@ class RAGRetrievalResult(BaseModel):
     """RAG 检索结果"""
 
     snapshot: RAGSnapshot
-    context_block: str | None  # 基于检索结果构建的 RAG block，用于构建 context
+    context_content: str | None  # 基于检索结果构建的 RAG block，用于构建 context
 
 
 # ========= Chat 流式对话 SSE 事件数据结构定义 =========
