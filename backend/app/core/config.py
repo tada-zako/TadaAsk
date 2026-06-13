@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     max_context_tokens: int = 12000  # LLM 输入的最大上下文 token 长度，只包含历史对话
     max_single_message_tokens: int = 2048  # 最大单条消息 token 长度，只约束历史消息
 
+    # LLM 请求默认参数
+    llm_default_context_window_tokens: int = 32768
+    llm_default_max_output_tokens: int = 4096
+    llm_default_temperature: float = 0.7
+    llm_default_top_p: float = 0.95
+    llm_default_timeout: float = 60.0
+    llm_default_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"] = (
+        "medium"
+    )
+
     # =======================================
     # RAG 相关配置
     # =======================================
