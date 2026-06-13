@@ -20,6 +20,7 @@ T = TypeVar("T", bound=BaseModel)
 
 class GeminiStreamedResponse(StreamedResponse):
     def __init__(self, stream_iter: AsyncIterator[GenerateContentResponse]):
+        super().__init__()
         self.stream_iter = stream_iter
 
     async def _get_stream_iter(self) -> AsyncIterator[str]:
@@ -33,6 +34,7 @@ class GeminiStreamedResponse(StreamedResponse):
         if hasattr(self.stream_iter, "aclose"):
             try:
                 await self.stream_iter.aclose()  # type: ignore
+                return
             except RuntimeError as exc:
                 if "asynchronous generator is already running" not in str(exc):
                     # 如果是因为生成器正在运行而无法关闭，则忽略该错误；否则，重新抛出异常

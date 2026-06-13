@@ -57,6 +57,7 @@ class OpenAIEndpoint:
 
 class OpenAIStreamedResponse(StreamedResponse):
     def __init__(self, stream_iter: AsyncStream[ChatCompletionChunk]):
+        super().__init__()
         self.stream_iter = stream_iter
 
     async def _get_stream_iter(self) -> AsyncIterator[str]:
