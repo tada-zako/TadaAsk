@@ -155,11 +155,13 @@ class RAGRetrievalService:
             items=snapshot_items,
         )
 
-        context_block = (
-            "[Knowledge Base Context]\n"
-            + "\n\n".join(blocks)
-            + "\n[/Knowledge Base Context]"
-        )
+        context_block = None
+        if blocks:
+            context_block = (
+                "[Knowledge Base Context]\n"
+                + "\n\n".join(blocks)
+                + "\n[/Knowledge Base Context]"
+            )
 
         return RAGRetrievalResult(
             snapshot=snapshot,

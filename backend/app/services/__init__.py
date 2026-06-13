@@ -1,4 +1,3 @@
-from .chat.chat import ChatService
 from .schemas import SearchDebugInfo
 
-__all__ = ["ChatService", "SearchDebugInfo"]
+__all__ = ["SearchDebugInfo"]
