@@ -7,6 +7,8 @@ from .base import (
     StructuredCompleter,
     ThinkingLevel,
     ModelSettings,
+    TokenUsage,
+    ModelResponse,
 )
 from .prompts import (
     DEFAULT_SYSTEM_PROMPT,
@@ -19,6 +21,8 @@ __all__ = [
     "Message",
     "ThinkingLevel",
     "ModelSettings",
+    "TokenUsage",
+    "ModelResponse",
     "StreamedResponse",
     "TextCompleter",
     "StructuredCompleter",

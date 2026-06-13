@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
+from app.providers import ThinkingLevel
 from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
 from app.db.schemas import HybridSearchResult, HybridSearchRequest
 from app.services import SearchDebugInfo
@@ -16,6 +17,13 @@ class AdminChatRequest(BaseModel):
     rag_enabled: bool = True
     source_uids: list[str] | None = None  # 可选的文档来源过滤条件
     rag_options: HybridSearchRequest | None = None
+
+    # LLM 请求参数配置
+    temperature: float | None = None
+    top_p: float | None = None
+    thinking: ThinkingLevel = Field(
+        default="medium", description="LLM 思考等级配置；False 为 none 或 minimal"
+    )
 
     model_config = ConfigDict(
         alias_generator=to_camel,
