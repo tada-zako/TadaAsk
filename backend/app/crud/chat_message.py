@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ChatMessage
@@ -111,6 +111,24 @@ class ChatMessageCRUD:
         messages = result.scalars().all()
         return list(reversed(messages))  # 将消息列表反转为正序，便于构建对话上下文
 
+    async def list_messages_until_sequence(
+        self,
+        *,
+        chat_session_id: int,
+        target_sequence: int,
+    ) -> Sequence[ChatMessage]:
+        """获取直到指定 sequence（包含）的历史消息列表"""
+        stmt = (
+            select(ChatMessage)
+            .where(
+                ChatMessage.chat_session_id == chat_session_id,
+                ChatMessage.sequence <= target_sequence,
+            )
+            .order_by(ChatMessage.sequence.asc(), ChatMessage.id.asc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
     async def create_message(
         self,
         message_data: ChatMessageInternal,
@@ -150,6 +168,20 @@ class ChatMessageCRUD:
             )
         )
 
+    async def bulk_add_messages(
+        self,
+        *,
+        messages_data: list[ChatMessageInternal],
+    ):
+        """批量添加消息"""
+        if not messages_data:
+            return
+        messages_dicts = [msg_data.model_dump() for msg_data in messages_data]
+        await self.session.execute(
+            insert(ChatMessage),
+            messages_dicts,
+        )
+
     async def update_assistant_message(
         self,
         *,
@@ -176,10 +208,10 @@ class ChatMessageCRUD:
         chat_session_id: int,
         target_sequence: int,
     ) -> int:
-        """删除指定 sequence 后的所有消息"""
+        """删除指定 sequence （包含）后的所有消息"""
         stmt = delete(ChatMessage).where(
             ChatMessage.chat_session_id == chat_session_id,
-            ChatMessage.sequence > target_sequence,
+            ChatMessage.sequence >= target_sequence,
         )
         result = await self.session.execute(stmt)
         return result.rowcount or 0  # type: ignore
