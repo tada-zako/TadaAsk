@@ -1,9 +1,7 @@
 from dataclasses import dataclass
+
 from app.db.models import ModelProfile
-
-
-DEFAULT_CONTEXT_WINDOW_TOKENS = 32768  # 默认上下文窗口大小
-DEFAULT_MAX_OUTPUT_TOKENS = 4096  # 默认最大输出 token 数量
+from app.core.config import settings
 
 
 @dataclass
@@ -42,11 +40,11 @@ class TokenBudget:
             context_window_tokens=(
                 profile.context_window_tokens
                 if profile and profile.context_window_tokens
-                else DEFAULT_CONTEXT_WINDOW_TOKENS
+                else settings.llm_default_context_window_tokens
             ),
             max_output_tokens=(
                 profile.max_output_tokens
                 if profile and profile.max_output_tokens
-                else DEFAULT_MAX_OUTPUT_TOKENS
+                else settings.llm_default_max_output_tokens
             ),
         )
