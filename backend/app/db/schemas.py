@@ -314,7 +314,6 @@ class ModelProfileBase(BaseModel):
     supports_stream: bool = True
     supports_structured: bool = True
     is_enabled: bool = True
-    default_params_json: dict[str, Any] | None = None
 
 
 class ModelProfileCreate(ModelProfileBase):

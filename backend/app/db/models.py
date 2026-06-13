@@ -408,16 +408,13 @@ class ModelProfile(Base):
     model: Mapped[str] = mapped_column(String, nullable=False)
 
     # 允许不设置 token 限制，上下文窗口/最大输出由 service 层配置默认值控制
+    # TODO: 只允许用户设置 max_output_tokens；context_window_tokens 由模型配置
     context_window_tokens: Mapped[Optional[int]]
     max_output_tokens: Mapped[Optional[int]]
 
     supports_stream: Mapped[bool] = mapped_column(Boolean, default=True)
     supports_structured: Mapped[bool] = mapped_column(Boolean, default=True)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-
-    default_params_json: Mapped[Optional[dict]] = mapped_column(
-        JSON, nullable=True
-    )  # 备用参数，设置模型的 top_p, temperature；不一定启用
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
