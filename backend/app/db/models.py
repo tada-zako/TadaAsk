@@ -171,7 +171,7 @@ class ProjectChatSetting(Base):
     visitor_default_model_profile: Mapped[Optional["ModelProfile"]] = relationship(
         foreign_keys=[visitor_default_model_profile_id]
     )
-    project: Mapped["Project"] = relationship(back_populates="chat_settings")
+    project: Mapped["Project"] = relationship(back_populates="chat_setting")
 
 
 # =========================
@@ -425,7 +425,7 @@ class ModelProfile(Base):
 
     __table_args__ = (
         # 同一提供商下模型名称唯一
-        UniqueConstraint("provider", "model_name", name="_provider_model_uc"),
+        UniqueConstraint("provider", "model", name="_provider_model_uc"),
     )
 
 
