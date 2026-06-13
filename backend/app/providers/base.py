@@ -20,7 +20,7 @@ from app.core.constants import ChatMessageRole
 if TYPE_CHECKING:
     # 避免循环导入
     from app.api.schemas import AdminChatRequest
-    from app.db.models import ModelProfile
+    from app.db.models import ModelProfile, ProjectChatSetting
 
 
 # LLM 思考等级定义
@@ -175,46 +175,20 @@ class ModelSettings:
     """
 
     @classmethod
-    def from_profile_and_request(
+    def for_admin_chat(
         cls,
         *,
         profile: ModelProfile,
         request: AdminChatRequest | None = None,
-        default_max_tokens: int | None = None,
-        default_temperature: float | None = None,
-        default_top_p: float | None = None,
-        default_timeout: float | None = None,
-        default_thinking: ThinkingLevel | None = None,
     ) -> "ModelSettings":
         """
-        从模型配置和 API 请求构建完整 ModelSettings。
+        Admin Chat 的模型配置入口。
 
-        - 优先级：API 请求参数 > 传入参数 > 模型配置参数 > 后端默认值
-        - 后端默认值来源于全局配置 settings
+        Admin 允许请求级字段覆盖全局默认值；max_tokens 仍以模型配置为准。
         """
-        max_tokens = (
-            default_max_tokens
-            if default_max_tokens is not None
-            else profile.max_output_tokens or settings.llm_default_max_output_tokens
-        )
-        temperature = (
-            default_temperature
-            if default_temperature is not None
-            else settings.llm_default_temperature
-        )
-        top_p = (
-            default_top_p if default_top_p is not None else settings.llm_default_top_p
-        )
-        timeout = (
-            default_timeout
-            if default_timeout is not None
-            else settings.llm_default_timeout
-        )
-        thinking = (
-            default_thinking
-            if default_thinking is not None
-            else settings.llm_default_thinking
-        )
+        temperature = settings.llm_default_temperature
+        top_p = settings.llm_default_top_p
+        thinking = settings.llm_default_thinking
 
         if request:
             if request.temperature is not None:
@@ -224,11 +198,92 @@ class ModelSettings:
             thinking = request.thinking
 
         return cls(
+            max_tokens=int(
+                profile.max_output_tokens or settings.llm_default_max_output_tokens
+            ),
+            temperature=float(temperature),
+            top_p=float(top_p),
+            timeout=float(settings.llm_default_timeout),
+            thinking=thinking,
+        )
+
+    @classmethod
+    def for_visitor_chat(
+        cls,
+        *,
+        profile: ModelProfile,
+        project_setting: ProjectChatSetting | None = None,
+    ) -> "ModelSettings":
+        """
+        Visitor Chat 的模型配置入口。
+
+        Visitor 不接受请求级模型参数，只使用 project setting 和最基础的后端兜底。
+        """
+        max_tokens = (
+            project_setting.visitor_max_output_tokens
+            if project_setting and project_setting.visitor_max_output_tokens
+            else profile.max_output_tokens or settings.llm_default_max_output_tokens
+        )
+        temperature = (
+            project_setting.visitor_temperature
+            if project_setting and project_setting.visitor_temperature is not None
+            else settings.llm_default_temperature
+        )
+        top_p = (
+            project_setting.visitor_top_p
+            if project_setting and project_setting.visitor_top_p is not None
+            else settings.llm_default_top_p
+        )
+        timeout = (
+            project_setting.visitor_timeout
+            if project_setting and project_setting.visitor_timeout is not None
+            else settings.llm_default_timeout
+        )
+        thinking = (
+            project_setting.visitor_thinking
+            if project_setting and project_setting.visitor_thinking is not None
+            else settings.llm_default_thinking
+        )
+
+        return cls(
             max_tokens=int(max_tokens),
             temperature=float(temperature),
             top_p=float(top_p),
             timeout=float(timeout),
-            thinking=thinking,
+            thinking=thinking,  # type: ignore
+        )
+
+    @classmethod
+    def for_compaction(cls, *, max_tokens: int = 2048) -> "ModelSettings":
+        """会话压缩摘要：忠实、稳定、结构化，避免使用用户的回答偏好。"""
+        return cls(
+            max_tokens=max_tokens,
+            temperature=0.2,
+            top_p=1.0,
+            timeout=60.0,
+            thinking=False,
+        )
+
+    @classmethod
+    def for_query_expansion(cls) -> "ModelSettings":
+        """查询扩展：低发散度，生成短 JSON 和一段 HyDE 文本。"""
+        return cls(
+            max_tokens=768,
+            temperature=0.2,
+            top_p=1.0,
+            timeout=30.0,
+            thinking=False,
+        )
+
+    @classmethod
+    def for_standalone_rewrite(cls) -> "ModelSettings":
+        """独立查询改写：确定性优先，只产出短检索 query。"""
+        return cls(
+            max_tokens=256,
+            temperature=0.0,
+            top_p=1.0,
+            timeout=20.0,
+            thinking=False,
         )
 
 
