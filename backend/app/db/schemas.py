@@ -380,8 +380,7 @@ class ChatMessageBase(BaseModel):
     provider: str
     model: str
 
-    # TODO: 类型声明之后改成 RAGSnapshot 类型
-    rag_snapshot: dict[str, Any] | None = None
+    rag_snapshot: "RAGSnapshot | None" = None
 
 
 class ChatMessageInternal(ChatMessageBase):
@@ -498,3 +497,27 @@ class HybridSearchOptions(HybridSearchRequest):
     min_common_overlap: int = 1  # 最小 FTS & vector 重叠数量；
     min_rerank_overlap: int = 0  # 最小 (FTS & vector) 与 rerank 重叠数量；
     max_hit_score_gap_threshold: float = 0.75  # 最大命中分数阈值；
+
+
+# ======= RAG Snap Schemas =======
+class RAGSnapshotItem(BaseModel):
+    """RAG 检索结果快照项"""
+
+    citation_id: int
+    source_id: int
+    source_item_id: int
+    chunk_id: int
+    vector_id: str | None = None
+
+    rrf_score: float | None = None
+    rerank_score: float | None = None
+    used_in_context: bool = True
+
+
+class RAGSnapshot(BaseModel):
+    """RAG 检索结果快照"""
+
+    version: int = 1
+    query: str
+    standalone_query: str | None = None
+    items: list[RAGSnapshotItem] = Field(default_factory=list)

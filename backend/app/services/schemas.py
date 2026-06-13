@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from app.rag import ExpandedQuery
-from app.db.schemas import ChatMessageRead, ChatSessionRead
+from app.db.schemas import ChatMessageRead, ChatSessionRead, RAGSnapshot
 
 
 @dataclass
@@ -34,6 +34,13 @@ class SearchDebugInfo(BaseModel):
         validate_by_alias=True,
         validate_by_name=True,
     )
+
+
+class RAGRetrievalResult(BaseModel):
+    """RAG 检索结果"""
+
+    snapshot: RAGSnapshot
+    context_block: str | None  # 基于检索结果构建的 RAG block，用于构建 context
 
 
 # ========= Chat 流式对话 SSE 事件数据结构定义 =========

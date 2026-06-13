@@ -1,45 +1,13 @@
-from pydantic import BaseModel, Field
-
 from .hybrid_search import HybridSearchService
+from ..schemas import RAGRetrievalResult
 from ..utils import TokenBudget
 from app.rag import StandaloneQueryRewriter
 from app.crud import RAGSearchCRUD
 from app.providers import Message
 from app.db.models import Source, ChatMessage
-from app.db.schemas import HybridSearchOptions
+from app.db.schemas import HybridSearchOptions, RAGSnapshotItem, RAGSnapshot
 from app.core.constants import ChatMessageRole
 from app.utils import TokenCounter
-
-
-class RAGSnapshotItem(BaseModel):
-    """RAG 检索结果快照项"""
-
-    citation_id: int
-    source_id: int
-    source_item_id: int
-    chunk_id: int
-    vector_id: str | None = None
-
-    rrf_score: float | None = None
-    rerank_score: float | None = None
-    used_in_context: bool = True
-
-
-class RAGSnapshot(BaseModel):
-    """RAG 检索结果快照"""
-
-    version: int = 1
-    query: str
-    standalone_query: str | None = None
-    search_options: HybridSearchOptions
-    items: list[RAGSnapshotItem] = Field(default_factory=list)
-
-
-class RAGRetrievalResult(BaseModel):
-    """RAG 检索结果"""
-
-    snapshot: RAGSnapshot
-    context_block: str | None  # 基于检索结果构建的 RAG block，用于构建 context
 
 
 class RAGRetrievalService:
@@ -122,7 +90,6 @@ class RAGRetrievalService:
         *,
         sources: list[Source],
         user_query: str,
-        # TODO: recent_messages 需要内部处理；包括限制数量等
         recent_messages: list[ChatMessage],
         compaction_message: ChatMessage | None,
         rag_options: HybridSearchOptions,
@@ -185,7 +152,6 @@ class RAGRetrievalService:
         snapshot = RAGSnapshot(
             query=user_query,
             standalone_query=standalone_query,
-            search_options=rag_options,
             items=snapshot_items,
         )
 
