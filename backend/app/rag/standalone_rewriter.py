@@ -1,6 +1,11 @@
 from pydantic import BaseModel, Field
 
-from app.providers import StructuredCompleter, Message, STANDALONE_QUERY_REWRITE_PROMPT
+from app.providers import (
+    StructuredCompleter,
+    Message,
+    ModelSettings,
+    STANDALONE_QUERY_REWRITE_PROMPT,
+)
 from app.core.constants import ChatMessageRole
 
 
@@ -43,7 +48,9 @@ class StandaloneQueryRewriter:
 
         # 调用 completer 生成改写后的查询
         rewritten_query = await self._completer.complete_structured(
-            messages=messages, schema=StandaloneQueryOutput
+            messages=messages,
+            model_settings=ModelSettings.for_standalone_rewrite(),
+            schema=StandaloneQueryOutput,
         )
         return rewritten_query.query.strip() or query.strip()
 

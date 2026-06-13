@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from app.providers import (
     StructuredCompleter,
     Message,
+    ModelSettings,
     QUERY_EXPAND_USER_TEMPLATE,
     QUERY_EXPAND_SYSTEM_PROMPT,
 )
@@ -110,6 +111,7 @@ class QueryExpander:
 
         result: ExpandedQuery = await self._completer.complete_structured(
             messages=messages,
+            model_settings=ModelSettings.for_query_expansion(),
             schema=ExpandedQuery,
         )
 

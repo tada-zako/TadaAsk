@@ -5,6 +5,7 @@ from ..utils import TokenBudget
 from app.providers import (
     TextCompleter,
     Message,
+    ModelSettings,
     SUMMARIZATION_PROMPT,
     UPDATE_SUMMARIZATION_PROMPT,
 )
@@ -189,19 +190,24 @@ class CompactionService:
         )
 
         # 调用 TextCompleter 进行文本生成，获取新的 compaction 消息内容
+        # 确定系统提示词
         system_prompt = (
             UPDATE_SUMMARIZATION_PROMPT
             if old_compaction_message
             else SUMMARIZATION_PROMPT
         )
-        new_compaction_content = await self.text_completer.chat(
+
+        response = await self.text_completer.chat(
             messages=[
                 Message(role=ChatMessageRole.SYSTEM, content=system_prompt),
                 Message(role=ChatMessageRole.USER, content=summary_input),
-            ]
+            ],
+            model_settings=ModelSettings.for_compaction(),
         )
 
+        new_compaction_content = response.text.strip()
         # TODO: 确保 new_compaction_content 不超过一定 token
+        # TODO: 统计 token 用量，更新数据库中的消息记录
 
         # 保存新的 compaction 消息到数据库
         return await self.chat_message_crud.append_message(

@@ -17,7 +17,7 @@ from ..schemas import (
 )
 from ..utils import TokenBudget
 from app.api.schemas import AdminChatRequest, VisitorChatRequest
-from app.providers import TextCompleter, StreamedResponse
+from app.providers import TextCompleter, StreamedResponse, ModelSettings
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
 from app.db.models import Project, ChatSession, ChatMessage, ModelProfile, Source
 from app.db.schemas import (
@@ -185,6 +185,7 @@ class ChatOrchestratorService:
         model_profile: ModelProfile,
         requester_type: ChatSessionType,
         rag_options: HybridSearchOptions,
+        model_settings: ModelSettings,
     ) -> AsyncIterable[ChatStreamEvent]:
         """流式对话；调用 RAG 服务"""
 
@@ -281,7 +282,7 @@ class ChatOrchestratorService:
 
             # 3. 调用 TextCompleter 进行文本生成
             async with self.text_completer.stream_chat(
-                messages=context, model_settings=xx
+                messages=context, model_settings=model_settings
             ) as response:
                 stream_response = response
 
@@ -320,6 +321,8 @@ class ChatOrchestratorService:
             yield MessageDoneData(
                 message=ChatMessageRead.model_validate(assistant_message)
             )
+
+            # 4.0 TODO: 统计 token 用量，更新数据库中的消息记录
 
         except asyncio.CancelledError:
             # 4.1 生成过程中被取消
