@@ -20,7 +20,7 @@ from app.core.constants import ChatMessageRole
 if TYPE_CHECKING:
     # 避免循环导入
     from app.api.schemas import AdminChatRequest
-    from app.db.models import ModelProfile, ProjectChatSetting
+    from app.db.models import ModelProfile, ProjectChatSettings
 
 
 # LLM 思考等级定义
@@ -212,7 +212,7 @@ class ModelSettings:
         cls,
         *,
         profile: ModelProfile,
-        project_setting: ProjectChatSetting | None = None,
+        project_settings: ProjectChatSettings | None = None,
     ) -> "ModelSettings":
         """
         Visitor Chat 的模型配置入口。
@@ -220,28 +220,28 @@ class ModelSettings:
         Visitor 不接受请求级模型参数，只使用 project setting 和最基础的后端兜底。
         """
         max_tokens = (
-            project_setting.visitor_max_output_tokens
-            if project_setting and project_setting.visitor_max_output_tokens
+            project_settings.visitor_max_output_tokens
+            if project_settings and project_settings.visitor_max_output_tokens
             else profile.max_output_tokens or settings.llm_default_max_output_tokens
         )
         temperature = (
-            project_setting.visitor_temperature
-            if project_setting and project_setting.visitor_temperature is not None
+            project_settings.visitor_temperature
+            if project_settings and project_settings.visitor_temperature is not None
             else settings.llm_default_temperature
         )
         top_p = (
-            project_setting.visitor_top_p
-            if project_setting and project_setting.visitor_top_p is not None
+            project_settings.visitor_top_p
+            if project_settings and project_settings.visitor_top_p is not None
             else settings.llm_default_top_p
         )
         timeout = (
-            project_setting.visitor_timeout
-            if project_setting and project_setting.visitor_timeout is not None
+            project_settings.visitor_timeout
+            if project_settings and project_settings.visitor_timeout is not None
             else settings.llm_default_timeout
         )
         thinking = (
-            project_setting.visitor_thinking
-            if project_setting and project_setting.visitor_thinking is not None
+            project_settings.visitor_thinking
+            if project_settings and project_settings.visitor_thinking is not None
             else settings.llm_default_thinking
         )
 

@@ -232,7 +232,7 @@ def test_stream_rag_chat_runs_normal_flow_and_persists_final_message():
     async def run_test():
         service = _orchestrator()
         request = SimpleNamespace(message="hello", chat_session_uid=None)
-        project = SimpleNamespace(id=1, chat_setting=None)
+        project = SimpleNamespace(id=1, project_settings=None)
 
         events = await _collect_chat_events(
             service,
@@ -262,7 +262,7 @@ def test_stream_rag_chat_uses_visitor_project_system_prompt():
         request = SimpleNamespace(message="hello", chat_session_uid=None)
         project = SimpleNamespace(
             id=1,
-            chat_setting=SimpleNamespace(visitor_system_prompt="visitor prompt"),
+            project_settings=SimpleNamespace(visitor_system_prompt="visitor prompt"),
         )
 
         await _collect_chat_events(
@@ -284,7 +284,7 @@ def test_stream_rag_chat_falls_back_to_default_system_prompt_for_blank_visitor_p
         request = SimpleNamespace(message="hello", chat_session_uid=None)
         project = SimpleNamespace(
             id=1,
-            chat_setting=SimpleNamespace(visitor_system_prompt=" "),
+            project_settings=SimpleNamespace(visitor_system_prompt=" "),
         )
 
         await _collect_chat_events(

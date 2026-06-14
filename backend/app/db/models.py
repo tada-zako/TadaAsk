@@ -93,7 +93,7 @@ class Project(Base):
     )
 
     # 关系字段
-    chat_setting: Mapped[Optional["ProjectChatSetting"]] = relationship(
+    project_settings: Mapped[Optional["ProjectChatSettings"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -118,7 +118,7 @@ class Project(Base):
     )  # 项目下的数据来源列表
 
 
-class ProjectChatSetting(Base):
+class ProjectChatSettings(Base):
     """
     项目设置表：存储项目的配置信息，如 RAG 策略等
     """
@@ -179,7 +179,7 @@ class ProjectChatSetting(Base):
     visitor_default_model_profile: Mapped[Optional["ModelProfile"]] = relationship(
         foreign_keys=[visitor_default_model_profile_id]
     )
-    project: Mapped["Project"] = relationship(back_populates="chat_setting")
+    project: Mapped["Project"] = relationship(back_populates="project_settings")
 
 
 # =========================

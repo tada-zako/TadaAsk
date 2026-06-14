@@ -67,8 +67,8 @@ class ProjectBase(BaseModel):
 
 
 class ProjectCreate(ProjectBase):
-    chat_setting: "ProjectChatSettingCreate" = Field(
-        default_factory=lambda: ProjectChatSettingCreate(),
+    project_settings: "ProjectChatSettingsCreate" = Field(
+        default_factory=lambda: ProjectChatSettingsCreate(),
     )
 
     model_config = ConfigDict(
@@ -94,7 +94,7 @@ class ProjectRead(ProjectBase):
 
 
 # ======= Project Chat Setting Schemas =======
-class ProjectChatSettingBase(BaseModel):
+class ProjectChatSettingsBase(BaseModel):
     """项目对话设置基类"""
 
     visitor_default_model_profile_uid: str | None = None
@@ -122,7 +122,7 @@ class ProjectChatSettingBase(BaseModel):
     rag_max_keywords: int = Field(default=5, ge=0, le=20)
 
 
-class ProjectChatSettingCreate(ProjectChatSettingBase):
+class ProjectChatSettingsCreate(ProjectChatSettingsBase):
     model_config = ConfigDict(
         alias_generator=to_camel,
         validate_by_alias=True,
@@ -130,7 +130,7 @@ class ProjectChatSettingCreate(ProjectChatSettingBase):
     )
 
 
-class ProjectChatSettingRead(ProjectChatSettingBase):
+class ProjectChatSettingsRead(ProjectChatSettingsBase):
     visitor_default_model_profile: "ModelProfileRead | None" = None
 
     model_config = ConfigDict(
