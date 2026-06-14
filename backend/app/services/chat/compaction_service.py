@@ -10,7 +10,7 @@ from app.providers import (
     UPDATE_SUMMARIZATION_PROMPT,
 )
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
-from app.db.models import ChatMessage, ModelProfile
+from app.db.models import ChatMessage
 from app.core.constants import ChatMessageRole, ChatMessageType
 from app.utils import TokenCounter
 
@@ -31,12 +31,10 @@ class CompactionService:
         self,
         chat_message_crud: ChatMessageCRUD,
         chat_session_crud: ChatSessionCRUD,
-        text_completer: TextCompleter,
         token_counter: TokenCounter,
     ):
         self.chat_message_crud = chat_message_crud
         self.chat_session_crud = chat_session_crud
-        self.text_completer = text_completer
         self.token_counter = token_counter
 
     def estimate_without_rag(
@@ -159,7 +157,9 @@ class CompactionService:
         chat_session_id: int,
         recent_messages: list[ChatMessage],
         old_compaction_message: ChatMessage | None,
-        model_profile: ModelProfile,
+        completer: TextCompleter,
+        provider: str,
+        model: str,
         token_budget: TokenBudget,
     ) -> ChatMessage:
         """
@@ -196,7 +196,7 @@ class CompactionService:
             else SUMMARIZATION_PROMPT
         )
 
-        response = await self.text_completer.chat(
+        response = await completer.chat(
             messages=[
                 Message(role=ChatMessageRole.SYSTEM, content=system_prompt),
                 Message(role=ChatMessageRole.USER, content=summary_input),
@@ -214,7 +214,7 @@ class CompactionService:
             role=ChatMessageRole.SYSTEM,
             message=new_compaction_content,
             type=ChatMessageType.COMPACTION,
-            provider=model_profile.provider,
-            model=model_profile.model,
+            provider=provider,
+            model=model,
             tail_start_sequence=plan.tail_start_sequence,
         )

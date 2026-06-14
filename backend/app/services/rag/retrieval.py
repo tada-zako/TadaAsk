@@ -3,7 +3,7 @@ from ..schemas import RAGRetrievalResult
 from ..utils import TokenBudget
 from app.rag import StandaloneQueryRewriter
 from app.crud import RAGSearchCRUD
-from app.providers import Message
+from app.providers import Message, StructuredCompleter
 from app.db.models import Source, ChatMessage
 from app.db.schemas import HybridSearchOptions, RAGSnapshotItem, RAGSnapshot
 from app.core.constants import ChatMessageRole
@@ -21,12 +21,10 @@ class RAGRetrievalService:
         *,
         rag_search_crud: RAGSearchCRUD,
         hybrid_search_service: HybridSearchService,
-        standalone_rewriter: StandaloneQueryRewriter,
         token_counter: TokenCounter,
     ):
         self.rag_search_crud = rag_search_crud
         self.hybrid_search_service = hybrid_search_service
-        self.standalone_rewriter = standalone_rewriter
         self.token_counter = token_counter
 
     def _build_standalone_context(
@@ -93,6 +91,7 @@ class RAGRetrievalService:
         recent_messages: list[ChatMessage],
         compaction_message: ChatMessage | None,
         rag_options: HybridSearchOptions,
+        completer: StructuredCompleter,
         token_budget: TokenBudget,
     ) -> RAGRetrievalResult:
         """
@@ -111,9 +110,10 @@ class RAGRetrievalService:
                 token_budget=token_budget,
             )
 
-            standalone_query = await self.standalone_rewriter.rewrite(
+            standalone_query = await StandaloneQueryRewriter.rewrite(
                 query=user_query,
                 standalone_context=standalone_context,
+                completer=completer,
             )
             retrieval_query = standalone_query
 
