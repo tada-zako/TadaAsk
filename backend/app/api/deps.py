@@ -38,10 +38,16 @@ from app.services.chat import (
     ContextBuilder,
     GenerationRegistry,
 )
+from app.core.security import ProviderAPIKeyCipher
 from app.core.config import settings
 
 
 # =========== 全局服务依赖注入接口 ============
+def get_api_key_cipher(request: Request) -> ProviderAPIKeyCipher:
+    """返回全局挂载的 ProviderAPIKeyCipher 实例"""
+    return request.app.state.api_key_cipher
+
+
 def get_vector_db(request: Request) -> VectorDatabase:
     """返回全局挂载的向量数据库实例"""
     return request.app.state.vector_db
@@ -243,7 +249,8 @@ def get_rag_retrieval_service(
 # =========== 组合依赖 ===========
 # 数据库会话依赖
 SessionDeps = Annotated[AsyncSession, Depends(get_db)]
-# 文件存储依赖
+
+APIKeyCipherDeps = Annotated[ProviderAPIKeyCipher, Depends(get_api_key_cipher)]
 FileStorageDeps = Annotated[FileStorage, Depends(get_file_storage)]
 
 VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]

@@ -8,7 +8,7 @@ from fastapi.exceptions import HTTPException as StarletteHTTPException
 from loguru import logger
 
 from app.core.config import settings
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, ProviderAPIKeyCipher
 from app.db import init_db, async_session
 from app.db.schemas import AdminCreate
 from app.storage import FileStorage, file_storage_factory
@@ -62,14 +62,21 @@ async def lifespan(app: FastAPI):
     """
 
     logger.info("Starting up the application...")
-    # ======= 初始化数据库连接 =======
+    # ======= 系统重要配置挂载 =======
     await init_db()
 
-    # ======= 初始化文件存储实例 =======
+    # 挂载文件存储实例
     file_storage: FileStorage = file_storage_factory(
         storage_backend=settings.file_storage_backend,
     )
     app.state.file_storage = file_storage
+
+    # 挂载密钥加密器实例
+    api_key_cipher = ProviderAPIKeyCipher(
+        encryption_key=settings.provider_api_key_encryption_key,
+        previous_keys=settings.provider_api_key_previous_encryption_keys,
+    )
+    app.state.api_key_cipher = api_key_cipher
 
     # ======= 初始化 RAG 组件实例 =======
     # 挂载向量库实例
