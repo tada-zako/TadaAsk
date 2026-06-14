@@ -4,7 +4,13 @@ from sqlalchemy.orm import contains_eager
 
 from app.core.security import ProviderAPIKeyCipher
 from app.db.models import ModelProfile, Provider
-from app.db.schemas import ModelProfileCreate, ProviderCreate
+from app.db.schemas import (
+    ModelProfileCreate,
+    ProviderCreate,
+    ProviderRead,
+    ModelProfileRead,
+    ProviderWithModelInternalRead,
+)
 
 
 class ModelProfileCRUD:
@@ -77,13 +83,17 @@ class ModelProfileCRUD:
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def get_provider_with_model_profile_by_uid(
+    async def get_internal_provider_with_model_profile_by_uid(
         self,
         *,
         provider_uid: str,
         model_uid: str,
-    ) -> Provider | None:
-        """根据模型配置 UID 获取包含启用状态的模型配置详情的提供商信息"""
+        api_key_cipher: ProviderAPIKeyCipher,
+    ) -> ProviderWithModelInternalRead | None:
+        """
+        根据提供商 UID 和模型 UID 获取包含提供商信息和模型配置详情的内部使用数据结构；
+        包含解密后的 API Key
+        """
         stmt = (
             select(Provider)
             .join(Provider.model_profiles)
@@ -99,4 +109,21 @@ class ModelProfileCRUD:
         )
 
         result = await self.session.execute(stmt)
-        return result.scalars().unique().one_or_none()
+        provider = result.scalars().first()
+
+        if not provider:
+            return None
+
+        # 解密 API Key
+        decrypted_api_key = None
+        if provider.encrypted_api_key:
+            decrypted_api_key = api_key_cipher.decrypt(provider.encrypted_api_key)
+
+        # 构建 dict 数据
+        provider_dict = ProviderRead.model_validate(provider).model_dump()
+        provider_dict["api_key"] = decrypted_api_key
+        provider_dict["model_profiles"] = ModelProfileRead.model_validate(
+            provider.model_profiles[0]
+        )
+
+        return ProviderWithModelInternalRead.model_validate(provider_dict)
