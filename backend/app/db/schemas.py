@@ -2,7 +2,7 @@ from typing import Literal, Any
 from dataclasses import dataclass
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from pydantic.alias_generators import to_camel
 
 from app.core.constants import (
@@ -297,7 +297,7 @@ class ProviderBase(BaseModel):
 
 
 class ProviderCreate(ProviderBase):
-    api_key: str
+    api_key: SecretStr | None = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,
