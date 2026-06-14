@@ -9,6 +9,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.security import get_password_hash, ProviderAPIKeyCipher
+from app.crud import AdminCRUD
 from app.db import init_db, async_session
 from app.db.schemas import AdminCreate
 from app.storage import FileStorage, file_storage_factory
@@ -19,6 +20,7 @@ from app.rag import (
     TokenAwareTextSplitter,
     embedding_provider_factory,
     EmbeddingProvider,
+    QueryExpander,
     rerank_provider_factory,
     RerankProvider,
     FTSProvider,
@@ -26,7 +28,7 @@ from app.rag import (
 )
 from app.rag.utils import FTSTokenizer, JiebaFTSTokenizer
 from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer, TokenCounter
-from app.crud import AdminCRUD
+from app.services.chat import GenerationRegistry
 from app.api import admin, visitor
 
 
@@ -78,6 +80,10 @@ async def lifespan(app: FastAPI):
     )
     app.state.api_key_cipher = api_key_cipher
 
+    # ======= Chat Service 相关组件实例挂载 =======
+    generation_registry = GenerationRegistry()
+    app.state.generation_registry = generation_registry
+
     # ======= 初始化 RAG 组件实例 =======
     # 挂载向量库实例
     vector_db: VectorDatabase = vector_db_factory(
@@ -120,6 +126,14 @@ async def lifespan(app: FastAPI):
         settings=settings
     )
     app.state.embedding = embedding_provider
+    # 挂载 QueryExpander 实例
+    query_expander: QueryExpander = QueryExpander(
+        prompt_version="prompt_v1",
+        cache_enabled=True,
+        cache_size=512,
+        ttl_seconds=3600,
+    )
+    app.state.query_expander = query_expander
     # 挂载 RerankProvider 实例
     rerank_provider: RerankProvider = rerank_provider_factory(settings=settings)
     app.state.rerank = rerank_provider
