@@ -17,7 +17,12 @@ from ..schemas import (
 )
 from ..utils import TokenBudget
 from app.api.schemas import AdminChatRequest, VisitorChatRequest
-from app.providers import TextCompleter, StreamedResponse, ModelSettings
+from app.providers import (
+    TextCompleter,
+    StreamedResponse,
+    ModelSettings,
+    DEFAULT_SYSTEM_PROMPT,
+)
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
 from app.db.models import Project, ChatSession, ChatMessage, ModelProfile, Source
 from app.db.schemas import (
@@ -32,13 +37,6 @@ from app.core.constants import ChatMessageRole, ChatMessageType, ChatSessionType
 class ChatOrchestratorService:
     """
     Chat 会话编排服务
-    负责协调 ChatSession、TextCompleter、ContextBuilder 等组件，完成一次完整的 Chat 会话流程。
-    包括但不限于：
-    - 根据前端传递的 model_profile_uid 获取对应的 TextCompleter 实例
-    - 验证或创建 ChatSession 实例
-    - 调用 TextCompleter 生成回复内容
-    - 调用 ContextBuilder 构建对话上下文
-    - 处理对话中的各种事件（如消息开始、消息结束、错误等）
     """
 
     def __init__(
@@ -107,13 +105,20 @@ class ChatOrchestratorService:
         )
         return new_chat_session, True
 
+    def _resolve_system_prompt(self) -> str:
+        """
+        解析系统提示词的内部方法
+
+        TODO: 这里只实现一个简单版本；后续考虑具体的组装细节
+        """
+        return DEFAULT_SYSTEM_PROMPT
+
     async def _prepare_chat_context(
         self,
         *,
         chat_session: ChatSession,
         current_message: ChatMessage,
         system_prompt: str,
-        text_completer: TextCompleter,
         model_profile: ModelProfile,
         token_budget: TokenBudget,
     ) -> tuple[ChatMessage | None, list[ChatMessage]]:
@@ -157,7 +162,6 @@ class ChatOrchestratorService:
                 chat_session_id=chat_session.id,
                 recent_messages=recent_messages,
                 old_compaction_message=compaction_message,
-                text_completer=text_completer,
                 model_profile=model_profile,
                 token_budget=token_budget,
             )
@@ -249,7 +253,6 @@ class ChatOrchestratorService:
                 chat_session=chat_session,
                 current_message=user_message,
                 system_prompt=system_prompt,
-                text_completer=self.text_completer,
                 model_profile=model_profile,
                 token_budget=token_budget,
             )
