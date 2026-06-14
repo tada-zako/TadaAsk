@@ -5,7 +5,7 @@ from sqlalchemy.orm import contains_eager
 from app.core.security import ProviderAPIKeyCipher
 from app.db.models import ModelProfile, Provider
 from app.db.schemas import (
-    ModelProfileCreate,
+    ModelProfileInternal,
     ProviderCreate,
     ProviderRead,
     ModelProfileRead,
@@ -40,7 +40,7 @@ class ModelProfileCRUD:
         return new_provider
 
     async def create_model_profile(
-        self, profile_data: ModelProfileCreate
+        self, profile_data: ModelProfileInternal
     ) -> ModelProfile:
         """创建新的模型配置，并返回创建的模型配置实例"""
         new_profile = ModelProfile(**profile_data.model_dump())
@@ -122,7 +122,7 @@ class ModelProfileCRUD:
         # 构建 dict 数据
         provider_dict = ProviderRead.model_validate(provider).model_dump()
         provider_dict["api_key"] = decrypted_api_key
-        provider_dict["model_profiles"] = ModelProfileRead.model_validate(
+        provider_dict["model_profile"] = ModelProfileRead.model_validate(
             provider.model_profiles[0]
         )
 

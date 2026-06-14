@@ -351,6 +351,12 @@ class ModelProfileCreate(ModelProfileBase):
     )
 
 
+class ModelProfileInternal(ModelProfileBase):
+    """系统内部使用的模型"""
+
+    provider_id: int  # 关联的 Provider ID
+
+
 class ModelProfileRead(ModelProfileBase):
     uid: str
     created_at: datetime
