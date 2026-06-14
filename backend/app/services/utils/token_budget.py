@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.db.models import ModelProfile
+from app.db.schemas import ModelProfileRead
 from app.core.config import settings
 
 
@@ -34,7 +34,7 @@ class TokenBudget:
         return max(0, self.context_window_tokens - self.max_output_tokens)
 
     @classmethod
-    def from_model_profile(cls, profile: ModelProfile | None) -> "TokenBudget":
+    def from_model_profile(cls, profile: ModelProfileRead | None) -> "TokenBudget":
         """根据模型配置文件创建 TokenBudget 实例；提供默认值回退机制"""
         return cls(
             context_window_tokens=(
