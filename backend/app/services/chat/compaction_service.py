@@ -159,7 +159,6 @@ class CompactionService:
         chat_session_id: int,
         recent_messages: list[ChatMessage],
         old_compaction_message: ChatMessage | None,
-        text_completer: TextCompleter,
         model_profile: ModelProfile,
         token_budget: TokenBudget,
     ) -> ChatMessage:

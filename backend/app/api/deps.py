@@ -24,9 +24,20 @@ from app.rag import (
     EmbeddingProvider,
     RerankProvider,
     QueryExpander,
+    StandaloneQueryRewriter,
 )
-from app.utils import EmbeddingTokenizer
-from app.services.rag import DocumentIngestService, HybridSearchService
+from app.utils import TokenCounter
+from app.services.rag import (
+    DocumentIngestService,
+    HybridSearchService,
+    RAGRetrievalService,
+)
+from app.services.chat import (
+    ChatOrchestratorService,
+    CompactionService,
+    ContextBuilder,
+    GenerationRegistry,
+)
 from app.core.config import settings
 
 
@@ -39,11 +50,6 @@ def get_vector_db(request: Request) -> VectorDatabase:
 def get_text_splitter(request: Request) -> TextSplitter:
     """返回全局挂载的文本分割器实例"""
     return request.app.state.text_splitter
-
-
-def get_embedding_tokenizer(request: Request) -> EmbeddingTokenizer:
-    """返回全局挂载的 embedding tokenizer 实例"""
-    return request.app.state.embedding_tokenizer
 
 
 def get_fts_provider(request: Request) -> FTSProvider:
@@ -70,6 +76,11 @@ def get_file_parser_factory(request: Request) -> FileParserFactory:
     """返回全局挂载的文件解析器工厂实例"""
     # TODO: 后续将 FileParserFactory 实例化逻辑放到 main.py; 使用注册器模式
     return request.app.state.file_parser_factory
+
+
+def get_token_counter(request: Request) -> TokenCounter:
+    """返回全局挂载的 TokenCounter 实例"""
+    return request.app.state.token_counter
 
 
 # ============ CRUD 依赖注入接口 ============
@@ -162,6 +173,13 @@ def get_query_expander(
     )
 
 
+def get_standalone_rewriter(
+    completer: Annotated[StructuredCompleter, Depends(get_completer)],
+) -> StandaloneQueryRewriter:
+    """依赖注入接口：提供 StandaloneQueryRewriter 实例"""
+    return StandaloneQueryRewriter(completer=completer)
+
+
 # =========== Service 层依赖注入接口 ===========
 def get_document_ingest_service(
     source_crud: "SourceCRUDeps",
@@ -207,25 +225,34 @@ def get_hybrid_search_service(
     )
 
 
-# =========== 组合依赖 ===========
-SessionDeps = Annotated[AsyncSession, Depends(get_db)]  # 数据库会话依赖
-FileStorageDeps = Annotated[FileStorage, Depends(get_file_storage)]  # 文件存储依赖
+def get_rag_retrieval_service(
+    rag_search_crud: "RAGSearchCRUDeps",
+    hybrid_search_service: "HybridSearchServiceDeps",
+    standalone_rewriter: "StandaloneQueryRewriterDeps",
+    token_counter: "TokenCounterDeps",
+) -> RAGRetrievalService:
+    """RAGRetrievalService 依赖注入接口"""
+    return RAGRetrievalService(
+        rag_search_crud=rag_search_crud,
+        hybrid_search_service=hybrid_search_service,
+        standalone_rewriter=standalone_rewriter,
+        token_counter=token_counter,
+    )
 
-VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]  # 向量库依赖
-TextSplitterDeps = Annotated[TextSplitter, Depends(get_text_splitter)]  # 文本分割器依赖
-EmbeddingTokenizerDeps = Annotated[
-    EmbeddingTokenizer, Depends(get_embedding_tokenizer)
-]  # Embedding Tokenizer 依赖
-FTSProviderDeps = Annotated[FTSProvider, Depends(get_fts_provider)]  # 全文检索服务依赖
-EmbeddingProviderDeps = Annotated[
-    EmbeddingProvider, Depends(get_embedding_provider)
-]  # 向量化服务依赖
-RerankProviderDeps = Annotated[
-    RerankProvider, Depends(get_rerank_provider)
-]  # 重排序服务依赖
-FileParserFactoryDeps = Annotated[
-    FileParserFactory, Depends(get_file_parser_factory)
-]  # 文件解析器工厂依赖
+
+# =========== 组合依赖 ===========
+# 数据库会话依赖
+SessionDeps = Annotated[AsyncSession, Depends(get_db)]
+# 文件存储依赖
+FileStorageDeps = Annotated[FileStorage, Depends(get_file_storage)]
+
+VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]
+TextSplitterDeps = Annotated[TextSplitter, Depends(get_text_splitter)]
+FTSProviderDeps = Annotated[FTSProvider, Depends(get_fts_provider)]
+EmbeddingProviderDeps = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]
+RerankProviderDeps = Annotated[RerankProvider, Depends(get_rerank_provider)]
+FileParserFactoryDeps = Annotated[FileParserFactory, Depends(get_file_parser_factory)]
+TokenCounterDeps = Annotated[TokenCounter, Depends(get_token_counter)]
 
 # CRUD 依赖
 ProjectCRUDeps = Annotated[ProjectCRUD, Depends(get_project_crud)]
@@ -241,9 +268,16 @@ ValidProjectDeps = Annotated[Project, Depends(valid_project)]
 
 # Provider 依赖
 QueryExpanderDeps = Annotated[QueryExpander, Depends(get_query_expander)]
+StandaloneQueryRewriterDeps = Annotated[
+    StandaloneQueryRewriter, Depends(get_standalone_rewriter)
+]
 
 # Service 依赖
 DocumentIngestServiceDeps = Annotated[
     DocumentIngestService,
     Depends(get_document_ingest_service),
+]
+HybridSearchServiceDeps = Annotated[
+    HybridSearchService,
+    Depends(get_hybrid_search_service),
 ]
