@@ -25,7 +25,7 @@ from app.providers import (
     DEFAULT_SYSTEM_PROMPT,
 )
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
-from app.db.models import Project, ChatSession, ChatMessage, Provider, Source
+from app.db.models import Project, ChatSession, ChatMessage, Source
 from app.db.schemas import (
     HybridSearchOptions,
     ProviderWithModelInternalRead,
@@ -33,7 +33,12 @@ from app.db.schemas import (
     ChatSessionRead,
     ChatSessionInternal,
 )
-from app.core.constants import ChatMessageRole, ChatMessageType, ChatSessionType
+from app.core.constants import (
+    ChatMessageRole,
+    ChatMessageType,
+    ChatSessionType,
+    SearchMode,
+)
 
 
 class ChatOrchestratorService:
@@ -199,7 +204,22 @@ class ChatOrchestratorService:
     ) -> AsyncIterable[ChatStreamEvent]:
         """流式对话；调用 RAG 服务"""
 
-        # 0. 预备参数
+        # 0. 策略检查 + 预备参数
+        # 如果 model 不支持 structured：
+        # - standalone rewriter 自动降级
+        # - SearchMode.ADAPTIVE 降级为 SearchMode.FAST
+        # - SearchMode.FULL 模式报错
+        if not provider_with_model.model_profile.supports_structured:
+            if rag_options.standalone_enabled:
+                rag_options.standalone_enabled = False
+
+            if rag_options.mode == SearchMode.ADAPTIVE:
+                rag_options.mode = SearchMode.FAST
+            elif rag_options.mode == SearchMode.FULL:
+                raise ValueError(
+                    "The selected model does not support structured output, cannot use FULL search mode."
+                )
+
         provider_name = provider_with_model.name
         model_name = provider_with_model.model_profile.model
 
