@@ -1,5 +1,6 @@
 from typing import Protocol
 
+from app.db.schemas import ProviderWithModelInternalRead
 from .base import (
     Message,
     StreamedResponse,
@@ -18,6 +19,7 @@ from .prompts import (
     SUMMARIZATION_PROMPT,
     UPDATE_SUMMARIZATION_PROMPT,
 )
+
 
 __all__ = [
     "Message",
@@ -44,24 +46,45 @@ class FullCompleter(TextCompleter, StructuredCompleter, Protocol):
 
 
 def completer_factory(
-    provider: str,
-    model: str,
+    provider_with_model: ProviderWithModelInternalRead,
 ) -> FullCompleter:
-    """ """
+    """FullCompleter 工厂函数"""
+    # 预备参数
+    provider = provider_with_model.name
+    model = provider_with_model.model_profile.model
+
+    api_key = None
+    if provider_with_model.api_key:
+        api_key = provider_with_model.api_key.get_secret_value()
+
     if provider == "google":
         from .gemini import GeminiModel
 
-        return GeminiModel(model_perf=model)
+        if api_key is None:
+            raise ValueError("API key is required for Gemini provider.")
+
+        return GeminiModel(
+            model_perf=model,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
 
     elif provider in ("openai", "deepseek", "ollama"):
         from .openai_compatible import OpenAIChatModel, OpenAIEndpoint
+
+        if provider != "ollama" and api_key is None:
+            raise ValueError(f"API key is required for {provider} provider.")
 
         endpoint_map = {
             "openai": OpenAIEndpoint.openai,
             "deepseek": OpenAIEndpoint.deepseek,
             "ollama": OpenAIEndpoint.ollama,
         }
-        endpoint = endpoint_map[provider]()
+        endpoint = endpoint_map[provider](
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
         return OpenAIChatModel(model_perf=model, endpoint=endpoint)
 
     raise ValueError(f"Unsupported TextCompleter provider: {provider}")

@@ -21,7 +21,6 @@ from .base import (
     ModelResponse,
     ThinkingLevel,
 )
-from app.core.config import settings
 from app.core.constants import ChatMessageRole
 
 
@@ -70,12 +69,22 @@ class GeminiStreamedResponse(StreamedResponse):
 
 
 class GeminiModel:
-    def __init__(self, model_perf: str):
-        if not settings.gemini_api_key:
-            raise ValueError("Gemini API key is not set in the configuration.")
+    def __init__(
+        self,
+        *,
+        model_perf: str,
+        api_key: str,
+        base_url: str | None = None,
+    ) -> None:
+        if not api_key:
+            raise ValueError("Gemini API key is required.")
+
+        http_options: HttpOptionsDict | None = None
+        if base_url:
+            http_options = {"base_url": base_url}
 
         self._model = model_perf
-        self._client = genai.Client(api_key=settings.gemini_api_key)
+        self._client = genai.Client(api_key=api_key, http_options=http_options)
 
         # 模型工具配置
         # self.grounding_tool = types.Tool(google_search=types.GoogleSearch())

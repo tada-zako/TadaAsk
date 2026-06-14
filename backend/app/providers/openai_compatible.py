@@ -16,7 +16,6 @@ from .base import (
     TokenUsage,
     ThinkingLevel,
 )
-from app.core.config import settings
 from app.core.constants import ChatMessageRole
 
 
@@ -35,29 +34,31 @@ class OpenAIEndpoint:
     base_url: str | None = None
 
     @classmethod
-    def deepseek(cls) -> "OpenAIEndpoint":
+    def deepseek(cls, api_key: str, base_url: str | None = None) -> "OpenAIEndpoint":
         """DeepSeek 兼容接口配置"""
         return cls(
-            api_key=settings.deepseek_api_key,
-            base_url="https://api.deepseek.com",
+            api_key=api_key,
+            base_url=base_url or "https://api.deepseek.com",
             endpoint_name="deepseek",
         )
 
     @classmethod
-    def openai(cls) -> "OpenAIEndpoint":
+    def openai(cls, api_key: str, base_url: str | None = None) -> "OpenAIEndpoint":
         """OpenAI 官方接口配置"""
         return cls(
-            api_key=settings.gemini_api_key,
-            base_url=None,  # OpenAI 官方 API 使用默认 base URL，无需配置
+            api_key=api_key,
+            base_url=base_url,  # OpenAI 官方 API 使用默认 base URL，无需配置
             endpoint_name="openai",
         )
 
     @classmethod
-    def ollama(cls) -> "OpenAIEndpoint":
+    def ollama(
+        cls, api_key: str | None = None, base_url: str | None = None
+    ) -> "OpenAIEndpoint":
         """Ollama 兼容接口配置，默认指向本地 Ollama 服务"""
         return cls(
             api_key=None,  # Ollama 本地服务通常不需要 API Key
-            base_url="http://localhost:11434",
+            base_url=base_url or "http://localhost:11434",
             endpoint_name="ollama",
         )
 
