@@ -25,7 +25,7 @@ from app.rag import (
     SQLiteFTSProvider,
 )
 from app.rag.utils import FTSTokenizer, JiebaFTSTokenizer
-from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer
+from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer, TokenCounter
 from app.crud import AdminCRUD
 from app.api import admin, visitor
 
@@ -78,13 +78,12 @@ async def lifespan(app: FastAPI):
     )
     app.state.vector_db = vector_db
 
-    # 挂载 embedding tokenizer 实例
+    # 创建 embedding tokenizer 实例
     embedding_tokenizer: EmbeddingTokenizer = embedding_tokenizer_factory(
         embedding_mode=settings.embedding_backend,
         model_name=settings.embedding_model_name,
         cache_dir=settings.hf_hub_cache,
     )
-    app.state.embedding_tokenizer = embedding_tokenizer
 
     # 挂载文本分割器实例
     text_splitter: TextSplitter = TokenAwareTextSplitter(
@@ -118,7 +117,11 @@ async def lifespan(app: FastAPI):
     rerank_provider: RerankProvider = rerank_provider_factory(settings=settings)
     app.state.rerank = rerank_provider
 
-    # MVP 实现：在应用启动时验证管理员账号，如果不存在则创建一个默认管理员
+    # 挂载 TokenCounter 实例
+    token_counter = TokenCounter(tokenizer=embedding_tokenizer)
+    app.state.token_counter = token_counter
+
+    # TODO: MVP 实现：在应用启动时验证管理员账号，如果不存在则创建一个默认管理员
     await valid_or_create_admin()
 
     yield  # 运行应用
