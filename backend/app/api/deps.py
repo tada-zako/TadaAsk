@@ -1,10 +1,13 @@
 from typing import Annotated
 
-from fastapi import Depends, Request, HTTPException, Path
+from fastapi import Depends, Request, HTTPException, Path, Body
 from sqlalchemy.ext.asyncio import AsyncSession
+from loguru import logger
 
+from .schemas import AdminChatRequest
 from app.db import get_db
 from app.db.models import Project
+from app.db.schemas import ProviderWithModelInternalRead
 from app.crud import (
     ProjectCRUD,
     AdminCRUD,
@@ -14,7 +17,7 @@ from app.crud import (
     RAGSearchCRUD,
     ModelProfileCRUD,
 )
-from app.providers import completer_factory, StructuredCompleter
+from app.providers import completer_factory, FullCompleter
 from app.storage import FileStorage
 from app.parser import FileParserFactory
 from app.rag import (
@@ -24,7 +27,6 @@ from app.rag import (
     EmbeddingProvider,
     RerankProvider,
     QueryExpander,
-    StandaloneQueryRewriter,
 )
 from app.utils import TokenCounter
 from app.services.rag import (
@@ -39,7 +41,6 @@ from app.services.chat import (
     GenerationRegistry,
 )
 from app.core.security import ProviderAPIKeyCipher
-from app.core.config import settings
 
 
 # =========== 全局服务依赖注入接口 ============
@@ -51,6 +52,11 @@ def get_api_key_cipher(request: Request) -> ProviderAPIKeyCipher:
 def get_vector_db(request: Request) -> VectorDatabase:
     """返回全局挂载的向量数据库实例"""
     return request.app.state.vector_db
+
+
+def get_generation_registry(request: Request) -> GenerationRegistry:
+    """返回全局挂载的 GenerationRegistry 实例"""
+    return request.app.state.generation_registry
 
 
 def get_text_splitter(request: Request) -> TextSplitter:
@@ -66,6 +72,11 @@ def get_fts_provider(request: Request) -> FTSProvider:
 def get_embedding_provider(request: Request) -> EmbeddingProvider:
     """返回全局挂载的向量化服务实例"""
     return request.app.state.embedding
+
+
+def get_query_expander(request: Request) -> QueryExpander:
+    """返回全局挂载的查询扩展服务实例"""
+    return request.app.state.query_expander
 
 
 def get_rerank_provider(request: Request) -> RerankProvider:
@@ -137,53 +148,38 @@ async def valid_project(
 
 
 # =========== Provider 依赖注入接口 ============
-def get_completer(
-    provider_name: Annotated[
-        str,
-        Path(
-            ...,
-            description="Provider name, e.g. 'openai', 'google', 'deepseek', 'ollama'",
-        ),
+async def get_admin_provider_with_model(
+    model_profile_crud: "ModelProfileCRUDeps",
+    api_key_cipher: "APIKeyCipherDeps",
+    request: Annotated[
+        AdminChatRequest, Body(..., description="AdminChatRequest 请求体")
     ],
-    model_name: Annotated[
-        str,
-        Path(
-            ...,
-            description="Model name, e.g. 'gpt-3.5-turbo', 'gemini-1.5-pro', 'ollama-mistral-7b-v0.1.Q4_0.gguf'",
-        ),
-    ],
-) -> StructuredCompleter:
-    """依赖注入接口：根据 provider_name 和 model_name 返回对应的 FullCompleter 实例"""
-    p_name = provider_name or settings.llm_provider_admin or "google"
-
-    if p_name == "google":
-        m_name = model_name or settings.gemini_model_perf or "gemini-2.5-flash"
-    elif p_name == "deepseek":
-        m_name = model_name or settings.deepseek_model_perf or "DeepSeek-V4-Flash"
-    else:
-        m_name = model_name
-
-    return completer_factory(provider=p_name, model=m_name)
-
-
-def get_query_expander(
-    completer: Annotated[StructuredCompleter, Depends(get_completer)],
-) -> QueryExpander:
-    """依赖注入接口：提供 QueryExpander 实例"""
-    return QueryExpander(
-        completer=completer,
-        prompt_version="prompt_v1",
-        cache_enabled=True,
-        cache_size=512,
-        ttl_seconds=3600,
+) -> ProviderWithModelInternalRead:
+    """依赖注入接口：根据前端传递的 provider_uid 和 model_uid 获取对应的 ProviderWithModelInternalRead 实例"""
+    provider_with_model = (
+        await model_profile_crud.get_internal_provider_with_model_profile_by_uid(
+            provider_uid=request.provider_uid,
+            model_uid=request.model_uid,
+            api_key_cipher=api_key_cipher,
+        )
     )
 
+    if not provider_with_model:
+        logger.error(
+            f"Invalid provider_uid or model_uid: {request.provider_uid}, {request.model_uid}"
+        )
+        raise ValueError("Invalid provider_uid or model_uid")
 
-def get_standalone_rewriter(
-    completer: Annotated[StructuredCompleter, Depends(get_completer)],
-) -> StandaloneQueryRewriter:
-    """依赖注入接口：提供 StandaloneQueryRewriter 实例"""
-    return StandaloneQueryRewriter(completer=completer)
+    return provider_with_model
+
+
+async def get_admin_completer(
+    provider_with_model: Annotated[
+        ProviderWithModelInternalRead, Depends(get_admin_provider_with_model)
+    ],
+) -> FullCompleter:
+    """依赖注入接口：根据 AdminChatRequest 请求体获取对应的 FullCompleter 实例"""
+    return completer_factory(provider_with_model=provider_with_model)
 
 
 # =========== Service 层依赖注入接口 ===========
@@ -234,15 +230,54 @@ def get_hybrid_search_service(
 def get_rag_retrieval_service(
     rag_search_crud: "RAGSearchCRUDeps",
     hybrid_search_service: "HybridSearchServiceDeps",
-    standalone_rewriter: "StandaloneQueryRewriterDeps",
     token_counter: "TokenCounterDeps",
 ) -> RAGRetrievalService:
     """RAGRetrievalService 依赖注入接口"""
     return RAGRetrievalService(
         rag_search_crud=rag_search_crud,
         hybrid_search_service=hybrid_search_service,
-        standalone_rewriter=standalone_rewriter,
         token_counter=token_counter,
+    )
+
+
+def get_context_builder(
+    token_counter: "TokenCounterDeps",
+) -> ContextBuilder:
+    """ContextBuilder 依赖注入接口"""
+    return ContextBuilder(token_counter=token_counter)
+
+
+def get_compaction_service(
+    chat_message_crud: "ChatMessageCRUDeps",
+    chat_session_crud: "ChatSessionCRUDeps",
+    token_counter: "TokenCounterDeps",
+) -> CompactionService:
+    """CompactionService 依赖注入接口"""
+    return CompactionService(
+        chat_message_crud=chat_message_crud,
+        chat_session_crud=chat_session_crud,
+        token_counter=token_counter,
+    )
+
+
+def get_chat_orchestrator_service(
+    session: "SessionDeps",
+    chat_message_crud: "ChatMessageCRUDeps",
+    chat_session_crud: "ChatSessionCRUDeps",
+    context_builder: "ContextBuilderDeps",
+    rag_retrieval_service: "RAGRetrievalServiceDeps",
+    generation_registry: "GenerationRegistryDeps",
+    compaction_service: "CompactionServiceDeps",
+) -> ChatOrchestratorService:
+    """ChatOrchestratorService 依赖注入接口"""
+    return ChatOrchestratorService(
+        session=session,
+        chat_message_crud=chat_message_crud,
+        chat_session_crud=chat_session_crud,
+        context_builder=context_builder,
+        rag_retrieval=rag_retrieval_service,
+        generation_registry=generation_registry,
+        compaction_service=compaction_service,
     )
 
 
@@ -254,9 +289,11 @@ APIKeyCipherDeps = Annotated[ProviderAPIKeyCipher, Depends(get_api_key_cipher)]
 FileStorageDeps = Annotated[FileStorage, Depends(get_file_storage)]
 
 VectorDBDeps = Annotated[VectorDatabase, Depends(get_vector_db)]
+GenerationRegistryDeps = Annotated[GenerationRegistry, Depends(get_generation_registry)]
 TextSplitterDeps = Annotated[TextSplitter, Depends(get_text_splitter)]
 FTSProviderDeps = Annotated[FTSProvider, Depends(get_fts_provider)]
 EmbeddingProviderDeps = Annotated[EmbeddingProvider, Depends(get_embedding_provider)]
+QueryExpanderDeps = Annotated[QueryExpander, Depends(get_query_expander)]
 RerankProviderDeps = Annotated[RerankProvider, Depends(get_rerank_provider)]
 FileParserFactoryDeps = Annotated[FileParserFactory, Depends(get_file_parser_factory)]
 TokenCounterDeps = Annotated[TokenCounter, Depends(get_token_counter)]
@@ -273,12 +310,6 @@ ModelProfileCRUDeps = Annotated[ModelProfileCRUD, Depends(get_model_profile_crud
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
 
-# Provider 依赖
-QueryExpanderDeps = Annotated[QueryExpander, Depends(get_query_expander)]
-StandaloneQueryRewriterDeps = Annotated[
-    StandaloneQueryRewriter, Depends(get_standalone_rewriter)
-]
-
 # Service 依赖
 DocumentIngestServiceDeps = Annotated[
     DocumentIngestService,
@@ -287,4 +318,16 @@ DocumentIngestServiceDeps = Annotated[
 HybridSearchServiceDeps = Annotated[
     HybridSearchService,
     Depends(get_hybrid_search_service),
+]
+RAGRetrievalServiceDeps = Annotated[
+    RAGRetrievalService,
+    Depends(get_rag_retrieval_service),
+]
+ContextBuilderDeps = Annotated[
+    ContextBuilder,
+    Depends(get_context_builder),
+]
+CompactionServiceDeps = Annotated[
+    CompactionService,
+    Depends(get_compaction_service),
 ]
