@@ -121,6 +121,7 @@ class RAGRetrievalService:
         search_results = await self.hybrid_search_service.search(
             query=retrieval_query,
             sources=sources,
+            completer=completer,
             options=rag_options,
         )
 

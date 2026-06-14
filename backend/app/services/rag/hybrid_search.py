@@ -16,6 +16,7 @@ from app.rag import (
     EmbeddingProvider,
     RerankProvider,
 )
+from app.providers import StructuredCompleter
 from app.db.models import Source
 from app.db.schemas import HybridSearchResult, HybridSearchOptions
 from app.crud import SourceCRUD, RAGSearchCRUD
@@ -398,6 +399,7 @@ class HybridSearchService:
         sources: list[Source],
         raw_ranked_lists: list[RankedList],
         options: HybridSearchOptions,
+        completer: StructuredCompleter,
         debug: SearchDebugInfo | None = None,
     ) -> list[HybridSearchResult]:
         """
@@ -416,6 +418,7 @@ class HybridSearchService:
             query=query,
             max_keywords=options.max_keywords,
             max_alternative_queries=options.max_alternative_queries,
+            completer=completer,
         )
 
         # 2. 扩展查询 embedding
@@ -545,6 +548,7 @@ class HybridSearchService:
         # TODO: 之后将这里的 sources 重命名为 source_with_items
         sources: list[Source],
         options: HybridSearchOptions,
+        completer: StructuredCompleter,
         enable_debug: bool = False,
     ) -> list[HybridSearchResult]:
         """
@@ -586,6 +590,7 @@ class HybridSearchService:
             sources=sources,
             raw_ranked_lists=ranked_lists,  # 复用 raw search 的 ranked list 结果，避免重复计算
             options=options,
+            completer=completer,
             debug=debug,
         )
 
