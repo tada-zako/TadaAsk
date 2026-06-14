@@ -84,6 +84,7 @@ class GeminiModel:
             http_options = {"base_url": base_url}
 
         self._model = model_perf
+        self._base_url = base_url
         self._client = genai.Client(api_key=api_key, http_options=http_options)
 
         # 模型工具配置
@@ -94,6 +95,11 @@ class GeminiModel:
     def model_name(self) -> str:
         """返回模型名称，供业务层记录日志等使用"""
         return self._model
+
+    @property
+    def provider_name(self) -> str:
+        """返回模型所属的 provider 名称，供业务层记录日志等使用"""
+        return "google"
 
     def _translate_thinking(self, thinking: ThinkingLevel) -> ThinkingConfigDict | None:
         """通用的 thinking 配置转换为 Gemini LLM 内部 thinking_config 格式"""

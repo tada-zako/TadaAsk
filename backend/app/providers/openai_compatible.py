@@ -30,7 +30,7 @@ class OpenAIEndpoint:
     """OpenAI 兼容接口配置"""
 
     endpoint_name: str
-    api_key: str | None = None
+    api_key: str
     base_url: str | None = None
 
     @classmethod
@@ -57,7 +57,7 @@ class OpenAIEndpoint:
     ) -> "OpenAIEndpoint":
         """Ollama 兼容接口配置，默认指向本地 Ollama 服务"""
         return cls(
-            api_key=None,  # Ollama 本地服务通常不需要 API Key
+            api_key="ollama",  # Ollama 本地服务通常不需要 API Key
             base_url=base_url or "http://localhost:11434",
             endpoint_name="ollama",
         )
@@ -105,12 +105,19 @@ class OpenAIChatModel:
             )
 
         self._model = model_perf
+        self._base_url = endpoint.base_url
+        self._provider_name = endpoint.endpoint_name
         self._client = AsyncOpenAI(base_url=endpoint.base_url, api_key=endpoint.api_key)
 
     @property
     def model_name(self) -> str:
         """返回模型名称，供业务层记录日志等使用"""
         return self._model
+
+    @property
+    def provider_name(self) -> str:
+        """返回模型所属的 provider 名称，供业务层记录日志等使用"""
+        return self._provider_name
 
     def _translate_thinking(self, thinking: ThinkingLevel) -> ReasoningEffort | Omit:
         """通用的 thinking 配置转换为 Openai Compatible LLM 内部 thinking_config 格式"""
