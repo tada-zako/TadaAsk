@@ -33,14 +33,12 @@ class QueryExpander:
 
     def __init__(
         self,
-        completer: StructuredCompleter,
         *,
         prompt_version: str = "prompt_v1",
         cache_enabled: bool = True,
         cache_size: int = 512,
         ttl_seconds: int = 3600,
     ):
-        self._completer = completer
         self._prompt_version = prompt_version
         self._cache_enabled = cache_enabled
 
@@ -50,13 +48,18 @@ class QueryExpander:
             )
 
     def _cache_key(
-        self, query: str, max_keywords: int, max_alternative_queries: int
+        self,
+        *,
+        query: str,
+        max_keywords: int,
+        max_alternative_queries: int,
+        completer: StructuredCompleter,
     ) -> str:
         """生成缓存键；基于查询文本和参数的规范化和稳定哈希"""
         return stable_hash(
             {
                 "kind": "expanded_query",
-                "model": self._completer.model_name,
+                "model": completer.model_name,
                 "prompt_version": self._prompt_version,
                 "query": normalize_text(query),
                 "max_keywords": max_keywords,
@@ -70,6 +73,7 @@ class QueryExpander:
         *,
         max_keywords: int = 5,
         max_alternative_queries: int = 2,
+        completer: StructuredCompleter,
     ) -> ExpandedQuery:
         """
         生成扩展查询
@@ -89,7 +93,12 @@ class QueryExpander:
 
         if self._cache_enabled:
             # 检查缓存结果
-            key = self._cache_key(query, max_keywords, max_alternative_queries)
+            key = self._cache_key(
+                query=query,
+                max_keywords=max_keywords,
+                max_alternative_queries=max_alternative_queries,
+                completer=completer,
+            )
             cached_result = self._cache.get(key)
             if cached_result is not None:
                 return cached_result
@@ -109,7 +118,7 @@ class QueryExpander:
             ),
         ]
 
-        result: ExpandedQuery = await self._completer.complete_structured(
+        result: ExpandedQuery = await completer.complete_structured(
             messages=messages,
             model_settings=ModelSettings.for_query_expansion(),
             schema=ExpandedQuery,
