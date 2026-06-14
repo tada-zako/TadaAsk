@@ -10,10 +10,13 @@ from app.services import SearchDebugInfo
 class AdminChatRequest(BaseModel):
     """Admin chat 请求结构体"""
 
+    # LLM Chat 请求的基础字段
     message: str = Field(..., description="用户输入的消息文本")
     chat_session_uid: str | None = None
-    model_profile_uid: str
+    provider_uid: str
+    model_uid: str
 
+    # RAG 相关参数配置
     rag_enabled: bool = True
     source_uids: list[str] | None = None  # 可选的文档来源过滤条件
     rag_options: HybridSearchRequest | None = None
