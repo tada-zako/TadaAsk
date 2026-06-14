@@ -19,19 +19,12 @@ class Settings(BaseSettings):
     project_root: str = str(PROJECT_ROOT)
 
     # =======================================
-    # LLM 配置
+    # LLM 相关配置
     # =======================================
 
-    llm_provider_admin: str = "google"  # Admin LLM 提供商
-    llm_provider_visitor: str = "deepseek"  # Visitor LLM 提供商
-
-    # Gemini LLM 配置
-    gemini_api_key: str = ""
-    gemini_model_perf: str = "gemini-2.5-flash"
-
-    # DeepSeek LLM 配置
-    deepseek_api_key: str = ""
-    deepseek_model_perf: str = "DeepSeek-V4-Flash"
+    # API Key 加密配置
+    provider_api_key_encryption_key: str = ""
+    provider_api_key_previous_encryption_keys: str = ""
 
     sql_history_fetch_limit: int = 100  # 数据库中获取的历史消息数量上限
     max_context_tokens: int = 12000  # LLM 输入的最大上下文 token 长度，只包含历史对话
@@ -43,9 +36,9 @@ class Settings(BaseSettings):
     llm_default_temperature: float = 0.7
     llm_default_top_p: float = 0.95
     llm_default_timeout: float = 60.0
-    llm_default_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"] = (
-        "medium"
-    )
+    llm_default_thinking: (
+        bool | Literal["minimal", "low", "medium", "high", "xhigh"]
+    ) = "medium"
 
     # =======================================
     # RAG 相关配置
@@ -148,13 +141,21 @@ class Settings(BaseSettings):
     def validate_model_paths(self) -> "Settings":
         """验证模型路径配置是否存在"""
         # 验证 FastEmbed 模型路径是否存在（如果使用 fastembed 作为嵌入后端）
-        if self.embedding_backend == "fastembed" and self.fastembed_model_path:
+        if (
+            self.embedding_backend == "fastembed"
+            or self.rerank_backend == "fastembed"
+            and self.fastembed_model_path
+        ):
             if not pathlib.Path(self.fastembed_model_path).exists():
                 raise ValueError(
                     f"FastEmbed model path does not exist: {self.fastembed_model_path}"
                 )
         # 验证 LLaMA.cpp 模型路径是否存在（如果使用 llamacpp 作为 LLM 后端）
-        if self.llm_provider_admin == "llamacpp" and self.llamacpp_model_path:
+        if (
+            self.embedding_backend == "llamacpp"
+            or self.rerank_backend == "llamacpp"
+            and self.llamacpp_model_path
+        ):
             if not pathlib.Path(self.llamacpp_model_path).exists():
                 raise ValueError(
                     f"LLaMA.cpp model path does not exist: {self.llamacpp_model_path}"
