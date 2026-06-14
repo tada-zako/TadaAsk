@@ -178,8 +178,8 @@ class ModelSettings:
     def for_admin_chat(
         cls,
         *,
-        profile: ModelProfile,
-        request: AdminChatRequest | None = None,
+        profile: "ModelProfile",
+        request: "AdminChatRequest | None" = None,
     ) -> "ModelSettings":
         """
         Admin Chat 的模型配置入口。
@@ -211,8 +211,8 @@ class ModelSettings:
     def for_visitor_chat(
         cls,
         *,
-        profile: ModelProfile,
-        project_settings: ProjectChatSettings | None = None,
+        profile: "ModelProfile",
+        project_settings: "ProjectChatSettings | None" = None,
     ) -> "ModelSettings":
         """
         Visitor Chat 的模型配置入口。
@@ -402,6 +402,11 @@ class TextCompleter(Protocol):
         """返回模型名称，供业务层记录日志等使用"""
         raise NotImplementedError()
 
+    @property
+    def provider_name(self) -> str:
+        """返回模型所属的 provider 名称，供业务层记录日志等使用"""
+        raise NotImplementedError()
+
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -426,4 +431,9 @@ class StructuredCompleter(Protocol):
     @property
     def model_name(self) -> str:
         """返回模型名称，供业务层记录日志等使用"""
+        raise NotImplementedError()
+
+    @property
+    def provider_name(self) -> str:
+        """返回模型所属的 provider 名称，供业务层记录日志等使用"""
         raise NotImplementedError()
