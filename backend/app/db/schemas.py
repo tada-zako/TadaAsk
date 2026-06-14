@@ -364,6 +364,20 @@ class ModelProfileRead(ModelProfileBase):
     )
 
 
+class ProviderWithModelInternalRead(ProviderRead):
+    """包含模型配置的 Provider 读取模型；内部使用"""
+
+    # 解密后的 API Key；仅内部使用，外部接口不暴露
+    api_key: SecretStr | None = None
+    model_profile: ModelProfileRead
+
+
+class ProviderWithModelProfileRead(ProviderRead):
+    """包含模型配置的 Provider 读取模型；对外接口使用"""
+
+    model_profile: ModelProfileRead
+
+
 # ======= Chat Sessions Schemas =======
 class ChatSessionBase(BaseModel):
     title: str
