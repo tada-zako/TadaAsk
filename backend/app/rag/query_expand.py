@@ -60,6 +60,7 @@ class QueryExpander:
             {
                 "kind": "expanded_query",
                 "model": completer.model_name,
+                "provider": completer.provider_name,
                 "prompt_version": self._prompt_version,
                 "query": normalize_text(query),
                 "max_keywords": max_keywords,
