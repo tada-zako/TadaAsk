@@ -18,15 +18,17 @@ from ..schemas import (
 from ..utils import TokenBudget
 from app.api.schemas import AdminChatRequest, VisitorChatRequest
 from app.providers import (
+    FullCompleter,
     TextCompleter,
     StreamedResponse,
     ModelSettings,
     DEFAULT_SYSTEM_PROMPT,
 )
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
-from app.db.models import Project, ChatSession, ChatMessage, ModelProfile, Source
+from app.db.models import Project, ChatSession, ChatMessage, Provider, Source
 from app.db.schemas import (
     HybridSearchOptions,
+    ProviderWithModelInternalRead,
     ChatMessageRead,
     ChatSessionRead,
     ChatSessionInternal,
@@ -45,7 +47,6 @@ class ChatOrchestratorService:
         session: AsyncSession,
         chat_message_crud: ChatMessageCRUD,
         chat_session_crud: ChatSessionCRUD,
-        text_completer: TextCompleter,
         context_builder: ContextBuilder,
         rag_retrieval: RAGRetrievalService,
         generation_registry: GenerationRegistry,
@@ -54,7 +55,6 @@ class ChatOrchestratorService:
         self.session = session
         self.chat_message_crud = chat_message_crud
         self.chat_session_crud = chat_session_crud
-        self.text_completer = text_completer
         self.context_builder = context_builder
         self.rag_retrieval = rag_retrieval
         self.generation_registry = generation_registry
@@ -65,7 +65,8 @@ class ChatOrchestratorService:
         *,
         project: Project,
         request: AdminChatRequest | VisitorChatRequest,
-        model_profile: ModelProfile,
+        provider: str,
+        model: str,
         requester_type: ChatSessionType,
     ) -> tuple[ChatSession, bool]:
         """
@@ -98,8 +99,8 @@ class ChatOrchestratorService:
                 # TODO: 命名后续基于 LLM 响应结果动态更新
                 title="",
                 owner_type=requester_type,
-                provider=model_profile.provider,
-                model=model_profile.model,
+                provider=provider,
+                model=model,
                 project_id=project.id,
             )
         )
@@ -119,7 +120,9 @@ class ChatOrchestratorService:
         chat_session: ChatSession,
         current_message: ChatMessage,
         system_prompt: str,
-        model_profile: ModelProfile,
+        completer: TextCompleter,
+        provider: str,
+        model: str,
         token_budget: TokenBudget,
     ) -> tuple[ChatMessage | None, list[ChatMessage]]:
         """
@@ -162,7 +165,9 @@ class ChatOrchestratorService:
                 chat_session_id=chat_session.id,
                 recent_messages=recent_messages,
                 old_compaction_message=compaction_message,
-                model_profile=model_profile,
+                completer=completer,
+                provider=provider,
+                model=model,
                 token_budget=token_budget,
             )
 
@@ -186,18 +191,24 @@ class ChatOrchestratorService:
         project: Project,
         sources: list[Source],
         request: AdminChatRequest | VisitorChatRequest,
-        model_profile: ModelProfile,
+        completer: FullCompleter,
+        provider_with_model: ProviderWithModelInternalRead,
         requester_type: ChatSessionType,
         rag_options: HybridSearchOptions,
         model_settings: ModelSettings,
     ) -> AsyncIterable[ChatStreamEvent]:
         """流式对话；调用 RAG 服务"""
 
+        # 0. 预备参数
+        provider_name = provider_with_model.name
+        model_name = provider_with_model.model_profile.model
+
         # 1. 验证或创建 ChatSession
         chat_session, session_created = await self._valid_or_create_chat_session(
             project=project,
             request=request,
-            model_profile=model_profile,
+            provider=provider_name,
+            model=model_name,
             requester_type=requester_type,
         )
 
@@ -213,8 +224,8 @@ class ChatOrchestratorService:
             message=request.message,
             role=ChatMessageRole.USER,
             type=ChatMessageType.MESSAGE,
-            provider=model_profile.provider,
-            model=model_profile.model,
+            provider=provider_name,
+            model=model_name,
         )
 
         assistant_message = await self.chat_message_crud.append_message(
@@ -222,13 +233,13 @@ class ChatOrchestratorService:
             role=ChatMessageRole.ASSISTANT,
             message="",
             type=ChatMessageType.MESSAGE,
-            provider=model_profile.provider,
-            model=model_profile.model,
+            provider=provider_name,
+            model=model_name,
         )
 
         # 1.2.2 预备 system_prompt 以及 token_budget
         system_prompt = self._resolve_system_prompt()
-        token_budget = TokenBudget.from_model_profile(model_profile)
+        token_budget = TokenBudget.from_model_profile(provider_with_model.model_profile)
 
         # 1.3 注册 generation 对象
         generation = self.generation_registry.register(
@@ -253,7 +264,9 @@ class ChatOrchestratorService:
                 chat_session=chat_session,
                 current_message=user_message,
                 system_prompt=system_prompt,
-                model_profile=model_profile,
+                completer=completer,
+                provider=provider_name,
+                model=model_name,
                 token_budget=token_budget,
             )
 
@@ -264,6 +277,7 @@ class ChatOrchestratorService:
                 recent_messages=recent_messages,
                 compaction_message=compaction_message,
                 rag_options=rag_options,
+                completer=completer,
                 token_budget=token_budget,
             )
 
@@ -284,7 +298,7 @@ class ChatOrchestratorService:
             )
 
             # 3. 调用 TextCompleter 进行文本生成
-            async with self.text_completer.stream_chat(
+            async with completer.stream_chat(
                 messages=context, model_settings=model_settings
             ) as response:
                 stream_response = response
