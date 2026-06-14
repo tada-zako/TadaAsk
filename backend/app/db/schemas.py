@@ -67,10 +67,6 @@ class ProjectBase(BaseModel):
 
 
 class ProjectCreate(ProjectBase):
-    project_settings: "ProjectChatSettingsCreate" = Field(
-        default_factory=lambda: ProjectChatSettingsCreate(),
-    )
-
     model_config = ConfigDict(
         alias_generator=to_camel,
         validate_by_alias=True,
@@ -97,37 +93,25 @@ class ProjectRead(ProjectBase):
 class ProjectChatSettingsBase(BaseModel):
     """项目对话设置基类"""
 
-    visitor_default_model_profile_uid: str | None = None
-    visitor_rag_enabled: bool = True
+    visitor_rag_enabled: bool
     visitor_system_prompt: str | None = None
 
     # visitor 模型请求参数配置
-    visitor_max_output_tokens: int = Field(default=1536, gt=0)
-    visitor_temperature: float = Field(default=0.3, ge=0, le=2)
-    visitor_top_p: float = Field(default=0.9, gt=0, le=1)
-    visitor_timeout: float = Field(default=45.0, gt=0)
-    visitor_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"] = (
-        "low"
-    )
+    visitor_max_output_tokens: int
+    visitor_temperature: float
+    visitor_top_p: float
+    visitor_timeout: float
+    visitor_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"]
+    rag_mode: SearchMode
+    rag_top_k: int
 
-    rag_mode: SearchMode = SearchMode.FULL
-    rag_top_k: int = Field(default=8, ge=1)
+    rag_rerank_enabled: bool
+    rag_fts_k: int
+    rag_vector_k: int
+    rag_rerank_k: int
 
-    rag_rerank_enabled: bool = True
-    rag_fts_k: int = Field(default=30, ge=0)
-    rag_vector_k: int = Field(default=20, ge=0)
-    rag_rerank_k: int = Field(default=12, ge=0)
-
-    rag_max_alternative_queries: int = Field(default=2, ge=0, le=10)
-    rag_max_keywords: int = Field(default=5, ge=0, le=20)
-
-
-class ProjectChatSettingsCreate(ProjectChatSettingsBase):
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
+    rag_max_alternative_queries: int
+    rag_max_keywords: int
 
 
 class ProjectChatSettingsRead(ProjectChatSettingsBase):
@@ -304,9 +288,44 @@ class DocumentChunkRead(DocumentChunkBase):
 # =========================
 
 
+# ======= Provider Schemas =======
+class ProviderBase(BaseModel):
+    name: str
+    base_url: str | None = None
+
+    is_enabled: bool = True
+
+
+class ProviderCreate(ProviderBase):
+    api_key: str
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class ProviderRead(ProviderBase):
+    uid: str
+
+    encrypted_api_key: str = Field(
+        ...,
+        description="Encrypted API key; the actual API key is not exposed for security reasons",
+    )  # NOTE: 安全考虑，前端是否展示 api_key；API Key 解密在前端完成
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 # ======= Model Profile Schemas =======
 class ModelProfileBase(BaseModel):
-    provider: str
     model: str
 
     context_window_tokens: int | None = Field(

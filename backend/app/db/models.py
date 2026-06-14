@@ -165,10 +165,20 @@ class ProjectChatSettings(Base):
     )
 
     # visitor 默认模型配置
+    visitor_default_provider_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("providers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     visitor_default_model_profile_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("model_profiles.id", ondelete="SET NULL"),
         nullable=True,
     )
+
+    auxiliary_model_profile_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("model_profiles.id", ondelete="SET NULL"),
+        nullable=True,
+    )  # NOTE: 保留字段；辅助 model 配置，structured_completer 等模型降级
+
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
@@ -176,9 +186,16 @@ class ProjectChatSettings(Base):
         index=True,
     )  # 一对一关系，外键关联到项目表
 
+    visitor_default_provider: Mapped[Optional["Provider"]] = relationship(
+        foreign_keys=[visitor_default_provider_id]
+    )
     visitor_default_model_profile: Mapped[Optional["ModelProfile"]] = relationship(
         foreign_keys=[visitor_default_model_profile_id]
     )
+    auxiliary_model_profile: Mapped[Optional["ModelProfile"]] = relationship(
+        foreign_keys=[auxiliary_model_profile_id]
+    )  # NOTE: 保留字段
+
     project: Mapped["Project"] = relationship(back_populates="project_settings")
 
 
@@ -396,6 +413,49 @@ class DocumentChunk(Base):
 # =========================
 # LLM Chat DDL 设计
 # =========================
+class Provider(Base):
+    """
+    模型提供商表：管理 LLM 模型提供商配置
+    """
+
+    __tablename__ = "providers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    uid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    base_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    encrypted_api_key: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # 加密后的 API Key
+    extra_config: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # NOTE: 保留字段；配置 header 等，暂不使用
+
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # 关系字段
+    model_profiles: Mapped[list["ModelProfile"]] = relationship(
+        back_populates="provider",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
 class ModelProfile(Base):
     """
     模型配置表：管理模型配置信息
@@ -412,11 +472,9 @@ class ModelProfile(Base):
         default=lambda: str(uuid.uuid4()),
     )
 
-    provider: Mapped[str] = mapped_column(String, nullable=False)
     model: Mapped[str] = mapped_column(String, nullable=False)
 
     # 允许不设置 token 限制，上下文窗口/最大输出由 service 层配置默认值控制
-    # TODO: 只允许用户设置 max_output_tokens；context_window_tokens 由模型配置
     context_window_tokens: Mapped[Optional[int]]
     max_output_tokens: Mapped[Optional[int]]
 
@@ -427,10 +485,20 @@ class ModelProfile(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # 关系字段
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("providers.id", ondelete="CASCADE"),
+        index=True,
+    )  # 外键关联到模型提供商表
+    provider: Mapped["Provider"] = relationship(back_populates="model_profiles")
 
     __table_args__ = (
         # 同一提供商下模型名称唯一
-        UniqueConstraint("provider", "model", name="_provider_model_uc"),
+        UniqueConstraint("provider_id", "model", name="_provider_model_uc"),
     )
 
 
@@ -545,23 +613,3 @@ class ChatMessage(Base):
             name="_session_sequence_uc",
         ),
     )
-
-
-# TODO: 目前对于实际的业务逻辑还是有些不太清楚：
-# 1. 每个 project 对应用户的一个部署的站点
-# 2. 每个 project 下可以有多个 source，每个 source 对应一个数据来源（如文件上传、网页爬取等）
-# 2.5 这里设置 sources 分层，每个 source 对应一个向量集合，后续可以根据 source 来复用向量集合
-# 多 sources 情况下，如何进行向量检索结果的合并和展示？向量查询时，需要一次查询多个向量集合？
-# 3. 每个 source 下可以有多个 source_item，每个 source_item 对应一个具体的文件或 URL 等
-# 4. 每个 source_item 可以切分成多个 document_chunk，每个 document_chunk 对应向量库中的一个向量
-# 4.5 这里的 document_chunk 作用有些困惑：如果目前只是用 SQL 维护一个文档向量 ID 的集合，其实没有多大的作用....
-# 这里的期望，其实需要存储 raw_text 和更多的 metadata 字段，实现：
-# 4.5.1 在 RAG 检索时，从 SQL 中获取相关文本内容和元数据，向量库只负责存储向量内容 —— 这意味着向量检索逻辑需要单独实现（？到底是否依赖于向量库的检索 API 呢）
-# 4.5.2 在后续的文档管理中，实现增量式的文档更新和增删，而不是每次都全量更新向量库
-# 4.5.3 提供更加准确的查询方式，不止是通过向量查询，也通过文本内容、元数据等进行查询（？具体的实现方式还不太清楚）
-# 4.5.4 能够将检索到的结果，更加清晰的展示给用户，实现文档信息来源的可视化展示功能
-# 5. 外来游客通过访问站点，每次对话时，自动创建 ChatSession，并将用户的消息保存到 ChatMessage 中
-
-# TODO: MVP 需要实现的功能：
-# - project-source 业务的实现，source-source_item 业务的实现，source_item-chunk 业务的实现
-# - project-chat_session 业务组合的实现，这里的重点是需要基于 project 进行 RAG 查询，涉及到多 collection 的查询和结果合并逻辑
