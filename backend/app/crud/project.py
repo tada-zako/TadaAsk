@@ -1,6 +1,7 @@
 from typing import Sequence
 
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Project, ProjectSourceLink, ProjectSettings
@@ -38,6 +39,25 @@ class ProjectCRUD:
         result = await self.session.execute(
             select(Project).where(Project.uid == project_uid)
         )
+        return result.scalars().first()
+
+    async def get_project_with_settings_by_uid(
+        self, project_uid: str
+    ) -> Project | None:
+        """联合查询：加载 Project -> ProjectSettings -> Provider & ModelProfile"""
+        stmt = (
+            select(Project)
+            .where(Project.uid == project_uid)
+            .options(
+                # 联合加载 ProjectSettings
+                joinedload(Project.project_settings).options(
+                    # 联合加载 Provider 和 ModelProfile
+                    joinedload(ProjectSettings.visitor_default_provider),
+                    joinedload(ProjectSettings.visitor_default_model_profile),
+                )
+            )
+        )
+        result = await self.session.execute(stmt)
         return result.scalars().first()
 
     async def delete_project_by_id(self, project_id: int) -> bool:
