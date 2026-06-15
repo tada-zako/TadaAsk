@@ -20,7 +20,8 @@ from app.core.constants import ChatMessageRole
 if TYPE_CHECKING:
     # 避免循环导入
     from app.api.schemas import AdminChatRequest
-    from app.db.models import ModelProfile, ProjectChatSettings
+    from app.db.schemas import ModelProfileRead
+    from app.db.models import ProjectChatSettings
 
 
 # LLM 思考等级定义
@@ -178,7 +179,7 @@ class ModelSettings:
     def for_admin_chat(
         cls,
         *,
-        profile: "ModelProfile",
+        profile: "ModelProfileRead",
         request: "AdminChatRequest | None" = None,
     ) -> "ModelSettings":
         """
@@ -211,7 +212,7 @@ class ModelSettings:
     def for_visitor_chat(
         cls,
         *,
-        profile: "ModelProfile",
+        profile: "ModelProfileRead",
         project_settings: "ProjectChatSettings | None" = None,
     ) -> "ModelSettings":
         """
