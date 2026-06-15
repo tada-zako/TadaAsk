@@ -1,12 +1,12 @@
-from typing import AsyncIterable, Annotated
+from typing import AsyncIterable, Annotated, cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException
-from fastapi.sse import ServerSentEvent
+from fastapi.sse import ServerSentEvent, EventSourceResponse
 from loguru import logger
 
 from ...deps import (
     APIKeyCipherDeps,
-    ValidProjectWithSettingsDeps,
+    ValidVisitorChatProjectDeps,
     RAGSearchCRUDeps,
     ChatOrchestratorServiceDeps,
     RAGRetrievalServiceDeps,
@@ -14,36 +14,30 @@ from ...deps import (
 from ...schemas import VisitorChatRequest
 from app.services.chat import ChatInput, RAGChatPlugin
 from app.providers import FullCompleter, completer_factory, ModelSettings
+from app.db.models import ProjectSettings, Provider, ModelProfile
 from app.db.schemas import (
     HybridSearchOptions,
     ProviderWithModelInternalRead,
     ProviderRead,
     ModelProfileRead,
 )
-from app.core.constants import ChatSessionType
+from app.core.constants import ChatSessionType, SearchMode
 
 
 router = APIRouter()
 
 
 async def get_visitor_provider_with_model(
-    project: ValidProjectWithSettingsDeps,
+    project: ValidVisitorChatProjectDeps,
     api_key_cipher: APIKeyCipherDeps,
 ) -> ProviderWithModelInternalRead:
     """
     Visitor: 从 Project 实例中装配 ProviderWithModelInternalRead 实例
     """
-    settings = project.project_settings
-    if not settings:
-        raise HTTPException(status_code=400, detail="Project settings not initialized")
+    settings = cast(ProjectSettings, project.project_settings)
 
-    provider = settings.visitor_default_provider
-    model_profile = settings.visitor_default_model_profile
-
-    if not provider or not model_profile:
-        raise HTTPException(
-            status_code=400, detail="Visitor default provider or model not configured"
-        )
+    provider = cast(Provider, settings.visitor_default_provider)
+    model_profile = cast(ModelProfile, settings.visitor_default_model_profile)
 
     # 1. 解密 API Key
     decrypted_api_key = None
@@ -69,7 +63,7 @@ async def get_visitor_completer(
 
 
 async def get_visitor_model_settings(
-    project: ValidProjectWithSettingsDeps,
+    project: ValidVisitorChatProjectDeps,
     provider_with_model: Annotated[
         ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
     ],
@@ -82,15 +76,47 @@ async def get_visitor_model_settings(
 
 
 async def get_rag_plugin(
-    project: ValidProjectWithSettingsDeps,
+    project: ValidVisitorChatProjectDeps,
     rag_search_crud: RAGSearchCRUDeps,
     rag_retrieval: RAGRetrievalServiceDeps,
+    provider_with_model: Annotated[
+        ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
+    ],
 ) -> RAGChatPlugin | None:
     """根据项目配置动态生成 RAGChatPlugin"""
-    settings = project.project_settings
-    if not settings or not settings.visitor_rag_enabled:
+    settings = cast(ProjectSettings, project.project_settings)
+    if not settings.visitor_rag_enabled:
         logger.info(f"Project {project.uid} RAG plugin not enabled for visitor chat")
         return None
+
+    # Options 策略检查和调整
+    # 如果 model 不支持 structured：
+    # - standalone rewriter 自动降级
+    # - SearchMode.ADAPTIVE 降级为 SearchMode.FAST
+    # - SearchMode.FULL 模式报错
+    rag_options = HybridSearchOptions(
+        mode=settings.rag_mode,
+        top_k=settings.rag_top_k,
+        rerank_enabled=settings.rag_rerank_enabled,
+        fts_k=settings.rag_fts_k,
+        vector_k=settings.rag_vector_k,
+        rerank_k=settings.rag_rerank_k,
+        max_alternative_queries=settings.rag_max_alternative_queries,
+        max_keywords=settings.rag_max_keywords,
+        standalone_enabled=settings.rag_standalone_enabled,
+    )
+
+    if not provider_with_model.model_profile.supports_structured:
+        if rag_options.standalone_enabled:
+            rag_options.standalone_enabled = False
+
+        if rag_options.mode == SearchMode.ADAPTIVE:
+            rag_options.mode = SearchMode.FAST
+        elif rag_options.mode == SearchMode.FULL:
+            raise HTTPException(
+                status_code=400,
+                detail="Model does not support structured output, cannot use FULL search mode",
+            )
 
     sources = await rag_search_crud.resolve_visitor_search_sources(
         project_id=project.id
@@ -103,26 +129,16 @@ async def get_rag_plugin(
     return RAGChatPlugin(
         rag_retrieval=rag_retrieval,
         sources=sources,
-        rag_options=HybridSearchOptions(
-            mode=settings.rag_mode,
-            top_k=settings.rag_top_k,
-            rerank_enabled=settings.rag_rerank_enabled,
-            fts_k=settings.rag_fts_k,
-            vector_k=settings.rag_vector_k,
-            rerank_k=settings.rag_rerank_k,
-            max_alternative_queries=settings.rag_max_alternative_queries,
-            max_keywords=settings.rag_max_keywords,
-            standalone_enabled=settings.rag_standalone_enabled,
-        ),
+        rag_options=rag_options,
     )
 
 
-@router.post("/project/{project_uid}/chat/stream")
+@router.post("/project/{project_uid}/chat/stream", response_class=EventSourceResponse)
 async def stream_chat(
     chat_request: Annotated[
         VisitorChatRequest, Body(..., description="VisitorChatRequest 请求体")
     ],
-    project: ValidProjectWithSettingsDeps,
+    project: ValidVisitorChatProjectDeps,
     completer: Annotated[FullCompleter, Depends(get_visitor_completer)],
     provider_with_model: Annotated[
         ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
