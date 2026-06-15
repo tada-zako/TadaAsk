@@ -143,6 +143,19 @@ async def valid_project(
     return project
 
 
+async def valid_project_with_settings(
+    project_crud: Annotated[ProjectCRUD, Depends(get_project_crud)],
+    project_uid: Annotated[str, Path(..., description="Project UID")],
+) -> Project:
+    """验证项目 UID 是否有效，返回包含设置的项目实例或抛出 HTTPException"""
+    project = await project_crud.get_project_with_settings_by_uid(
+        project_uid=project_uid
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
 # =========== Service 层依赖注入接口 ===========
 def get_document_ingest_service(
     source_crud: "SourceCRUDeps",
@@ -268,6 +281,7 @@ ModelProfileCRUDeps = Annotated[ModelProfileCRUD, Depends(get_model_profile_crud
 
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
+ValidProjectWithSettingsDeps = Annotated[Project, Depends(valid_project_with_settings)]
 
 # Service 依赖
 DocumentIngestServiceDeps = Annotated[

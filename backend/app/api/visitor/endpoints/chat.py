@@ -1,148 +1,155 @@
-from typing import AsyncIterable, Annotated, Any
+from typing import AsyncIterable, Annotated
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.sse import ServerSentEvent
 from loguru import logger
 
-from ...schemas import ChatRequest
 from ...deps import (
-    SessionDeps,
-    ValidProjectDeps,
-    RAGServiceDeps,
-    ChatMessageCRUDeps,
-    ChatSessionCRUDeps,
+    APIKeyCipherDeps,
+    ValidProjectWithSettingsDeps,
+    RAGSearchCRUDeps,
+    ChatOrchestratorServiceDeps,
+    RAGRetrievalServiceDeps,
 )
-from app.core.config import settings
+from ...schemas import VisitorChatRequest
+from app.services.chat import ChatInput, RAGChatPlugin
+from app.providers import FullCompleter, completer_factory, ModelSettings
+from app.db.schemas import (
+    HybridSearchOptions,
+    ProviderWithModelInternalRead,
+    ProviderRead,
+    ModelProfileRead,
+)
 from app.core.constants import ChatSessionType
-from app.db.models import ChatSession
-from app.db.schemas import ChatSessionInternal
-from app.providers import Model, model_factory
-from app.services import ChatService
 
 
 router = APIRouter()
 
 
-def get_visitor_model(
-    project: ValidProjectDeps,
-) -> Model[Any]:
+async def get_visitor_provider_with_model(
+    project: ValidProjectWithSettingsDeps,
+    api_key_cipher: APIKeyCipherDeps,
+) -> ProviderWithModelInternalRead:
     """
-    游客级 model 工厂: 基于关联的 Project 获取对应的 Model 实例。
-    NOTE: 目前仅支持 GeminiModel。
+    Visitor: 从 Project 实例中装配 ProviderWithModelInternalRead 实例
     """
-    provider_name = project.provider or settings.llm_provider_visitor or "deepseek"
-    # TODO: 模型字段的获取逻辑，后期重新处理；
-    model_name = project.model or settings.gemini_model_perf or None
-    return model_factory(provider=provider_name, model=model_name)
+    settings = project.project_settings
+    if not settings:
+        raise HTTPException(status_code=400, detail="Project settings not initialized")
 
+    provider = settings.visitor_default_provider
+    model_profile = settings.visitor_default_model_profile
 
-ModelDeps = Annotated[Model[Any], Depends(get_visitor_model)]
-
-
-async def valid_or_create_visitor_chat_session(
-    chat_session_crud: ChatSessionCRUDeps,
-    model: ModelDeps,
-    project: ValidProjectDeps,
-    visitor_id: Annotated[
-        str | None,
-        Body(
-            default=None,
-            embed=True,
-            alias="visitorId",
-            description="访客 ID: 针对匿名用户可选字段，便于后续分析和调试",
-        ),
-    ] = None,
-    chat_session_uid: Annotated[
-        str | None,
-        Body(
-            embed=True,
-            alias="chatSessionUid",
-            description="前端传递的 chat_session_uid, 为空时创建新的对话",
-        ),
-    ] = None,
-) -> ChatSession:
-    """
-    Admin 端 ChatSession 依赖：
-    验证 chat_session_uid 是否有效，返回对应的 ChatSession 实例。
-    如果 chat_session_uid 为空或无效，则创建新的 ChatSession 实例并返回。
-    """
-    if chat_session_uid:
-        chat_session = await chat_session_crud.get_chat_session_by_uid(
-            chat_session_uid=chat_session_uid
+    if not provider or not model_profile:
+        raise HTTPException(
+            status_code=400, detail="Visitor default provider or model not configured"
         )
-        if chat_session:
-            # 检查会话类型是否为 VISITOR，如果不是则抛出异常
-            if chat_session.session_type != ChatSessionType.VISITOR:
-                logger.warning(
-                    f"Chat session {chat_session_uid} is not a visitor session, creating new chat session"
-                )
-                raise ValueError(
-                    "Invalid chat_session_uid for visitor session, creating new chat session"
-                )
 
-            return chat_session
-        else:
-            logger.warning(
-                f"Invalid chat_session_uid: {chat_session_uid}, creating new chat session"
-            )
-            raise ValueError("Invalid chat_session_uid, creating new chat session")
+    # 1. 解密 API Key
+    decrypted_api_key = None
+    if provider.encrypted_api_key:
+        decrypted_api_key = api_key_cipher.decrypt(provider.encrypted_api_key)
 
-    # 如果没有提供有效的 chat_session_uid，则创建新的聊天会话
-    new_chat_session = await chat_session_crud.create_chat_session(
-        chat_session_data=ChatSessionInternal(
-            title="New Chat Session",
-            model=model.model_name,
-            visitor_id=visitor_id,
-            session_type=ChatSessionType.VISITOR,
-            project_id=project.id,
-        ),
+    # 2. 将 ORM 数据转为 Pydantic 读取模型
+    provider_dict = ProviderRead.model_validate(provider).model_dump()
+    provider_dict["api_key"] = decrypted_api_key
+    provider_dict["model_profile"] = ModelProfileRead.model_validate(model_profile)
+
+    # 3. 创建 Pydantic 内部实例
+    return ProviderWithModelInternalRead.model_validate(provider_dict)
+
+
+async def get_visitor_completer(
+    provider_with_model: Annotated[
+        ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
+    ],
+) -> FullCompleter:
+    """Visitor: 基于 ProviderWithModelInternalRead 实例构建 FullCompleter 实例"""
+    return completer_factory(provider_with_model=provider_with_model)
+
+
+async def get_visitor_model_settings(
+    project: ValidProjectWithSettingsDeps,
+    provider_with_model: Annotated[
+        ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
+    ],
+) -> ModelSettings:
+    """Visitor: 从 ProviderWithModelInternalRead 实例创建 ModelSettings 实例"""
+    return ModelSettings.for_visitor_chat(
+        project_settings=project.project_settings,
+        profile=provider_with_model.model_profile,
     )
-    return new_chat_session
 
 
-def get_visitor_chat_service(
-    session: SessionDeps,
-    chat_message_crud: ChatMessageCRUDeps,
-    llm_model: ModelDeps,
-    rag_service: RAGServiceDeps,
-) -> ChatService:
-    """聊天服务工厂函数，提供 ChatService 实例"""
-    return ChatService(
-        session,
-        chat_message_crud=chat_message_crud,
-        llm_model=llm_model,
-        rag_service=rag_service,
+async def get_rag_plugin(
+    project: ValidProjectWithSettingsDeps,
+    rag_search_crud: RAGSearchCRUDeps,
+    rag_retrieval: RAGRetrievalServiceDeps,
+) -> RAGChatPlugin | None:
+    """根据项目配置动态生成 RAGChatPlugin"""
+    settings = project.project_settings
+    if not settings or not settings.visitor_rag_enabled:
+        logger.info(f"Project {project.uid} RAG plugin not enabled for visitor chat")
+        return None
+
+    sources = await rag_search_crud.resolve_visitor_search_sources(
+        project_id=project.id
+    )
+    if not sources:
+        raise HTTPException(
+            status_code=400, detail="No valid sources found for RAG chat"
+        )
+
+    return RAGChatPlugin(
+        rag_retrieval=rag_retrieval,
+        sources=sources,
+        rag_options=HybridSearchOptions(
+            mode=settings.rag_mode,
+            top_k=settings.rag_top_k,
+            rerank_enabled=settings.rag_rerank_enabled,
+            fts_k=settings.rag_fts_k,
+            vector_k=settings.rag_vector_k,
+            rerank_k=settings.rag_rerank_k,
+            max_alternative_queries=settings.rag_max_alternative_queries,
+            max_keywords=settings.rag_max_keywords,
+            standalone_enabled=settings.rag_standalone_enabled,
+        ),
     )
 
 
 @router.post("/project/{project_uid}/chat/stream")
 async def stream_chat(
-    chat_request: ChatRequest,
-    project: ValidProjectDeps,
-    chat_session: Annotated[ChatSession, Depends(valid_or_create_visitor_chat_session)],
-    chat_service: Annotated[ChatService, Depends(get_visitor_chat_service)],
-) -> AsyncIterable[str]:
+    chat_request: Annotated[
+        VisitorChatRequest, Body(..., description="VisitorChatRequest 请求体")
+    ],
+    project: ValidProjectWithSettingsDeps,
+    completer: Annotated[FullCompleter, Depends(get_visitor_completer)],
+    provider_with_model: Annotated[
+        ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
+    ],
+    chat_service: ChatOrchestratorServiceDeps,
+    model_settings: Annotated[ModelSettings, Depends(get_visitor_model_settings)],
+    rag_plugin: Annotated[RAGChatPlugin | None, Depends(get_rag_plugin)],
+) -> AsyncIterable[ServerSentEvent]:
     """
-    流式调用 LLM 生成聊天回复（无 Agent）
-
-    Args:
-        chat_request: 前端传递的聊天请求数据，包含用户消息和相关参数
-        project: 通过依赖注入获取的项目实例，基于 project_uid 验证
-        chat_session: 通过依赖注入获取或创建的聊天会话实例，基于 chat_session_uid 验证或创建
-        chat_service: 通过依赖注入获取的 ChatService 实例，用于处理聊天逻辑
-
-    Returns:
-        异步生成的聊天回复字符串流
+    Visitor 侧的流式对话接口
     """
-    logger.info(
-        f"Received chat request: {chat_request} for project {project.id} and chat session {chat_session.uid}"
-    )
-
-    async with chat_service.stream_chat_reply(
+    async for event in chat_service.stream_rag_chat(
         project=project,
-        chat_session=chat_session,
-        user_message=chat_request.message,
-        top_k=chat_request.doc_top_k,
-    ) as chat_result:
-        # 开启异步上下文，迭代异步生成器输出结果
-        async for chunk in chat_result.stream_reply():
-            yield chunk
+        chat_input=ChatInput(
+            message=chat_request.message,
+            chat_session_uid=chat_request.chat_session_uid,
+        ),
+        completer=completer,
+        provider_with_model=provider_with_model,
+        requester_type=ChatSessionType.VISITOR,
+        model_settings=model_settings,
+        rag_plugin=rag_plugin,
+    ):
+        yield ServerSentEvent(
+            event=event.event,
+            data=event.model_dump_json(
+                exclude={"event"},
+                by_alias=True,
+            ),
+        )
