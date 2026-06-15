@@ -16,11 +16,6 @@ class AdminChatRequest(BaseModel):
     provider_uid: str
     model_uid: str
 
-    # RAG 相关参数配置
-    rag_enabled: bool = True
-    source_uids: list[str] | None = None  # 可选的文档来源过滤条件
-    rag_options: HybridSearchRequest | None = None
-
     # LLM 请求参数配置
     temperature: float | None = None
     top_p: float | None = None
@@ -33,6 +28,16 @@ class AdminChatRequest(BaseModel):
         validate_by_alias=True,
         validate_by_name=True,
     )
+
+
+class AdminRAGChatRequest(AdminChatRequest):
+    """Admin RAG Chat 请求结构体；包含 RAG 相关的参数配置"""
+
+    # RAG 相关参数配置
+    source_uids: list[str] = Field(
+        ..., min_length=1, description="RAG 检索使用的 source_uids 列表"
+    )
+    rag_options: HybridSearchRequest = Field(default_factory=HybridSearchRequest)
 
 
 class VisitorChatRequest(BaseModel):
