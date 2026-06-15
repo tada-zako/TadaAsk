@@ -1,5 +1,6 @@
 from typing import AsyncIterable
 import asyncio
+from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,12 +15,13 @@ from ..schemas import (
     TextDeltaData,
     MessageDoneData,
     ErrorData,
+    RAGRetrievalResult,
 )
 from ..utils import TokenBudget
-from app.api.schemas import AdminChatRequest, VisitorChatRequest
 from app.providers import (
     FullCompleter,
     TextCompleter,
+    StructuredCompleter,
     StreamedResponse,
     ModelSettings,
     DEFAULT_SYSTEM_PROMPT,
@@ -37,8 +39,44 @@ from app.core.constants import (
     ChatMessageRole,
     ChatMessageType,
     ChatSessionType,
-    SearchMode,
 )
+
+
+@dataclass
+class ChatInput:
+    """封装 Chat 输入参数"""
+
+    message: str
+    chat_session_uid: str | None
+
+
+@dataclass
+class RAGChatPlugin:
+    """RAG Chat 插件封装"""
+
+    sources: list[Source]
+    rag_retrieval: RAGRetrievalService
+    rag_options: HybridSearchOptions
+
+    async def rag_retrieval_for_chat(
+        self,
+        *,
+        user_query: str,
+        recent_messages: list[ChatMessage],
+        compaction_message: ChatMessage | None,
+        completer: StructuredCompleter,
+        token_budget: TokenBudget,
+    ) -> RAGRetrievalResult:
+        """封装 RAG 检索方法，供 ChatOrchestrator 调用"""
+        return await self.rag_retrieval.retrieve_for_chat(
+            sources=self.sources,
+            user_query=user_query,
+            recent_messages=recent_messages,
+            compaction_message=compaction_message,
+            completer=completer,
+            token_budget=token_budget,
+            rag_options=self.rag_options,
+        )
 
 
 class ChatOrchestratorService:
@@ -53,7 +91,6 @@ class ChatOrchestratorService:
         chat_message_crud: ChatMessageCRUD,
         chat_session_crud: ChatSessionCRUD,
         context_builder: ContextBuilder,
-        rag_retrieval: RAGRetrievalService,
         generation_registry: GenerationRegistry,
         compaction_service: CompactionService,
     ):
@@ -61,7 +98,6 @@ class ChatOrchestratorService:
         self.chat_message_crud = chat_message_crud
         self.chat_session_crud = chat_session_crud
         self.context_builder = context_builder
-        self.rag_retrieval = rag_retrieval
         self.generation_registry = generation_registry
         self.compaction_service = compaction_service
 
@@ -69,7 +105,7 @@ class ChatOrchestratorService:
         self,
         *,
         project: Project,
-        request: AdminChatRequest | VisitorChatRequest,
+        chat_input: ChatInput,
         provider: str,
         model: str,
         requester_type: ChatSessionType,
@@ -80,10 +116,11 @@ class ChatOrchestratorService:
         - 如果 chat_session_uid 为空或无效，则创建新的 ChatSession 实例并返回。
         - 返回值包含 ChatSession 实例和一个布尔值，指示是否新创建了会话。
         """
-        chat_session_uid = request.chat_session_uid
+        chat_session_uid = chat_input.chat_session_uid
         if chat_session_uid:
             chat_session = await self.chat_session_crud.get_chat_session_by_uid(
-                chat_session_uid=chat_session_uid
+                project_id=project.id,
+                chat_session_uid=chat_session_uid,
             )
             if not chat_session:
                 raise ValueError("Invalid chat_session_uid")
@@ -194,39 +231,23 @@ class ChatOrchestratorService:
         self,
         *,
         project: Project,
-        sources: list[Source],
-        request: AdminChatRequest | VisitorChatRequest,
+        chat_input: ChatInput,
         completer: FullCompleter,
         provider_with_model: ProviderWithModelInternalRead,
         requester_type: ChatSessionType,
-        rag_options: HybridSearchOptions,
         model_settings: ModelSettings,
+        rag_plugin: RAGChatPlugin | None,
     ) -> AsyncIterable[ChatStreamEvent]:
         """流式对话；调用 RAG 服务"""
 
-        # 0. 策略检查 + 预备参数
-        # 如果 model 不支持 structured：
-        # - standalone rewriter 自动降级
-        # - SearchMode.ADAPTIVE 降级为 SearchMode.FAST
-        # - SearchMode.FULL 模式报错
-        if not provider_with_model.model_profile.supports_structured:
-            if rag_options.standalone_enabled:
-                rag_options.standalone_enabled = False
-
-            if rag_options.mode == SearchMode.ADAPTIVE:
-                rag_options.mode = SearchMode.FAST
-            elif rag_options.mode == SearchMode.FULL:
-                raise ValueError(
-                    "The selected model does not support structured output, cannot use FULL search mode."
-                )
-
+        # 0. 预备参数
         provider_name = provider_with_model.name
         model_name = provider_with_model.model_profile.model
 
         # 1. 验证或创建 ChatSession
         chat_session, session_created = await self._valid_or_create_chat_session(
             project=project,
-            request=request,
+            chat_input=chat_input,
             provider=provider_name,
             model=model_name,
             requester_type=requester_type,
@@ -241,7 +262,7 @@ class ChatOrchestratorService:
         # 1.2 用户/Assistant 消息入库
         user_message = await self.chat_message_crud.append_message(
             chat_session_id=chat_session.id,
-            message=request.message,
+            message=chat_input.message,
             role=ChatMessageRole.USER,
             type=ChatMessageType.MESSAGE,
             provider=provider_name,
@@ -261,24 +282,24 @@ class ChatOrchestratorService:
         system_prompt = self._resolve_system_prompt()
         token_budget = TokenBudget.from_model_profile(provider_with_model.model_profile)
 
-        # 1.3 注册 generation 对象
-        generation = self.generation_registry.register(
-            session_uid=chat_session.uid,
-            message_uid=assistant_message.uid,
-        )
-
-        # 1.4 yield 生成开始事件
-        yield GenerationStartData(
-            generation_uid=generation.generation_uid,
-            session_uid=chat_session.uid,
-            user_message=ChatMessageRead.model_validate(user_message),
-            assistant_message=ChatMessageRead.model_validate(assistant_message),
-        )
-
-        # 2.0 预备参数
+        # 1.2.3 预备参数
+        generation = None
         stream_response: StreamedResponse | None = None
-
         try:
+            # 1.3 注册 generation 对象
+            generation = self.generation_registry.register(
+                session_uid=chat_session.uid,
+                message_uid=assistant_message.uid,
+            )
+
+            # 1.4 yield 生成开始事件
+            yield GenerationStartData(
+                generation_uid=generation.generation_uid,
+                session_uid=chat_session.uid,
+                user_message=ChatMessageRead.model_validate(user_message),
+                assistant_message=ChatMessageRead.model_validate(assistant_message),
+            )
+
             # 2.1 预构建对话上下文
             compaction_message, recent_messages = await self._prepare_chat_context(
                 chat_session=chat_session,
@@ -290,22 +311,22 @@ class ChatOrchestratorService:
                 token_budget=token_budget,
             )
 
-            # 2.2 调用 RAG 服务
-            rag_result = await self.rag_retrieval.retrieve_for_chat(
-                sources=sources,
-                user_query=request.message,
-                recent_messages=recent_messages,
-                compaction_message=compaction_message,
-                rag_options=rag_options,
-                completer=completer,
-                token_budget=token_budget,
-            )
+            rag_result: RAGRetrievalResult | None = None
+            if rag_plugin:
+                # 2.2 调用 RAG 服务
+                rag_result = await rag_plugin.rag_retrieval_for_chat(
+                    user_query=chat_input.message,
+                    recent_messages=recent_messages,
+                    compaction_message=compaction_message,
+                    completer=completer,
+                    token_budget=token_budget,
+                )
 
-            # 2.2.1 RAG 检索结果写库
-            await self.chat_message_crud.update_assistant_message(
-                assistant_message=assistant_message,
-                new_rag_snapshot=rag_result.snapshot,
-            )
+                # 2.2.1 RAG 检索结果写库
+                await self.chat_message_crud.update_assistant_message(
+                    assistant_message=assistant_message,
+                    new_rag_snapshot=rag_result.snapshot,
+                )
 
             # 2.3 构建对话上下文
             context = self.context_builder.build_chat_context(
@@ -313,7 +334,7 @@ class ChatOrchestratorService:
                 compaction_message=compaction_message,
                 recent_messages=recent_messages,
                 current_message=user_message,
-                rag_context=rag_result.context_content,
+                rag_context=rag_result.context_content if rag_result else None,
                 token_budget=token_budget,
             )
 
@@ -391,5 +412,6 @@ class ChatOrchestratorService:
             return
 
         finally:
-            # 5. 清理注册的 generation 对象
-            self.generation_registry.unregister(generation.generation_uid)
+            if generation is not None:
+                # 5. 清理注册的 generation 对象
+                self.generation_registry.unregister(generation.generation_uid)
