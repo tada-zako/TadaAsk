@@ -1,13 +1,10 @@
 from typing import Annotated
 
-from fastapi import Depends, Request, HTTPException, Path, Body
+from fastapi import Depends, Request, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
-from loguru import logger
 
-from .schemas import AdminChatRequest
 from app.db import get_db
 from app.db.models import Project
-from app.db.schemas import ProviderWithModelInternalRead
 from app.crud import (
     ProjectCRUD,
     AdminCRUD,
@@ -17,7 +14,6 @@ from app.crud import (
     RAGSearchCRUD,
     ModelProfileCRUD,
 )
-from app.providers import completer_factory, FullCompleter
 from app.storage import FileStorage
 from app.parser import FileParserFactory
 from app.rag import (
@@ -147,41 +143,6 @@ async def valid_project(
     return project
 
 
-# =========== Provider 依赖注入接口 ============
-async def get_admin_provider_with_model(
-    model_profile_crud: "ModelProfileCRUDeps",
-    api_key_cipher: "APIKeyCipherDeps",
-    request: Annotated[
-        AdminChatRequest, Body(..., description="AdminChatRequest 请求体")
-    ],
-) -> ProviderWithModelInternalRead:
-    """依赖注入接口：根据前端传递的 provider_uid 和 model_uid 获取对应的 ProviderWithModelInternalRead 实例"""
-    provider_with_model = (
-        await model_profile_crud.get_internal_provider_with_model_profile_by_uid(
-            provider_uid=request.provider_uid,
-            model_uid=request.model_uid,
-            api_key_cipher=api_key_cipher,
-        )
-    )
-
-    if not provider_with_model:
-        logger.error(
-            f"Invalid provider_uid or model_uid: {request.provider_uid}, {request.model_uid}"
-        )
-        raise ValueError("Invalid provider_uid or model_uid")
-
-    return provider_with_model
-
-
-async def get_admin_completer(
-    provider_with_model: Annotated[
-        ProviderWithModelInternalRead, Depends(get_admin_provider_with_model)
-    ],
-) -> FullCompleter:
-    """依赖注入接口：根据 AdminChatRequest 请求体获取对应的 FullCompleter 实例"""
-    return completer_factory(provider_with_model=provider_with_model)
-
-
 # =========== Service 层依赖注入接口 ===========
 def get_document_ingest_service(
     source_crud: "SourceCRUDeps",
@@ -265,7 +226,6 @@ def get_chat_orchestrator_service(
     chat_message_crud: "ChatMessageCRUDeps",
     chat_session_crud: "ChatSessionCRUDeps",
     context_builder: "ContextBuilderDeps",
-    rag_retrieval_service: "RAGRetrievalServiceDeps",
     generation_registry: "GenerationRegistryDeps",
     compaction_service: "CompactionServiceDeps",
 ) -> ChatOrchestratorService:
@@ -275,7 +235,6 @@ def get_chat_orchestrator_service(
         chat_message_crud=chat_message_crud,
         chat_session_crud=chat_session_crud,
         context_builder=context_builder,
-        rag_retrieval=rag_retrieval_service,
         generation_registry=generation_registry,
         compaction_service=compaction_service,
     )
@@ -330,4 +289,8 @@ ContextBuilderDeps = Annotated[
 CompactionServiceDeps = Annotated[
     CompactionService,
     Depends(get_compaction_service),
+]
+ChatOrchestratorServiceDeps = Annotated[
+    ChatOrchestratorService,
+    Depends(get_chat_orchestrator_service),
 ]
