@@ -308,7 +308,7 @@ async def upload_source_item(
 
 
 # TODO: 缺少文件存在验证，如果用户上传了相同的文件，应该复用已经存在的文件
-@router.post("/{source_uid}/document/ingest", response_model=EventSourceResponse)
+@router.post("/{source_uid}/document/ingest", response_class=EventSourceResponse)
 async def upsert_document(
     source: ValidSourceDeps,
     source_items: Annotated[
@@ -351,7 +351,7 @@ async def pause_ingest(
     )
 
 
-@router.post("/{source_uid}/document/resume", response_model=EventSourceResponse)
+@router.post("/{source_uid}/document/resume", response_class=EventSourceResponse)
 async def resume_ingest(
     source: ValidSourceDeps,
     source_item: Annotated[
