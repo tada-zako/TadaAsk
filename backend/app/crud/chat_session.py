@@ -69,11 +69,17 @@ class ChatSessionCRUD:
         return result.scalars().all()
 
     async def get_chat_session_by_uid(
-        self, chat_session_uid: str
+        self,
+        *,
+        project_id: int,
+        chat_session_uid: str,
     ) -> ChatSession | None:
-        """根据 UID 获取指定的聊天会话"""
+        """根据聊天会话 UID 获取聊天会话实例，如果未找到则返回 None"""
         result = await self.session.execute(
-            select(ChatSession).where(ChatSession.uid == chat_session_uid)
+            select(ChatSession).where(
+                ChatSession.uid == chat_session_uid,
+                ChatSession.project_id == project_id,
+            )
         )
         return result.scalars().first()
 
