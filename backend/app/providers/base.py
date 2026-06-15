@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     # 避免循环导入
     from app.api.schemas import AdminChatRequest
     from app.db.schemas import ModelProfileRead
-    from app.db.models import ProjectChatSettings
+    from app.db.models import ProjectSettings
 
 
 # LLM 思考等级定义
@@ -213,7 +213,7 @@ class ModelSettings:
         cls,
         *,
         profile: "ModelProfileRead",
-        project_settings: "ProjectChatSettings | None" = None,
+        project_settings: "ProjectSettings | None" = None,
     ) -> "ModelSettings":
         """
         Visitor Chat 的模型配置入口。

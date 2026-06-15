@@ -3,7 +3,7 @@ from typing import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Project, ProjectSourceLink
+from app.db.models import Project, ProjectSourceLink, ProjectSettings
 from app.db.schemas import ProjectCreate
 
 

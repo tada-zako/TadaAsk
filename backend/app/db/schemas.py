@@ -90,7 +90,7 @@ class ProjectRead(ProjectBase):
 
 
 # ======= Project Chat Setting Schemas =======
-class ProjectChatSettingsBase(BaseModel):
+class ProjectSettingsBase(BaseModel):
     """项目对话设置基类"""
 
     visitor_rag_enabled: bool
@@ -114,7 +114,7 @@ class ProjectChatSettingsBase(BaseModel):
     rag_max_keywords: int
 
 
-class ProjectChatSettingsRead(ProjectChatSettingsBase):
+class ProjectSettingsRead(ProjectSettingsBase):
     visitor_default_model_profile: "ModelProfileRead | None" = None
 
     model_config = ConfigDict(
