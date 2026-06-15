@@ -157,6 +157,8 @@ class ProjectSettings(Base):
     rag_max_alternative_queries: Mapped[int] = mapped_column(Integer, default=2)
     rag_max_keywords: Mapped[int] = mapped_column(Integer, default=5)
 
+    rag_standalone_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

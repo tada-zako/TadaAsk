@@ -113,6 +113,8 @@ class ProjectSettingsBase(BaseModel):
     rag_max_alternative_queries: int
     rag_max_keywords: int
 
+    rag_standalone_enabled: bool
+
 
 class ProjectSettingsRead(ProjectSettingsBase):
     visitor_default_model_profile: "ModelProfileRead | None" = None
