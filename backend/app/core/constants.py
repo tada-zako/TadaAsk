@@ -1,6 +1,70 @@
 import enum
+from typing import Literal
+
+# ================ 常量定义 ==================
+PDF_EXTS = {".pdf"}
+DOC_EXTS = {".docx"}
+DATA_EXTS = {".json", ".xml", ".yaml", ".yml"}
+TEXT_EXTS = {".txt", ".md", ".html"}
+# AST 支持解析的源码文件类型
+AST_CODE_EXTS = {
+    ".ts",
+    ".tsx",
+    ".js",
+    ".jsx",
+    ".mts",
+    ".cts",
+    ".mjs",
+    ".cjs",
+    ".py",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".cpp",
+    ".cs",
+}
+# 其它源码文件类型
+OTHER_CODE_EXTS = {".sh", ".bash", ".sql"}
+ALLOWED_FILE_TYPES = (
+    PDF_EXTS | DOC_EXTS | DATA_EXTS | TEXT_EXTS | AST_CODE_EXTS | OTHER_CODE_EXTS
+)
+
+# AST Scanner 支持的语言类型
+type ASTScannerSupportedLanguages = Literal[
+    "python",
+    "javascript",
+    "java",
+    "rust",
+    "go",
+    "typescript",
+    "tsx",
+    "c",
+    "cpp",
+    "csharp",
+]
+
+# 文件后缀对应的语言映射
+EXTENSION_MAP: dict[str, ASTScannerSupportedLanguages] = {
+    ".ts": "typescript",
+    ".tsx": "tsx",
+    ".js": "javascript",
+    ".jsx": "tsx",
+    ".mts": "typescript",
+    ".cts": "typescript",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".py": "python",
+    ".go": "go",
+    ".rs": "rust",
+    ".java": "java",
+    ".c": "c",
+    ".cpp": "cpp",
+    ".cs": "csharp",
+}
 
 
+# ================ 枚举定义 ==================
 class SourceProcessStatus(str, enum.Enum):
     """
     source 数据源处理状态

@@ -30,20 +30,13 @@ from app.db.schemas import (
     SourceInternal,
     SourceItemRead,
 )
+from app.core.constants import ALLOWED_FILE_TYPES
 from app.core.config import settings
 
 
 # 相关配置
 MAX_FILE_SIZE = settings.max_file_size  # 最大文件大小
 MAX_FILE_COUNT = settings.max_file_count  # 最大文件数量
-
-DOC_EXTS = {".pdf", ".docx", ".doc"}
-DATA_EXTS = {".json", ".xml", ".yaml", ".yml"}
-TEXT_EXTS = {".txt", ".md", ".html"}
-CODE_EXTS = {".py", ".js", ".ts", ".java", ".cpp", ".c", ".go", ".rs", ".sql", ".sh"}
-
-ALLOWED_FILE_TYPES = DOC_EXTS | DATA_EXTS | TEXT_EXTS | CODE_EXTS  # 允许的文件类型集合
-
 MAX_INGEST_SOURCE_ITEMS = 10  # 每次 ingest 的最大数据项数量
 
 

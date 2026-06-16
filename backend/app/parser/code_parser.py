@@ -1,22 +1,7 @@
 from pathlib import Path
 
 from .base import ParsedDocument, decode_text_file, title_from_filename
-
-
-LANGUAGE_HINT_BY_EXTENSION: dict[str, str] = {
-    ".py": "python",
-    ".js": "javascript",
-    ".jsx": "tsx",
-    ".ts": "typescript",
-    ".tsx": "tsx",
-    ".java": "java",
-    ".go": "go",
-    ".rs": "rust",
-    ".sql": "sql",
-    ".sh": "bash",
-    ".c": "c",
-    ".cpp": "cpp",
-}
+from app.core.constants import EXTENSION_MAP
 
 
 class CodeParser:
@@ -30,5 +15,5 @@ class CodeParser:
             text=text,
             title=title_from_filename(filename),
             source_type="code",
-            lang_hint=LANGUAGE_HINT_BY_EXTENSION.get(ext),
+            lang_hint=EXTENSION_MAP.get(ext),
         )

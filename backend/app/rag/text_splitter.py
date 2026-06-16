@@ -6,32 +6,19 @@ import asyncio
 from loguru import logger
 
 from .utils import (
-    SupportedLanguages,
     MarkdownBreakpointScanner,
     CodeFenceScanner,
     Breakpoint,
     CodeFence,
 )
 from app.utils import EmbeddingTokenizer
+from app.core.constants import ASTScannerSupportedLanguages, EXTENSION_MAP
 
+
+# 类型别名；兼容旧代码
+type SupportedLanguages = ASTScannerSupportedLanguages
 
 AVG_CHARS_PER_TOKEN_ESTIMATE = 3  # 粗略估计平均每个 token 约为 3 个字符
-
-# 文件后缀对应的语言映射
-EXTENSION_MAP: dict[str, SupportedLanguages] = {
-    ".ts": "typescript",
-    ".tsx": "tsx",
-    ".js": "javascript",
-    ".jsx": "tsx",
-    ".mts": "typescript",
-    ".cts": "typescript",
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-    ".py": "python",
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-}
 
 
 def detect_language_from_extension(file_path: str) -> SupportedLanguages | None:
