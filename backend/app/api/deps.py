@@ -87,7 +87,6 @@ def get_file_storage(request: Request) -> FileStorage:
 
 def get_file_parser_factory(request: Request) -> FileParserFactory:
     """返回全局挂载的文件解析器工厂实例"""
-    # TODO: 后续将 FileParserFactory 实例化逻辑放到 main.py; 使用注册器模式
     return request.app.state.file_parser_factory
 
 
