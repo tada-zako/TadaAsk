@@ -1,11 +1,13 @@
 import importlib
 import asyncio
 from dataclasses import dataclass
-from typing import Literal, Callable
+from typing import Callable
 import re
 
 from tree_sitter import Language, Parser, Query, QueryCursor, Node
 from loguru import logger
+
+from app.core.constants import ASTScannerSupportedLanguages
 
 
 @dataclass
@@ -53,10 +55,8 @@ class MarkdownBreakpointScanner:
         return breakpoints
 
 
-# 支持的语言类型
-SupportedLanguages = Literal[
-    "python", "javascript", "java", "rust", "go", "typescript", "tsx"
-]
+# 类型别名；兼容旧代码
+type SupportedLanguages = ASTScannerSupportedLanguages
 
 
 # ======================================
@@ -75,6 +75,9 @@ GRAMMAR_MAP: dict[SupportedLanguages, tuple[str, str]] = {
     "go": ("tree_sitter_go", "language"),
     "rust": ("tree_sitter_rust", "language"),
     "java": ("tree_sitter_java", "language"),
+    "c": ("tree_sitter_c", "language"),
+    "cpp": ("tree_sitter_cpp", "language"),
+    "csharp": ("tree_sitter_c_sharp", "language"),
 }
 
 
@@ -145,6 +148,29 @@ LANGUAGE_QUERIES: dict[SupportedLanguages, str] = {
         (enum_declaration) @enum
         (import_declaration) @import
     """,
+    "c": """
+        (preproc_include) @import
+        (struct_specifier) @struct
+        (enum_specifier) @enum
+        (function_definition) @func
+    """,
+    "cpp": """
+        (preproc_include) @import
+        (namespace_definition) @namespace
+        (enum_specifier) @enum
+        (struct_specifier) @struct
+        (class_specifier) @class
+        (function_definition) @func
+        (template_declaration) @template
+    """,
+    "csharp": """
+        (using_directive) @import
+        (namespace_declaration) @namespace
+        (enum_declaration) @enum
+        (struct_declaration) @struct
+        (class_declaration) @class
+        (method_declaration) @method
+    """,
 }
 
 # 断点类型优先级映射
@@ -155,10 +181,12 @@ SCORE_MAP: dict[str, int] = {
     "trait": 100,
     "impl": 100,
     "mod": 100,
+    "namespace": 100,
     "export": 90,
     "func": 90,
     "method": 90,
     "decorated": 90,
+    "template": 80,
     "type": 80,
     "enum": 80,
     "import": 60,
