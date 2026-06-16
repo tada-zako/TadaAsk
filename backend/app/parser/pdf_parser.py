@@ -1,62 +1,43 @@
-import io
-import asyncio
+import pymupdf
+import pymupdf4llm
 
-import httpx
-from pypdf import PdfReader
-from langchain_core.documents import Document
-from loguru import logger
+from .base import ParsedDocument, title_from_filename
+from app.core.exceptions import FileParserError
 
 
 class PDFParser:
-    @staticmethod
-    async def httpx_download(url: str) -> bytes:
-        """
-        httpx 方式请求下载 PDF 文件内容
-        """
-        logger.debug(f"正在下载 PDF 文件: {url}")
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            response.raise_for_status()  # 确保请求成功
+    """PDF 解析器骨架：输出 Markdown，并保留页边界用于后续 citation"""
 
-        return response.content
-
-    @staticmethod
-    def parse(file_input: bytes, filename: str) -> list[Document]:
-        """
-        解析 PDF 文件内容为 Document 对象
-
-        Args:
-            file_input: PDF 文件内容
-            filename: PDF 文件名，网络爬取的 PDF 传入 url 的最后一部分
-
-        Returns:
-            Document 对象列表，每个对象包含页面内容和元数据
-        """
-        documents = []
+    def parse(self, file_input: bytes, filename: str) -> ParsedDocument:
         try:
-            pdf_reader = PdfReader(io.BytesIO(file_input))
+            with pymupdf.open(stream=file_input, filetype="pdf") as doc:
+                # 解析结果按分页组织
+                page_chunks = pymupdf4llm.to_markdown(doc, page_chunks=True)
+        except Exception as exc:
+            raise FileParserError(f"Failed to parse PDF file: {filename}") from exc
 
-            for i, page in enumerate(pdf_reader.pages):
-                text = page.extract_text()
-                if text.strip():
-                    doc = Document(
-                        page_content=text,
-                        metadata={"filename": filename, "page_number": i + 1},
-                    )
-                    documents.append(doc)
+        text_parts: list[str] = []
+        page_boundaries: list[tuple[int, int]] = []
+        cursor = 0
 
-            logger.debug(f"成功解析 PDF 内容，共 {len(documents)} 个文本块")
-        except Exception as e:
-            logger.error(f"解析 PDF 文件失败: {e}")
-            raise
+        for page in page_chunks:
+            # 类型兼容处理
+            page_text = page.get("text", "") if isinstance(page, dict) else str(page)
+            if not page_text.strip():
+                continue
 
-        return documents
+            if text_parts:
+                text_parts.append("\n\n")
+                cursor += 2
 
+            start = cursor
+            text_parts.append(page_text)
+            cursor += len(page_text)
+            page_boundaries.append((start, cursor))
 
-if __name__ == "__main__":
-    import asyncio
-
-    url = "https://arxiv.org/pdf/2505.00272"
-    documents = asyncio.run(PDFParser.httpx_download(url))
-    # for doc in documents:
-    #     print(f"Page {doc.metadata['page_number']}: {doc.page_content[:100]}...")
+        return ParsedDocument(
+            text="".join(text_parts),
+            title=title_from_filename(filename),
+            source_type="pdf",
+            page_boundaries=page_boundaries,
+        )
