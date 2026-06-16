@@ -10,3 +10,7 @@ class SecretCryptoError(RuntimeError):
 
 class SecretKeyNotConfiguredError(SecretCryptoError):
     """密钥未配置错误，当尝试加密或解密时，如果没有正确配置加密密钥，则抛出此异常"""
+
+
+class FileParserError(ValueError):
+    """文件解析失败时抛出的业务异常"""
