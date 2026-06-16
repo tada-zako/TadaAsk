@@ -13,6 +13,7 @@ from app.crud import AdminCRUD
 from app.db import init_db, async_session
 from app.db.schemas import AdminCreate
 from app.storage import FileStorage, file_storage_factory
+from app.parser import FileParserFactory, create_default_file_parser_factory
 from app.rag import (
     vector_db_factory,
     VectorDatabase,
@@ -72,6 +73,10 @@ async def lifespan(app: FastAPI):
         storage_backend=settings.file_storage_backend,
     )
     app.state.file_storage = file_storage
+
+    # 挂载文件解析器注册工厂
+    file_parser_factory: FileParserFactory = create_default_file_parser_factory()
+    app.state.file_parser_factory = file_parser_factory
 
     # 挂载密钥加密器实例
     api_key_cipher = ProviderAPIKeyCipher(
