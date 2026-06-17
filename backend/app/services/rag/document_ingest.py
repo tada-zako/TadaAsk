@@ -4,7 +4,8 @@ from pathlib import Path
 
 from loguru import logger
 
-from .ingest_operations import IngestOperationsService
+from .ingest_runner import IngestRunService
+from .ingest_item_state import IngestItemStateService
 from .document_index import DocumentIndexService
 
 from app.ingestion import ParsedDocument
@@ -14,6 +15,7 @@ from app.db.models import Source, SourceItem
 from app.crud import SourceCRUD
 from app.api.schemas import IngestProgressEvent, IngestPausedResponse
 from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
+from app.core.exceptions import DocumentPausedException
 
 
 # 最大并发量
@@ -27,14 +29,16 @@ class DocumentIngestService:
         source_crud: SourceCRUD,
         file_storage: FileStorage,
         file_parser_factory: FileParserFactory,
-        ingest_operations: IngestOperationsService,
+        ingest_item_state_service: IngestItemStateService,
+        ingest_run_service: IngestRunService,
         document_index: DocumentIndexService,
     ):
         """具体的参数由依赖注入"""
         self.source_crud = source_crud
         self.file_storage = file_storage
         self.file_parser_factory = file_parser_factory
-        self.ingest_operations = ingest_operations
+        self.ingest_item_state_service = ingest_item_state_service
+        self.ingest_run_service = ingest_run_service
         self.document_index = document_index
 
     async def request_pause_ingest(
@@ -44,7 +48,7 @@ class DocumentIngestService:
         source_item: SourceItem,
     ) -> IngestPausedResponse:
         """请求暂停文档处理"""
-        return await self.ingest_operations.request_pause_ingest(
+        return await self.ingest_item_state_service.request_pause_ingest(
             source=source, source_item=source_item
         )
 
@@ -53,7 +57,7 @@ class DocumentIngestService:
     ) -> AsyncIterable[IngestProgressEvent]:
         """恢复文档处理"""
         # 仅允许从 PAUSED 状态恢复
-        await self.ingest_operations.ensure_resumable(source_item=source_item)
+        await self.ingest_item_state_service.ensure_resumable(source_item=source_item)
 
         # 主动触发后续 ingest
         async for event in self.ingest_source_items(
@@ -66,11 +70,29 @@ class DocumentIngestService:
     ) -> AsyncIterable[IngestProgressEvent]:
         """处理文档并存储到数据库中"""
 
-        async for event in self.ingest_operations.run_ingest(
-            source=source,
-            source_items=source_items,
-            processor=self._process_single_document,
+        async for event in self.ingest_run_service.run_many_ingest(
+            items=source_items,
+            processor=lambda item: self._process_single_document(
+                source=source, source_item=item
+            ),
             max_concurrency=RAG_INGEST_MAX_CONCURRENCY,
+            start_event=IngestProgressEvent(
+                event=RAGIngestEventType.INGEST_START,
+                source_uid=source.uid,
+                ingest_stage=IngestStage.LOADING,
+                process_status=SourceItemProcessStatus.PROCESSING,
+                item_progress=0.0,
+                message="Document ingestion started",
+            ),
+            complete_event=IngestProgressEvent(
+                event=RAGIngestEventType.INGEST_COMPLETE,
+                source_uid=source.uid,
+                ingest_stage=IngestStage.COMPLETED,
+                process_status=SourceItemProcessStatus.COMPLETED,
+                message="All documents ingested",
+                item_progress=1.0,
+            ),
+            on_error=lambda item, exc: self._handle_item_exception(source, item, exc),
         ):
             yield event
 
@@ -98,12 +120,10 @@ class DocumentIngestService:
             return
 
         # 0. 更新 item 状态
-        await self.source_crud.update_source_item_status(
-            source_item, SourceItemProcessStatus.PROCESSING
-        )
+        await self.ingest_item_state_service.mark_processing(source_item=source_item)
 
         # 0.1 暂停请求检查
-        await self.ingest_operations.pause_checkpoint(source_item.id)
+        await self.ingest_item_state_service.pause_checkpoint(source_item.id)
 
         # 1.0 发送开始事件
         yield IngestProgressEvent(
@@ -135,7 +155,7 @@ class DocumentIngestService:
             # 1.2 解析文档内容
             file_bytes = await self.file_storage.load_file(key=source_item.storage_key)
             # 1.3 暂停断点
-            await self.ingest_operations.pause_checkpoint(source_item.id)
+            await self.ingest_item_state_service.pause_checkpoint(source_item.id)
 
             yield IngestProgressEvent(
                 event=RAGIngestEventType.INGEST_PROGRESS,
@@ -172,8 +192,36 @@ class DocumentIngestService:
             yield event
 
         # 3. 调用完成
-        yield await self.ingest_operations.complete_item(
+        yield await self.ingest_item_state_service.complete_item(
             source=source,
             source_item=source_item,
             message="Document ingest completed",
+        )
+
+    async def _handle_item_exception(
+        self, source: Source, source_item: SourceItem, exc: Exception
+    ) -> AsyncIterable[IngestProgressEvent]:
+        """处理单个文档处理过程中发生的异常，更新状态并发送事件"""
+        if isinstance(exc, DocumentPausedException):
+            yield IngestProgressEvent(
+                event=RAGIngestEventType.ITEM_PAUSED,
+                source_uid=source.uid,
+                source_item_uid=source_item.uid,
+                ingest_stage=IngestStage.PAUSED,
+                process_status=SourceItemProcessStatus.PAUSED,
+                message="Document ingest paused",
+            )
+            return
+
+        # 其他异常都标记为失败
+        logger.error(f"Error processing document {source_item.uid}: {exc}")
+        await self.ingest_item_state_service.mark_failed(source_item=source_item)
+        yield IngestProgressEvent(
+            event=RAGIngestEventType.ITEM_FAILED,
+            source_uid=source.uid,
+            source_item_uid=source_item.uid,
+            ingest_stage=IngestStage.FAILED,
+            process_status=SourceItemProcessStatus.FAILED,
+            message="Document ingest failed",
+            error=str(exc),
         )
