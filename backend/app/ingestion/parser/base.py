@@ -1,21 +1,8 @@
 from pathlib import Path
 from typing import Protocol, runtime_checkable
-from dataclasses import dataclass
 
+from ..models import ParsedDocument
 from app.core.exceptions import FileParserError
-
-
-@dataclass
-class ParsedDocument:
-    """解析后的文档内容"""
-
-    text: str  # 解析后的文档 MD 内容
-    title: str  # 文档标题
-    source_type: str
-    lang_hint: str | None = None  # 代码文件的语言类型
-    page_boundaries: list[tuple[int, int]] | None = (
-        None  # 文档文本块的页码边界列表（仅适用于 PDF 等分页文档；page: (start, end)）
-    )
 
 
 @runtime_checkable
