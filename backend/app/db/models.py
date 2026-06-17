@@ -310,7 +310,7 @@ class SourceItem(Base):
         default=lambda: str(uuid.uuid4()),
     )
     # 来源项的唯一标识
-    # local_file -> storage_key
+    # local_file -> storage_key -> file_hash[:2]/file_hash.ext
     # web_crawl -> origin_url
     # github_repo -> repo_url
     item_key: Mapped[str] = mapped_column(String, nullable=False)
