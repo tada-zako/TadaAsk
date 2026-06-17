@@ -94,6 +94,7 @@ class SourceItemService:
                     storage_key=storage_key,
                     origin_url=None,
                     item_hash=file_hash,
+                    metadata_json=None,
                 )
             )
 
