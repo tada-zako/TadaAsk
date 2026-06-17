@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.core.constants import (
+    SourceType,
     SourceProcessStatus,
     SourceItemProcessStatus,
     ChatSessionType,
@@ -92,7 +93,7 @@ class Project(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # 关系字段
+    # ---- 关系字段 ----
     project_settings: Mapped[Optional["ProjectSettings"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
@@ -166,6 +167,7 @@ class ProjectSettings(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # ---- 关系字段 ----
     # visitor 默认模型配置
     visitor_default_provider_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("providers.id", ondelete="SET NULL"),
@@ -228,12 +230,14 @@ class Source(Base):
     collection_name: Mapped[str] = mapped_column(
         String, unique=True, nullable=False
     )  # 每个数据来源对应一个向量集合，便于复用
-    source_type: Mapped[
-        str
-    ]  # 数据来源类型，如 "file", "web_sitemap", "web_url", "github_repo" 等
+    source_type: Mapped[SourceType] = mapped_column(Enum(SourceType))  # 数据来源类型
     is_public: Mapped[bool] = mapped_column(
         Boolean, default=False
     )  # 公开的来源应用于 visitor 访问
+
+    web_crawl_config: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # Web_Crawl 抓取规则配置
 
     sync_interval: Mapped[
         int
@@ -248,6 +252,7 @@ class Source(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    # ---- 关系字段 ----
     source_items: Mapped[list["SourceItem"]] = relationship(
         back_populates="source",
         cascade="all, delete-orphan",
@@ -304,12 +309,25 @@ class SourceItem(Base):
         index=True,
         default=lambda: str(uuid.uuid4()),
     )
+    # 来源项的唯一标识
+    # local_file -> storage_key
+    # web_crawl -> origin_url
+    # github_repo -> repo_url
+    item_key: Mapped[str] = mapped_column(String, nullable=False)
 
     title: Mapped[str]  # 项目标题，如文件名、网页标题等
-    filename: Mapped[str]  # 文件名
-    storage_key: Mapped[str] = mapped_column(String)  # 存储 key
+    filename: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # 可选文件名字段
+    storage_key: Mapped[Optional[str]] = mapped_column(
+        String, nullable=True
+    )  # 存储在对象存储中的文件路径
     origin_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 可选 url
     item_hash: Mapped[str]  # 文件或 URL 的哈希值，用于去重和校验
+
+    metadata_json: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # 其他元数据信息
 
     status: Mapped[SourceItemProcessStatus] = mapped_column(
         Enum(SourceItemProcessStatus), default=SourceItemProcessStatus.PENDING
@@ -321,6 +339,7 @@ class SourceItem(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    # ---- 关系字段 ----
     source_id: Mapped[int] = mapped_column(
         ForeignKey("sources.id", ondelete="CASCADE")
     )  # 外键关联到数据来源表
@@ -341,7 +360,7 @@ class SourceItem(Base):
 
     # 复合唯一约束
     __table_args__ = (
-        UniqueConstraint("item_hash", "source_id", name="_item_source_uc"),
+        UniqueConstraint("item_key", "source_id", name="_item_source_uc"),
     )
 
 
@@ -354,10 +373,17 @@ class DocumentContent(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     content: Mapped[str] = mapped_column(String)  # 文档的原始文本内容
+
+    metadata_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
+    # ---- 关系字段 ----
     source_item_id: Mapped[int] = mapped_column(
         ForeignKey("source_items.id", ondelete="CASCADE")
     )  # 外键关联到来源项表
@@ -398,6 +424,7 @@ class DocumentChunk(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    # ---- 关系字段 ----
     source_item_id: Mapped[int] = mapped_column(
         ForeignKey("source_items.id", ondelete="CASCADE")
     )  # 外键关联到来源项表
@@ -450,7 +477,7 @@ class Provider(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # 关系字段
+    # ---- 关系字段 ----
     model_profiles: Mapped[list["ModelProfile"]] = relationship(
         back_populates="provider",
         cascade="all, delete-orphan",
@@ -491,7 +518,7 @@ class ModelProfile(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # 关系字段
+    # ---- 关系字段 ----
     provider_id: Mapped[int] = mapped_column(
         ForeignKey("providers.id", ondelete="CASCADE"),
         index=True,
@@ -544,7 +571,7 @@ class ChatSession(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # 外键关联到项目表
+    # ---- 关系字段 ----
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE")
     )
@@ -601,7 +628,7 @@ class ChatMessage(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    # 关联字段
+    # ---- 关系字段 ----
     chat_session_id: Mapped[int] = mapped_column(
         ForeignKey("chat_sessions.id", ondelete="CASCADE")
     )  # 外键关联到对话表

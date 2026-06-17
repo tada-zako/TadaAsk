@@ -2,10 +2,12 @@ from typing import Literal, Any
 from dataclasses import dataclass
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, AnyHttpUrl
 from pydantic.alias_generators import to_camel
 
 from app.core.constants import (
+    SourceType,
+    CrawlEntryType,
     SourceProcessStatus,
     SourceItemProcessStatus,
     ChatSessionType,
@@ -135,15 +137,20 @@ class ProjectSettingsRead(ProjectSettingsBase):
 # ======= Source Schemas =======
 class SourceBase(BaseModel):
     source_name: str
-    source_type: Literal["local_file", "web_scrape", "github_repo"]
-    sync_interval: int = Field(
-        default=24,
+    source_type: SourceType
+    sync_interval: int | None = Field(
+        default=None,
         ge=1,
-        description="Synchronization interval (in hours); the default value is 24",
+        description="Synchronization interval (in hours); optional field for sources that require periodic synchronization, such as web crawl or GitHub repo",
     )
     is_public: bool = Field(
         default=False,
         description="Whether public; if public, the source is accessible to visitors",
+    )
+
+    web_crawl_config: "WebCrawlConfig | None" = Field(
+        default=None,
+        description="Configuration for web crawling; required if source_type is 'web_crawl'",
     )
 
 
@@ -192,16 +199,73 @@ class SourceUpdate(BaseModel):
     )
 
 
+# ======= Web Crawl Config Schemas =======
+class WebCrawlConfig(BaseModel):
+    """web crawl 抓取规则模型"""
+
+    # 抓取类型
+    entry_type: CrawlEntryType
+    urls: list[AnyHttpUrl] | None = Field(
+        default=None,
+        description="List of URLs to crawl; required if entry_type is 'url_list'",
+    )
+    sitemap_url: AnyHttpUrl | None = Field(
+        default=None,
+        description="Sitemap URL; required if entry_type is 'sitemap'",
+    )
+    site_root_url: AnyHttpUrl | None = Field(
+        default=None,
+        description="Site root URL; required if entry_type is 'site_root'",
+    )
+
+    # 抓取规则
+    allowed_domains: list[str] = Field(default_factory=list)
+    include_paths: list[str] = Field(default_factory=list)
+    exclude_paths: list[str] = Field(default_factory=list)
+
+    content_selectors: list[str] = Field(default_factory=list)
+    exclude_selectors: list[str] = Field(default_factory=list)
+
+    max_pages: int = Field(
+        default=8,
+        ge=1,
+        description="Maximum number of pages to crawl; optional, used to limit crawl scope",
+    )
+    max_depth: int = Field(
+        default=3,
+        ge=1,
+        description="Maximum crawl depth; optional, used to limit crawl scope",
+    )
+
+    # 抓取策略
+    concurrency: int = Field(
+        default=5,
+        ge=1,
+        description="Number of concurrent crawl workers; the default value is 5",
+    )
+    request_delay_ms: int = Field(
+        default=500,
+        ge=0,
+        description="Delay between requests in milliseconds; the default value is 500ms",
+    )
+    respect_robots_txt: bool = Field(
+        default=True,
+        description="Whether to respect robots.txt rules; the default value is True",
+    )
+
+
 # ======= Source Items Schemas =======
 class SourceItemBase(BaseModel):
+    item_key: str
     title: str
-    filename: str
-    storage_key: str
+    filename: str | None = None
+    storage_key: str | None = None
     origin_url: str | None = Field(
         default=None,
         description="Original URL of the document; optional for local files",
     )
     item_hash: str
+    metadata_json: dict[str, Any] | None = None
 
 
 class SourceItemInternal(SourceItemBase):
@@ -242,6 +306,12 @@ class SourceItemUpdate(BaseModel):
         alias_generator=to_camel,
         validate_by_alias=True,
     )
+
+
+# ======= Document Content Schemas =======
+class DocumentContentInternal(BaseModel):
+    content: str
+    metadata_json: dict[str, Any] | None = None
 
 
 # ======= Document Chunks Schemas =======

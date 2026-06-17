@@ -65,6 +65,27 @@ EXTENSION_MAP: dict[str, ASTScannerSupportedLanguages] = {
 
 
 # ================ 枚举定义 ==================
+class SourceType(str, enum.Enum):
+    """
+    数据源类型
+    """
+
+    LOCAL_FILE = "local_file"
+    WEB_CRAWL = "web_crawl"
+    GITHUB_REPO = "github_repo"
+    CUSTOM_CONTENT = "custom_content"  # 用户直接输入的文本内容
+
+
+class CrawlEntryType(str, enum.Enum):
+    """
+    爬取条目类型
+    """
+
+    URL_LIST = "url_list"
+    SITEMAP_URL = "sitemap_url"
+    SITE_ROOT = "site_root"
+
+
 class SourceProcessStatus(str, enum.Enum):
     """
     source 数据源处理状态
