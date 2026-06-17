@@ -10,6 +10,7 @@ from app.db.schemas import (
     SourceWithItemsCount,
     SourceItemInternal,
     DocumentChunkInternal,
+    DocumentContentInternal,
 )
 from app.core.constants import SourceItemProcessStatus
 
@@ -121,13 +122,38 @@ class SourceCRUD:
         for item_data in items_data:
             new_item = SourceItem(
                 **item_data.model_dump(),
-                source_id=source.id,
             )
             source.source_items.append(new_item)
             new_items.append(new_item)
 
         await self.session.flush()  # 获取新数据项的完整字段
         return new_items
+
+    async def upsert_source_item_by_item_key(
+        self,
+        source: Source,
+        item_data: SourceItemInternal,
+    ) -> SourceItem:
+        """根据 item_key 更新或插入数据项"""
+        result = await self.session.execute(
+            select(SourceItem).where(
+                SourceItem.item_key == item_data.item_key,
+                SourceItem.source_id == source.id,
+            )
+        )
+        existing_item = result.scalars().first()
+
+        if existing_item:
+            # 更新现有数据项的字段
+            for key, value in item_data.model_dump(exclude_unset=True).items():
+                setattr(existing_item, key, value)
+            return existing_item
+        else:
+            # 创建新数据项
+            new_item = SourceItem(**item_data.model_dump())
+            source.source_items.append(new_item)
+            await self.session.flush()  # 获取新数据项的完整字段
+            return new_item
 
     async def delete_source_item_by_id(self, item_id: int) -> bool:
         """根据数据项 ID 删除数据项，返回是否删除成功"""
@@ -157,10 +183,11 @@ class SourceCRUD:
         self, *, source_id: int
     ) -> Sequence[str]:
         """根据数据源 ID 获取数据项的文件名列表"""
-        result = await self.session.execute(
-            select(SourceItem.filename).where(SourceItem.source_id == source_id)
-        )
-        return result.scalars().all()
+        stmt = select(SourceItem.filename).where(SourceItem.source_id == source_id)
+
+        result = await self.session.execute(stmt)
+        filenames = result.scalars().all()
+        return [name for name in filenames if name is not None]
 
     async def get_source_items_by_uids_with_document_for_source(
         self, source_id: int, item_uids: list[str]
@@ -206,19 +233,21 @@ class SourceCRUD:
     # DocumentContent 相关操作
     # =====================
     async def upsert_document_content(
-        self, source_item: SourceItem, content: str
+        self,
+        source_item: SourceItem,
+        content_data: DocumentContentInternal,
     ) -> None:
         """
         更新或插入数据项的 document_content
-        NOTE: 这里 source_item.document_content 的检查逻辑依赖于
-                .options(selectinload(...)) 预先加载 document_content 字段；
-                如果没有预加载，可能会导致会导致同步查询，阻塞异步流程
         """
-        if source_item.document_content:
-            source_item.document_content.content = content
+        existing_content = source_item.awaitable_attrs.document_content
+
+        if existing_content:
+            for key, value in content_data.model_dump(exclude_unset=True).items():
+                setattr(existing_content, key, value)
         else:
-            new_doc_content = DocumentContent(content=content)
-            source_item.document_content = new_doc_content
+            new_content = DocumentContent(**content_data.model_dump())
+            source_item.document_content = new_content
 
     # =====================
     # DocumentChunk 相关操作
