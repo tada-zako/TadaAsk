@@ -18,7 +18,7 @@ from app.db.models import Source, SourceItem
 from app.db.schemas import DocumentChunkInternal, DocumentContentInternal
 from app.crud import SourceCRUD
 from app.api.schemas import IngestProgressEvent
-from app.utils.calcu_file_hash import calculate_text_hash
+from app.utils import calculate_text_hash
 from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
 
 
