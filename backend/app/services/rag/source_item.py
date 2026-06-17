@@ -88,6 +88,7 @@ class SourceItemService:
             # 4. 创建 SourceItemInternal 实例
             source_items.append(
                 SourceItemInternal(
+                    item_key=storage_key,
                     title=unique_filename,
                     filename=unique_filename,
                     storage_key=storage_key,

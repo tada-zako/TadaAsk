@@ -15,7 +15,7 @@ from app.crud import (
     ModelProfileCRUD,
 )
 from app.storage import FileStorage
-from app.parser import FileParserFactory
+from app.ingestion.parser import FileParserFactory
 from app.rag import (
     VectorDatabase,
     TextSplitter,

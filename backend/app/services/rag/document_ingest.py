@@ -14,7 +14,8 @@ from app.rag import (
     EmbeddingProvider,
     FTSProvider,
 )
-from app.parser import FileParserFactory, ParsedDocument
+from app.ingestion import ParsedDocument
+from app.ingestion.parser import FileParserFactory
 from app.storage import FileStorage
 from app.db.models import Source, SourceItem
 from app.db.schemas import DocumentChunkInternal

@@ -13,7 +13,10 @@ from app.crud import AdminCRUD
 from app.db import init_db, async_session
 from app.db.schemas import AdminCreate
 from app.storage import FileStorage, file_storage_factory
-from app.parser import FileParserFactory, create_default_file_parser_factory
+from app.ingestion.parser import (
+    FileParserFactory,
+    create_default_file_parser_factory,
+)
 from app.rag import (
     vector_db_factory,
     VectorDatabase,
