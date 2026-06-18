@@ -112,6 +112,18 @@ class SourceCRUD:
         )
         return result.scalars().first()
 
+    async def get_source_item_by_item_key(
+        self, *, source: Source, item_key: str
+    ) -> SourceItem | None:
+        """根据 item_key 获取数据项详情"""
+        result = await self.session.execute(
+            select(SourceItem).where(
+                SourceItem.item_key == item_key,
+                SourceItem.source_id == source.id,
+            )
+        )
+        return result.scalars().first()
+
     async def add_source_items(
         self,
         source: Source,
