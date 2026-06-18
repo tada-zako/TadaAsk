@@ -2,8 +2,14 @@ from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
 from app.providers import ThinkingLevel
-from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
-from app.db.schemas import HybridSearchResult, HybridSearchRequest
+from app.core.constants import (
+    SourceItemProcessStatus,
+    IngestStage,
+    RAGIngestEventType,
+    RAGSyncEventType,
+    SourceProcessStatus,
+)
+from app.db.schemas import HybridSearchResult, HybridSearchRequest, SourceItemRead
 from app.services import SearchDebugInfo
 
 
@@ -115,6 +121,47 @@ class IngestPausedResponse(BaseModel):
     source_item_uid: str
     process_status: SourceItemProcessStatus
     message: str
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class RAGSyncCounters(BaseModel):
+    """Web Crawl 类型 ingest 内部的 crawl 计数器"""
+
+    discovered: int = 0
+    fetched: int = 0
+    skipped: int = 0
+    upserted: int = 0
+    indexed: int = 0
+    failed: int = 0
+
+
+class RAGSyncEvent(BaseModel):
+    """RAG sync 事件结构体；Web Crawl 类型 Source Ingest 的 SSE 事件结构体"""
+
+    event: RAGSyncEventType
+
+    source_uid: str
+    source_status: SourceProcessStatus | None = None
+
+    source_item_uid: str | None = None
+    source_item_status: SourceItemProcessStatus | None = None
+    source_item: SourceItemRead | None = (
+        None  # 传递 source_item 详细信息，便于前端动态更新 source_item list
+    )
+
+    ingest_stage: IngestStage | None = None
+    item_progress: float | None = None
+    sync_progress: float | None = None
+
+    counters: RAGSyncCounters | None = None
+
+    message: str | None = None
+    error: str | None = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,
