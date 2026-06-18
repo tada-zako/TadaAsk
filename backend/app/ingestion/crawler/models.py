@@ -41,3 +41,13 @@ class ParsedPage:
     raw_html_hash: str
     parsed_markdown_hash: str
     fetch_metadata: dict
+
+
+@dataclass
+class PageExtractionOptions:
+    """页面内容提取配置"""
+
+    content_selectors: list[str]
+    exclude_selectors: list[str]
+    title_selector: str | None = None
+    matched_rule_name: str | None = None
