@@ -4,6 +4,7 @@ from .cache_keys import normalize_text, stable_hash
 from .gen_collection_name import generate_collection_name
 from .tokenizer import EmbeddingTokenizer
 from .token_counter import TokenCounter
+from .normalize_url import normalize_url, hostname_from_url, path_prefix_from_url
 
 from app.core.config import EmbeddingBackend
 
@@ -17,6 +18,9 @@ __all__ = [
     "generate_collection_name",
     "EmbeddingTokenizer",
     "TokenCounter",
+    "normalize_url",
+    "hostname_from_url",
+    "path_prefix_from_url",
 ]
 
 
