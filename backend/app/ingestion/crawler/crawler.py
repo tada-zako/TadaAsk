@@ -7,10 +7,8 @@ import httpx
 
 from . import (
     PageExtractionOptions,
-    ParsedPage,
     DiscoveredURL,
     FetchedPage,
-    HTMLPageParser,
 )
 from app.db.schemas import WebCrawlConfig, WebCrawlExtractionRule
 from app.utils import (
@@ -28,75 +26,15 @@ class WebCrawler:
     def __init__(
         self,
         *,
-        html_parser: HTMLPageParser,
         timeout: float = 20.0,
         # TODO: 后续自定义这里的 User Agent
         user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
     ):
-        self.html_parser = html_parser
         self.timeout = timeout
         self.user_agent = user_agent
 
-    async def crawl(
-        self,
-        config: WebCrawlConfig,
-        *,
-        previous_metadata_by_item_key: dict[str, dict] | None = None,
-    ) -> AsyncIterable[ParsedPage]:
-        """根据 WebCrawlConfig 进行爬取，并产出 ParsedPage"""
-        # 校验 config 的合法性
-        config = self._validate_and_normalize_config(config)
-
-        discovered_urls = self._discover_urls(config)
-
-        semaphore = asyncio.Semaphore(config.concurrency)  # 限制并发数，避免过度爬取
-
-        # 开启异步 client
-        async with httpx.AsyncClient(
-            timeout=self.timeout,
-            follow_redirects=True,
-            headers={
-                "User-Agent": self.user_agent,
-                "Accept": "text/html,application/xhtml+xml",
-            },
-        ) as client:
-            # 单个 worker 流程
-            async def worker(discovered: DiscoveredURL) -> ParsedPage | None:
-                async with semaphore:
-                    # 获取之前爬取的元数据
-                    previous_metadata = (previous_metadata_by_item_key or {}).get(
-                        discovered.item_key
-                    )
-
-                    page: FetchedPage = await self._fetch_page(
-                        client=client,
-                        discovered=discovered,
-                        config=config,
-                        previous_metadata=previous_metadata,
-                    )
-
-                    if page.not_modified:
-                        return None  # 页面未修改，无需重新解析
-
-                    # 处理页面解析配置
-                    options = self._resolve_extraction_options(
-                        config=config, url=page.final_url
-                    )
-                    return self.html_parser.parse(page=page, options=options)
-
-            # 创建 worker 任务
-            tasks = [
-                asyncio.create_task(worker(discovered))
-                for discovered in discovered_urls
-            ]
-
-            # 逐个获取结果
-            for task in asyncio.as_completed(tasks):
-                parsed_page = await task
-                if parsed_page:
-                    yield parsed_page
-
-    def _validate_and_normalize_config(self, config: WebCrawlConfig) -> WebCrawlConfig:
+    # TODO: validate 业务后续迁移到 API 层
+    def validate_and_normalize_config(self, config: WebCrawlConfig) -> WebCrawlConfig:
         """校验 WebCrawlConfig 的合法性，并对 Config 进行规范化"""
         if config.entry_type == CrawlEntryType.URL_LIST and not config.urls:
             raise ValueError("urls is required when entry_type is url_list")
@@ -137,14 +75,18 @@ class WebCrawler:
             }
         )
 
-    def _discover_urls(self, config: WebCrawlConfig) -> list[DiscoveredURL]:
+    def discover_urls(self, config: WebCrawlConfig) -> list[DiscoveredURL]:
         """根据 WebCrawlConfig 进行 URL 发现，返回待爬取的 URL 列表"""
         if config.entry_type == CrawlEntryType.URL_LIST:
             return self._discover_url_list(config)
 
-        raise NotImplementedError(
-            f"Entry type {config.entry_type} is not supported yet"
-        )
+        if config.entry_type == CrawlEntryType.SITEMAP_URL:
+            raise NotImplementedError("sitemap discovery is not implemented yet")
+
+        if config.entry_type == CrawlEntryType.SITE_ROOT:
+            raise NotImplementedError("site root discovery is not implemented yet")
+
+        raise ValueError(f"Unsupported entry_type: {config.entry_type}")
 
     def _discover_url_list(self, config: WebCrawlConfig) -> list[DiscoveredURL]:
         """从 URL 列表中进行 URL 发现"""
@@ -190,7 +132,18 @@ class WebCrawler:
             return False
         return True
 
-    async def _fetch_page(
+    def create_http_client(self) -> httpx.AsyncClient:
+        """创建 HTTP 客户端实例"""
+        return httpx.AsyncClient(
+            timeout=self.timeout,
+            follow_redirects=True,
+            headers={
+                "User-Agent": self.user_agent,
+                "Accept": "text/html,application/xhtml+xml",
+            },
+        )
+
+    async def fetch_page(
         self,
         *,
         client: httpx.AsyncClient,
@@ -245,7 +198,7 @@ class WebCrawler:
             not_modified=False,
         )
 
-    def _resolve_extraction_options(
+    def resolve_extraction_options(
         self, *, config: WebCrawlConfig, url: str
     ) -> PageExtractionOptions:
         """根据 URL 和 WebCrawlConfig 解析页面内容提取配置"""
