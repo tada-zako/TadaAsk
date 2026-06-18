@@ -1,25 +1,17 @@
 from bs4 import BeautifulSoup, Tag
 from markdownify import MarkdownConverter
 
-from .models import FetchedPage, ParsedPage
-from ..models import ParsedDocument, ParsedSection
-from app.db.schemas import WebCrawlConfig
+from . import FetchedPage, ParsedPage, PageExtractionOptions
+from .. import ParsedDocument, ParsedSection
 from app.utils import calculate_text_hash
 from app.core.constants import SourceType
 
 
-# 默认排除选择器
+# 默认排除选择器；尽可能保持最简
 DEFAULT_EXCLUDE_SELECTORS = [
     "script",
     "style",
     "noscript",
-    "nav",
-    "footer",
-    "aside",
-    ".sidebar",
-    ".toc",
-    ".table-of-contents",
-    ".copy-button",
 ]
 # 默认内容选择器列表
 DEFAULT_CONTENT_SELECTORS = [
@@ -38,18 +30,21 @@ class HTMLPageParser:
     负责清洗 fetched html 内容，并将 html 转换成 MD 文本输出
     """
 
-    def parse(self, page: FetchedPage, *, config: WebCrawlConfig) -> ParsedPage:
+    def parse(self, page: FetchedPage, *, options: PageExtractionOptions) -> ParsedPage:
         """解析 HTML 页面，提取文本内容并转换为 Markdown"""
+        if page.not_modified:
+            # 不解析未修改的页面
+            raise ValueError("Cannot parse a not-modified page")
         if not page.html:
             raise ValueError(f"Fetched page {page.url} has no HTML content to parse")
 
         # 转换为 BeautifulSoup 对象进行解析
         soup = BeautifulSoup(page.html, "lxml")
-        title = self._extract_title(soup)
+        title = self._extract_title(soup, options=options)
 
         # 选择内容根节点，并清理噪音元素
-        root = self._select_content_root(soup, config=config)
-        self._remove_noise(root, config=config)
+        root = self._select_content_root(soup, options=options)
+        self._remove_noise(root, options=options)
 
         # 转换为 MD 文本，提取 sections 并计算 hash
         markdown_text, sections = self._convert_to_markdown_with_sections(root)
@@ -64,6 +59,7 @@ class HTMLPageParser:
                 "origin_url": page.url,
                 "final_url": page.final_url,
                 "content_type": page.content_type,
+                "matched_extraction_rule": options.matched_rule_name,
             },
         )
 
@@ -82,26 +78,38 @@ class HTMLPageParser:
                 "last_fetch_status": page.status_code,
                 "final_url": page.final_url,
                 "content_type": page.content_type,
+                "matched_extraction_rule": options.matched_rule_name,
             },
         )
 
-    def _extract_title(self, soup: BeautifulSoup) -> str:
+    def _extract_title(
+        self, soup: BeautifulSoup, *, options: PageExtractionOptions
+    ) -> str:
         """提取页面标题"""
+        # 优先使用 options 中的 title_selector
+        if options.title_selector:
+            title_element = soup.select_one(options.title_selector)
+            if title_element:
+                title = title_element.get_text(" ", strip=True)
+                if title:
+                    return title
+
         if soup.title and soup.title.string:
             return soup.title.string.strip()
 
-        # 尝试 <h1> 标签
+        # fallback: 尝试 <h1> 标签
         h1 = soup.find("h1")
         if h1 and h1.get_text():
             return h1.get_text(" ", strip=True)
+
         return "Untitled"
 
     def _select_content_root(
-        self, soup: BeautifulSoup, *, config: WebCrawlConfig
+        self, soup: BeautifulSoup, *, options: PageExtractionOptions
     ) -> Tag:
         """选择内容根节点"""
         # 优先使用配置的内容选择器
-        selectors = config.content_selectors or DEFAULT_CONTENT_SELECTORS
+        selectors = options.content_selectors or DEFAULT_CONTENT_SELECTORS
         for selector in selectors:
             root = soup.select_one(selector)
             if isinstance(root, Tag):
@@ -112,9 +120,9 @@ class HTMLPageParser:
             raise ValueError("No <body> tag found in the HTML content")
         return soup.body
 
-    def _remove_noise(self, root: Tag, *, config: WebCrawlConfig) -> None:
+    def _remove_noise(self, root: Tag, *, options: PageExtractionOptions) -> None:
         """移除噪音元素"""
-        exclude_selectors = config.exclude_selectors or DEFAULT_EXCLUDE_SELECTORS
+        exclude_selectors = options.exclude_selectors + DEFAULT_EXCLUDE_SELECTORS
         for selector in exclude_selectors:
             for element in root.select(selector):
                 element.decompose()  # 从 DOM 中移除元素
