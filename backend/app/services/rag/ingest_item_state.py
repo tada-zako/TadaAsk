@@ -4,8 +4,8 @@ from loguru import logger
 
 from app.db.models import Source, SourceItem
 from app.crud import SourceCRUD
-from app.api.schemas import IngestProgressEvent, IngestPausedResponse
-from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
+from app.api.schemas import IngestPausedResponse
+from app.core.constants import SourceItemProcessStatus
 from app.core.exceptions import DocumentPausedException
 
 
@@ -92,26 +92,4 @@ class IngestItemStateService:
         """将文档状态标记为 COMPLETED"""
         await self.source_crud.update_source_item_status(
             source_item, SourceItemProcessStatus.COMPLETED
-        )
-
-    async def complete_item(
-        self,
-        *,
-        source: Source,
-        source_item: SourceItem,
-        message: str = "Ingest completed",
-    ) -> IngestProgressEvent:
-        """完成单个文档的处理"""
-        # 6. 胜利宣言
-        await self.source_crud.update_source_item_status(
-            source_item, SourceItemProcessStatus.COMPLETED
-        )
-        return IngestProgressEvent(
-            event=RAGIngestEventType.INGEST_PROGRESS,
-            source_uid=source.uid,
-            source_item_uid=source_item.uid,
-            ingest_stage=IngestStage.COMPLETED,
-            process_status=SourceItemProcessStatus.COMPLETED,
-            item_progress=1.0,
-            message=message,
         )

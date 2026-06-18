@@ -70,6 +70,7 @@ class HTMLPageParser:
             parsed_document=parsed_document,
             raw_html_hash=page.raw_html_hash or "",
             parsed_markdown_hash=parsed_markdown_hash,
+            # TODO: 这里的 metadata 之后使用明确的类型定义创建
             fetch_metadata={
                 "etag": page.etag,
                 "last_modified": page.last_modified,

@@ -188,13 +188,21 @@ class DocumentIngestService:
             parsed_doc=parsed_doc,
             cover_content=source_item.document_content
             is None,  # 只有在之前没有解析过的情况下才入库内容
+            checkpoint=lambda: self.ingest_item_state_service.pause_checkpoint(
+                source_item_id=source_item.id
+            ),
         ):
             yield event
 
-        # 3. 调用完成
-        yield await self.ingest_item_state_service.complete_item(
-            source=source,
-            source_item=source_item,
+        # 3. 胜利宣言
+        await self.ingest_item_state_service.mark_completed(source_item=source_item)
+        yield IngestProgressEvent(
+            event=RAGIngestEventType.INGEST_PROGRESS,
+            source_uid=source.uid,
+            source_item_uid=source_item.uid,
+            ingest_stage=IngestStage.COMPLETED,
+            process_status=SourceItemProcessStatus.COMPLETED,
+            item_progress=1.0,
             message="Document ingest completed",
         )
 
