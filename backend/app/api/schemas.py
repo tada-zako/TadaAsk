@@ -5,7 +5,6 @@ from app.providers import ThinkingLevel
 from app.core.constants import (
     SourceItemProcessStatus,
     IngestStage,
-    RAGIngestEventType,
     RAGSyncEventType,
     SourceProcessStatus,
 )
@@ -95,25 +94,6 @@ class TokenData(BaseModel):
     token_version: int = Field(..., description="Token 版本号")
 
 
-class IngestProgressEvent(BaseModel):
-    """文档处理进度实事件：SSE data 部分结构"""
-
-    event: RAGIngestEventType
-    source_uid: str
-    source_item_uid: str | None = None
-    ingest_stage: IngestStage
-    process_status: SourceItemProcessStatus
-    item_progress: float | None = None  # 当前文档处理进度，0.0 - 1.0
-    message: str | None = None  # 可选的进度描述信息
-    error: str | None = None  # 可选的错误信息，仅在 process_status=FAILED 时提供
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
-
-
 class IngestPausedResponse(BaseModel):
     """文档处理暂停响应结构"""
 
@@ -130,18 +110,20 @@ class IngestPausedResponse(BaseModel):
 
 
 class RAGSyncCounters(BaseModel):
-    """Web Crawl 类型 ingest 内部的 crawl 计数器"""
+    """RAG sync 过程中的计数器"""
 
     discovered: int = 0
     fetched: int = 0
     skipped: int = 0
     upserted: int = 0
     indexed: int = 0
+    completed: int = 0
+    paused: int = 0
     failed: int = 0
 
 
 class RAGSyncEvent(BaseModel):
-    """RAG sync 事件结构体；Web Crawl 类型 Source Ingest 的 SSE 事件结构体"""
+    """RAG sync/ingest SSE 事件结构体"""
 
     event: RAGSyncEventType
 

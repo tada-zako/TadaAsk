@@ -118,7 +118,11 @@ class IngestStage(str, enum.Enum):
     """
 
     LOADING = "loading"
+    DISCOVERING = "discovering"
+    FETCHING = "fetching"
+    CHECKING = "checking"
     PARSING = "parsing"
+    UPSERTING = "upserting"
     SPLITTING = "splitting"
     FTS_TOKENIZING = "fts_tokenizing"
     EMBEDDING = "embedding"
@@ -131,22 +135,8 @@ class IngestStage(str, enum.Enum):
     PAUSED = "paused"
 
 
-class RAGIngestEventType(str, enum.Enum):
-    """RAG ingest 事件类型；用于 LOCAL_FILE 类型的 Source Ingest"""
-
-    INGEST_START = "ingest_start"
-    INGEST_PROGRESS = "ingest_progress"
-    _WORKER_DONE = "_worker_done"  # 内部事件，表示单个文档处理完成
-    INGEST_COMPLETE = "ingest_complete"
-
-    ITEM_SKIPPED = "item_skipped"  # 文档状态不匹配，跳过处理
-    ITEM_PAUSED = "item_paused"
-    ITEM_FAILED = "item_failed"
-    ITEM_RESUMED = "item_resumed"
-
-
 class RAGSyncEventType(str, enum.Enum):
-    """RAG sync 事件类型；用于 WEB_CRAWL 类型的 Source Ingest"""
+    """RAG sync 事件类型；用于不同 Source 类型的 ingest/sync"""
 
     SYNC_START = "sync_start"
     SYNC_PROGRESS = "sync_progress"
@@ -157,6 +147,7 @@ class RAGSyncEventType(str, enum.Enum):
     ITEM_DISCOVERED = "item_discovered"
     ITEM_FETCHED = "item_fetched"
     ITEM_UPSERTED = "item_upserted"
+    ITEM_PROGRESS = "item_progress"
     ITEM_SKIPPED = "item_skipped"
     ITEM_INDEXING = "item_indexing"
     ITEM_COMPLETED = "item_completed"
