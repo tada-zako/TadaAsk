@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from sqlalchemy import select, func, delete, insert
+from sqlalchemy import select, func, delete, insert, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -100,6 +100,13 @@ class SourceCRUD:
         )
         return result.scalars().first()
 
+    async def get_source_item_by_uid(self, item_uid: str) -> SourceItem | None:
+        """根据数据项 UID 获取数据项详情"""
+        result = await self.session.execute(
+            select(SourceItem).where(SourceItem.uid == item_uid)
+        )
+        return result.scalars().first()
+
     async def get_source_item_by_uid_for_source(
         self, source_id: int, item_uid: str
     ) -> SourceItem | None:
@@ -108,6 +115,20 @@ class SourceCRUD:
             select(SourceItem).where(
                 SourceItem.uid == item_uid,
                 SourceItem.source_id == source_id,
+            )
+        )
+        return result.scalars().first()
+
+    async def get_source_item_by_uid_for_source_uid(
+        self, source_uid: str, item_uid: str
+    ) -> SourceItem | None:
+        """根据数据项 UID 和数据源 UID 获取数据项详情"""
+        result = await self.session.execute(
+            select(SourceItem)
+            .join(Source, Source.id == SourceItem.source_id)
+            .where(
+                SourceItem.uid == item_uid,
+                Source.uid == source_uid,
             )
         )
         return result.scalars().first()
@@ -230,6 +251,35 @@ class SourceCRUD:
         source_item.status = new_status
         return source_item
 
+    async def claim_source_item_for_ingest(
+        self, *, source_uid: str, source_item_uid: str
+    ) -> bool:
+        """
+        声明 source_item 进入 ingest 流程；
+        确保并发请求同一个 source_item_uid 时，
+        只有一个请求能成功 claim 到该数据项进行处理
+        """
+        source_id_stmt = (
+            select(Source.id).where(Source.uid == source_uid).scalar_subquery()
+        )
+        stmt = (
+            update(SourceItem)
+            .where(
+                SourceItem.uid == source_item_uid,
+                SourceItem.source_id == (source_id_stmt),
+                SourceItem.status.in_(
+                    [
+                        SourceItemProcessStatus.PENDING,
+                        SourceItemProcessStatus.PAUSED,
+                        SourceItemProcessStatus.FAILED,
+                    ]
+                ),
+            )
+            .values(status=SourceItemProcessStatus.PROCESSING)
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount == 1  # type: ignore[attr-defined]
+
     async def list_vector_ids_by_source_item_id(
         self, source_item_id: int
     ) -> Sequence[str]:
@@ -240,6 +290,43 @@ class SourceCRUD:
             )
         )
         return result.scalars().all()
+
+    async def get_source_and_item_by_uid(
+        self, *, source_uid: str, source_item_uid: str
+    ) -> tuple[Source, SourceItem] | None:
+        """根据数据源 UID 和数据项 UID 获取数据源和数据项详情"""
+        result = await self.session.execute(
+            select(Source, SourceItem)
+            .join(SourceItem, SourceItem.source_id == Source.id)
+            .where(
+                Source.uid == source_uid,
+                SourceItem.uid == source_item_uid,
+            )
+        )
+        row = result.first()
+        if row:
+            return tuple(row)
+        return None
+
+    async def get_source_and_item_with_content_by_uid(
+        self, *, source_uid: str, source_item_uid: str
+    ) -> tuple[Source, SourceItem] | None:
+        """根据数据源 UID 和数据项 UID 获取数据源和数据项详情，包含 document_content"""
+        result = await self.session.execute(
+            select(Source, SourceItem)
+            .join(SourceItem, SourceItem.source_id == Source.id)
+            .options(
+                selectinload(SourceItem.document_content)
+            )  # 级联加载 document_content
+            .where(
+                Source.uid == source_uid,
+                SourceItem.uid == source_item_uid,
+            )
+        )
+        row = result.first()
+        if row:
+            return tuple(row)
+        return None
 
     # =====================
     # DocumentContent 相关操作
@@ -252,7 +339,7 @@ class SourceCRUD:
         """
         更新或插入数据项的 document_content
         """
-        existing_content = source_item.awaitable_attrs.document_content
+        existing_content = await source_item.awaitable_attrs.document_content
 
         if existing_content:
             for key, value in content_data.model_dump(exclude_unset=True).items():
