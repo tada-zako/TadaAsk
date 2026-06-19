@@ -17,9 +17,9 @@ from app.ingestion import ParsedDocument, ParsedSection
 from app.db.models import Source, SourceItem
 from app.db.schemas import DocumentChunkInternal, DocumentContentInternal
 from app.crud import SourceCRUD
-from app.api.schemas import IngestProgressEvent
+from app.api.schemas import RAGSyncEvent
 from app.utils import calculate_text_hash
-from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
+from app.core.constants import SourceItemProcessStatus, IngestStage, RAGSyncEventType
 
 
 # 文档分块后每批次的数量
@@ -62,7 +62,7 @@ class DocumentIndexService:
         parsed_doc: ParsedDocument,
         cover_content: bool = True,
         checkpoint: PauseCheckPoint | None = None,
-    ) -> AsyncIterable[IngestProgressEvent]:
+    ) -> AsyncIterable[RAGSyncEvent]:
         """处理单个文档的完整流程，返回处理进度事件的异步生成器"""
 
         async def maybe_checkpoint() -> None:
@@ -80,6 +80,7 @@ class DocumentIndexService:
                         "sections": [
                             section.__dict__ for section in parsed_doc.sections or []
                         ],
+                        "page_boundaries": parsed_doc.page_boundaries or [],
                         "parser_metadata": parsed_doc.metadata or {},
                     },
                 ),
@@ -89,12 +90,12 @@ class DocumentIndexService:
         await maybe_checkpoint()
 
         # 2.0 发送分块事件
-        yield IngestProgressEvent(
-            event=RAGIngestEventType.INGEST_PROGRESS,
+        yield RAGSyncEvent(
+            event=RAGSyncEventType.ITEM_PROGRESS,
             source_uid=source.uid,
             source_item_uid=source_item.uid,
             ingest_stage=IngestStage.SPLITTING,
-            process_status=SourceItemProcessStatus.PROCESSING,
+            source_item_status=SourceItemProcessStatus.PROCESSING,
             item_progress=0.3,
             message="Splitting document into chunks",
         )
@@ -108,12 +109,12 @@ class DocumentIndexService:
         await maybe_checkpoint()
 
         # 3.0 发送分块处理事件
-        yield IngestProgressEvent(
-            event=RAGIngestEventType.INGEST_PROGRESS,
+        yield RAGSyncEvent(
+            event=RAGSyncEventType.ITEM_PROGRESS,
             source_uid=source.uid,
             source_item_uid=source_item.uid,
             ingest_stage=IngestStage.PROCESSING_CHUNKS,
-            process_status=SourceItemProcessStatus.PROCESSING,
+            source_item_status=SourceItemProcessStatus.PROCESSING,
             item_progress=0.5,
             message="Processing document chunks",
         )
@@ -143,7 +144,7 @@ class DocumentIndexService:
         chunks: list[TextChunk],
         parsed_doc: ParsedDocument,
         maybe_checkpoint: PauseCheckPoint,
-    ) -> AsyncIterable[IngestProgressEvent]:
+    ) -> AsyncIterable[RAGSyncEvent]:
         """批处理文本的 FTS 分词、向量化嵌入以及数据库写入"""
 
         batches = [
@@ -212,12 +213,12 @@ class DocumentIndexService:
             )
 
             # 3.2.5 发送批次完成事件
-            yield IngestProgressEvent(
-                event=RAGIngestEventType.INGEST_PROGRESS,
+            yield RAGSyncEvent(
+                event=RAGSyncEventType.ITEM_PROGRESS,
                 source_uid=source.uid,
                 source_item_uid=source_item.uid,
                 ingest_stage=IngestStage.PROCESSING_CHUNKS,
-                process_status=SourceItemProcessStatus.PROCESSING,
+                source_item_status=SourceItemProcessStatus.PROCESSING,
                 item_progress=0.5 + (batch_index + 1) / len(batches) * 0.4,
                 message=f"Processed chunk batch {batch_index + 1}/{len(batches)}",
             )
