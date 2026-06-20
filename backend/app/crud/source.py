@@ -89,7 +89,7 @@ class SourceCRUD:
             await self.session.delete(source)
             return True
         return False
-    
+
     async def update_source_status(
         self, source: Source, new_status: SourceProcessStatus
     ) -> Source:
@@ -229,6 +229,21 @@ class SourceCRUD:
         filenames = result.scalars().all()
         return [name for name in filenames if name is not None]
 
+    async def get_source_items_by_uids_for_source(
+        self, source_id: int, item_uids: list[str]
+    ) -> Sequence[SourceItem]:
+        """基于数据源 ID 和数据项 UID 列表获取数据项详情列表"""
+        if not item_uids:
+            return []
+
+        result = await self.session.execute(
+            select(SourceItem).where(
+                SourceItem.source_id == source_id,
+                SourceItem.uid.in_(item_uids),
+            )
+        )
+        return result.scalars().all()
+
     async def get_source_items_by_uids_with_document_for_source(
         self, source_id: int, item_uids: list[str]
     ) -> Sequence[SourceItem]:
@@ -257,6 +272,26 @@ class SourceCRUD:
         """更新数据项的处理状态"""
         source_item.status = new_status
         return source_item
+
+    async def bulk_update_source_items_status(
+        self,
+        source: Source,
+        source_item_uids: list[str],
+    ) -> None:
+        """
+        根据数据源和数据项 UID 列表批量更新数据项的处理状态为 PAUSE_REQUESTED
+        """
+        stmt = (
+            update(SourceItem)
+            .where(
+                SourceItem.source_id == source.id,
+                SourceItem.uid.in_(source_item_uids),
+                SourceItem.status == SourceItemProcessStatus.PROCESSING,
+            )
+            .values(status=SourceItemProcessStatus.PAUSE_REQUESTED)
+            .execution_options(synchronize_session="fetch")
+        )
+        await self.session.execute(stmt)
 
     async def claim_source_item_for_ingest(
         self, *, source_uid: str, source_item_uid: str
