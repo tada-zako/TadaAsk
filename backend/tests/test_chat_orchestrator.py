@@ -9,7 +9,7 @@ from app.providers import DEFAULT_SYSTEM_PROMPT
 from app.services.chat.chat_orchestrator import ChatOrchestratorService
 from app.services.chat.compaction_service import CompactionService
 from app.services.chat.generation_registry import GenerationRegistry
-from app.services.rag.retrieval import RAGRetrievalService
+from app.services.search.retrieval import RAGRetrievalService
 from app.services.schemas import RAGRetrievalResult
 from app.services.utils import TokenBudget
 

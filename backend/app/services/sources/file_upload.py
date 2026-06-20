@@ -11,10 +11,10 @@ from app.db.schemas import (
     SourceItemRead,
 )
 from app.crud import SourceCRUD
-from app.utils.calcu_file_hash import calculate_file_hash
+from app.utils import calculate_file_hash
 
 
-class SourceItemService:
+class SourceItemUploadService:
     def __init__(
         self,
         *,

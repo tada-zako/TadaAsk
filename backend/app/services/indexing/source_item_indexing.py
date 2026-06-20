@@ -6,7 +6,7 @@ from dataclasses import dataclass, asdict
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from loguru import logger
 
-from .document_index import DocumentIndexService
+from . import DocumentChunkIndexWriter
 
 from app.rag import (
     VectorDatabase,
@@ -41,7 +41,7 @@ class WorkerDone:
     source_item_uid: str
 
 
-class DocumentIngestService:
+class SourceItemIndexingService:
     def __init__(
         self,
         *,
@@ -64,12 +64,12 @@ class DocumentIngestService:
 
     def _new_document_index_service(
         self, source_crud: SourceCRUD
-    ) -> DocumentIndexService:
+    ) -> DocumentChunkIndexWriter:
         """
         内部创建 document_index service；
         每个 worker 使用一个单独的实例，避免依赖注入的 session 跨线程/协程共享问题
         """
-        return DocumentIndexService(
+        return DocumentChunkIndexWriter(
             source_crud=source_crud,
             vector_db=self.vector_db,
             text_splitter=self.text_splitter,

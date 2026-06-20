@@ -37,7 +37,7 @@ def generate_vector_id(source_item_id: int, chunk_index: int) -> str:
     return str(uuid.uuid5(RAG_NAMESPACE, name))
 
 
-class DocumentIndexService:
+class DocumentChunkIndexWriter:
     def __init__(
         self,
         *,

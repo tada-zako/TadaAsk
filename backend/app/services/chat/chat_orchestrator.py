@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .generation_registry import GenerationRegistry
 from .context_builder import ContextBuilder
 from .compaction_service import CompactionService
-from ..rag import RAGRetrievalService
+from ..search import RAGRetrievalService
 from ..schemas import (
     ChatStreamEvent,
     SessionReadyData,
