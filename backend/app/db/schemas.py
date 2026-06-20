@@ -138,6 +138,7 @@ class ProjectSettingsRead(ProjectSettingsBase):
 class SourceBase(BaseModel):
     source_name: str
     source_type: SourceType
+    status: SourceProcessStatus = Field(default=SourceProcessStatus.PENDING)
     sync_interval: int | None = Field(
         default=None,
         ge=1,
@@ -170,7 +171,6 @@ class SourceInternal(SourceBase):
 class SourceRead(SourceBase):
     uid: str
     synced_at: datetime
-    status: SourceProcessStatus
     created_at: datetime
 
     model_config = ConfigDict(
@@ -312,11 +312,6 @@ class WebCrawlConfig(BaseModel):
         ge=1,
         description="Maximum crawl depth; optional, used to limit crawl scope",
     )
-    concurrency: int = Field(
-        default=5,
-        ge=1,
-        description="Number of concurrent crawl workers; the default value is 5",
-    )
     request_delay_ms: int = Field(
         default=5000,
         ge=0,
@@ -339,6 +334,7 @@ class SourceItemBase(BaseModel):
         description="Original URL of the document; optional for local files",
     )
     item_hash: str
+    status: SourceItemProcessStatus = Field(default=SourceItemProcessStatus.PENDING)
     metadata_json: dict[str, Any] | None = None
 
 
@@ -356,7 +352,6 @@ class SourceItemInternalWithSourceID(SourceItemInternal):
 
 class SourceItemRead(SourceItemBase):
     uid: str
-    status: SourceItemProcessStatus
     updated_at: datetime
     created_at: datetime
 
