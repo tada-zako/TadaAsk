@@ -87,4 +87,19 @@ def completer_factory(
 
         return OpenAIChatModel(model_perf=model, endpoint=endpoint)
 
-    raise ValueError(f"Unsupported TextCompleter provider: {provider}")
+    else:
+        # custom provider
+        from .openai_compatible import OpenAIChatModel, OpenAIEndpoint
+
+        if api_key is None:
+            raise ValueError(f"API key is required for custom provider {provider}.")
+        if not provider_with_model.base_url:
+            raise ValueError(f"Base URL is required for custom provider {provider}.")
+
+        endpoint = OpenAIEndpoint.custom(
+            endpoint_name=provider,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
+        return OpenAIChatModel(model_perf=model, endpoint=endpoint)
