@@ -1,22 +1,33 @@
-from typing import AsyncIterable
+import asyncio
+from typing import AsyncIterable, cast
+from dataclasses import asdict
 
 from loguru import logger
 
-from .ingest_runner import IngestRunService
-from .ingest_item_state import IngestItemStateService
-from .document_index import DocumentIndexService
-
-from app.ingestion.crawler import WebCrawler, ParsedPage
+from app.ingestion.crawler import (
+    WebCrawler,
+    ParsedPage,
+    HTMLPageParser,
+    DiscoveredURL,
+    FetchedPage,
+    WebPageMetadata,
+)
 from app.db.models import Source, SourceItem
-from app.db.schemas import WebCrawlConfig, SourceItemInternal
+from app.db.schemas import WebCrawlConfig, SourceItemInternal, DocumentContentInternal
 from app.crud import SourceCRUD
-from app.api.schemas import IngestProgressEvent, IngestPausedResponse
-from app.core.constants import SourceItemProcessStatus, IngestStage, RAGIngestEventType
-from app.core.exceptions import DocumentPausedException
+from app.api.schemas import RAGSyncCounters, RAGSyncEvent
+from app.core.constants import SourceItemProcessStatus, IngestStage, RAGSyncEventType
 
 
 # ingest runner 并发控制
-WEB_CRAWL_INDEX_MAX_CONCURRENCY = 3
+WEB_CRAWL_INDEX_MAX_CONCURRENCY = 5
+
+# 处于 index 构建状态集合；crawl_sync 过程不能修改这些状态的 source_items
+_INDEX_BUSY_STATUSES = {
+    SourceItemProcessStatus.PROCESSING,
+    SourceItemProcessStatus.PAUSE_REQUESTED,
+    SourceItemProcessStatus.PAUSED,
+}
 
 
 class WebCrawlSyncService:
@@ -25,197 +36,360 @@ class WebCrawlSyncService:
         *,
         source_crud: SourceCRUD,
         crawler: WebCrawler,
-        ingest_runner: IngestRunService,
-        ingest_item_state_service: IngestItemStateService,
-        document_index: DocumentIndexService,
+        html_parser: HTMLPageParser,
     ):
         self.source_crud = source_crud
         self.crawler = crawler
-        self.document_index = document_index
-        self.ingest_runner = ingest_runner
-        self.ingest_item_state_service = ingest_item_state_service
+        self.html_parser = html_parser
 
-    async def request_pause_ingest(
-        self,
-        source: Source,
-        source_item: SourceItem,
-    ) -> IngestPausedResponse:
-        return await self.ingest_item_state_service.request_pause_ingest(
-            source=source,
-            source_item=source_item,
-        )
-
-    async def resume_ingest(
-        self,
-        source: Source,
-        source_item: SourceItem,
-    ) -> AsyncIterable[IngestProgressEvent]:
-        # await self.ingest_operations.ensure_resumable_item(source_item=source_item)
-        ...
-
-    async def crawl_and_ingest(
+    async def sync_source(
         self,
         *,
         source: Source,
         config: WebCrawlConfig,
-    ) -> AsyncIterable[IngestProgressEvent]:
-        """执行爬取和后续 ingest 的流程"""
-        # 加载历史爬取元数据
+    ) -> AsyncIterable[RAGSyncEvent]:
+        """
+        Web Crawl sync 流程；
+
+        负责的业务：
+        - discover URL
+        - fetch page
+        - parse HTML -> ParsedDocument
+        - upsert SourceItem
+        - upsert DocumentContent
+        - 标记需要 Index 的 SourceItem，并修改 status 为 PENDING
+        """
+        counters = RAGSyncCounters()
+        changed_source_item_uids: list[str] = []
+
+        # 0. 发送开始事件
+        yield RAGSyncEvent(
+            event=RAGSyncEventType.SYNC_START,
+            source_uid=source.uid,
+            ingest_stage=IngestStage.DISCOVERING,
+            sync_progress=0.0,
+            message="Web crawl materialization started",
+        )
+
+        # 1.0 加载历史爬取元数据
         previous_metadata_by_item_key = await self._load_previous_metadata_by_item_key(
             source=source
         )
 
-        async for event in self.ingest_runner.run_stream_ingest(
-            item_stream=self.crawler.crawl(
-                config=config,
-                previous_metadata_by_item_key=previous_metadata_by_item_key,
-            ),
-            processor=lambda parsed_page: self._process_crawled_page(
-                parsed_page=parsed_page, source=source
-            ),
-            max_concurrency=WEB_CRAWL_INDEX_MAX_CONCURRENCY,
-            start_event=IngestProgressEvent(
-                event=RAGIngestEventType.INGEST_START,
-                source_uid=source.uid,
-                ingest_stage=IngestStage.LOADING,
-                process_status=SourceItemProcessStatus.PROCESSING,
-                item_progress=0.0,
-                message="Web crawl sync started",
-            ),
-            complete_event=IngestProgressEvent(
-                event=RAGIngestEventType.INGEST_COMPLETE,
+        # 1.1 discover URL
+        discovered_urls = await self.crawler.discover_urls(config=config)
+        counters.discovered = len(discovered_urls)
+
+        if not discovered_urls:
+            yield RAGSyncEvent(
+                event=RAGSyncEventType.SYNC_COMPLETE,
                 source_uid=source.uid,
                 ingest_stage=IngestStage.COMPLETED,
-                process_status=SourceItemProcessStatus.COMPLETED,
-                message="Web crawl sync completed",
-                item_progress=1.0,
-            ),
-            on_error=lambda item, exc: self._handle_crawled_page_exception(
-                source, item, exc
-            ),
-        ):
-            yield event
+                sync_progress=1.0,
+                counters=counters,
+                message=("no URLs discovered with the given configuration"),
+            )
+            return
 
-    async def _process_crawled_page(
-        self, *, parsed_page: ParsedPage, source: Source
-    ) -> AsyncIterable[IngestProgressEvent]:
-        """处理爬取到的页面，执行后续的文档分块、索引等流程，返回处理进度事件的异步生成器"""
-        # 0. 尝试获取已存在的 source_item
-        existing_item = await self.source_crud.get_source_item_by_item_key(
-            source=source, item_key=parsed_page.item_key
+        # 1.2 依次发送 discover 事件
+        for discovered in discovered_urls:
+            yield RAGSyncEvent(
+                event=RAGSyncEventType.ITEM_DISCOVERED,
+                source_uid=source.uid,
+                ingest_stage=IngestStage.DISCOVERING,
+                message=f"Discovered URL: {discovered.discovered_url}",
+                counters=counters,
+            )
+
+        # 2.0 依次 fetch 页面
+        queue: asyncio.Queue[RAGSyncEvent | ParsedPage | FetchedPage] = asyncio.Queue()
+        semaphore = asyncio.Semaphore(WEB_CRAWL_INDEX_MAX_CONCURRENCY)
+
+        # 2.1 定义 fetch worker
+        async def worker(discovered: DiscoveredURL) -> None:
+            async with semaphore:
+                try:
+                    result = await self._fetch_and_parse_page(
+                        discovered=discovered,
+                        config=config,
+                        previous_metadata=previous_metadata_by_item_key.get(
+                            discovered.item_key
+                        ),
+                    )
+                    await queue.put(result)
+                except Exception as exc:
+                    # 抓取或解析失败，记录日志并发送失败事件
+                    counters.failed += 1
+                    logger.exception(
+                        f"Failed to crawl page {discovered.discovered_url}: {exc}"
+                    )
+
+                    await queue.put(
+                        RAGSyncEvent(
+                            event=RAGSyncEventType.ITEM_FAILED,
+                            source_uid=source.uid,
+                            ingest_stage=IngestStage.FAILED,
+                            message=f"Failed to crawl page: {discovered.discovered_url}",
+                            error=str(exc),
+                            counters=counters,
+                        )
+                    )
+
+        # 2.2 创建 fetch worker 任务队列
+        tasks = [asyncio.create_task(worker(url)) for url in discovered_urls]
+        completed_tasks = 0
+
+        # 3.0 处理 worker 结果
+        try:
+            while completed_tasks < len(discovered_urls):
+                result = await queue.get()
+
+                if isinstance(result, RAGSyncEvent):
+                    # 输出 fetch/parse 过程中的事件
+                    yield result
+                    continue
+
+                completed_tasks += 1
+
+                # 处理成功 fetch + parse 的页面
+                synced_uid = await self._sync_crawled_page(
+                    result=result,
+                    source=source,
+                    counters=counters,
+                )
+
+                sync_progress = completed_tasks / len(discovered_urls)
+
+                if synced_uid:
+                    changed_source_item_uids.append(synced_uid)
+
+                    # 发送进度事件
+                    yield RAGSyncEvent(
+                        event=RAGSyncEventType.ITEM_UPSERTED,
+                        source_uid=source.uid,
+                        source_item_uid=synced_uid,
+                        source_item_status=SourceItemProcessStatus.PENDING,
+                        ingest_stage=IngestStage.UPSERTING,
+                        sync_progress=sync_progress,
+                        message="Web page materialized; indexing required",
+                        counters=counters,
+                    )
+                    continue
+
+                # 发送页面跳过事件
+                yield RAGSyncEvent(
+                    event=RAGSyncEventType.ITEM_SKIPPED,
+                    source_uid=source.uid,
+                    ingest_stage=IngestStage.SKIPPED,
+                    sync_progress=sync_progress,
+                    message=f"Web page unchanged or skipped: {result.discovered_url}",
+                    counters=counters,
+                )
+
+        finally:
+            # 取消所有未完成的任务
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 4. 发送完成事件
+        yield RAGSyncEvent(
+            event=RAGSyncEventType.SYNC_COMPLETE,
+            source_uid=source.uid,
+            ingest_stage=IngestStage.COMPLETED,
+            sync_progress=1.0,
+            counters=counters,
+            message=(
+                "Web crawl materialization completed; "
+                f"{len(changed_source_item_uids)} item(s) require indexing"
+            ),
         )
 
-        # 0.1 如果已经存在 source_item -> 判断对应 html 页面是否有变化
-        if existing_item and self._is_unchanged(
-            existing_item=existing_item, parsed_page=parsed_page
-        ):
-            # 文档已存在并且未改变，跳过处理
-            logger.info(
-                f"SourceItem with item_key {parsed_page.item_key} already exists and is unchanged, skipping"
-            )
-            await self._update_checked_metadata(
-                source=source, source_item=existing_item, parsed_page=parsed_page
-            )
-            # 响应跳过事件
-            yield self._skipped_event(
-                source=source,
-                source_item=existing_item,
-                message="Web page unchanged, skipped indexing",
+    async def _fetch_and_parse_page(
+        self,
+        *,
+        discovered: DiscoveredURL,
+        config: WebCrawlConfig,
+        previous_metadata: WebPageMetadata | None,
+    ) -> ParsedPage | FetchedPage:
+        """抓取并解析页面内容"""
+        # 抓取页面内容
+        async with self.crawler.create_http_client() as client:
+            fetched_page = await self.crawler.fetch_page(
+                client=client,
+                discovered=discovered,
+                config=config,
+                previous_metadata=previous_metadata,
             )
 
-        # 1. 基于 parsed_page 更新或构建 source_item
-        source_item = await self.source_crud.upsert_source_item_by_item_key(
+        # 如果抓取的 page 未变化
+        if fetched_page.not_modified:
+            return fetched_page
+
+        # 处理 config 中的 extraction 规则
+        options = self.crawler.resolve_extraction_options(
+            config=config, url=discovered.discovered_url
+        )
+
+        # 解析 HTML 页面并返回
+        return await asyncio.to_thread(
+            self.html_parser.parse,
+            page=fetched_page,
+            options=options,
+        )
+
+    async def _sync_crawled_page(
+        self,
+        *,
+        source: Source,
+        result: ParsedPage | FetchedPage,
+        counters: RAGSyncCounters,
+    ) -> str | None:
+        """
+        基于爬取结果同步到数据库，并返回需要后续 index 的 source_item_uid。
+        如果页面未变化或被跳过（例如处于 index 阶段），则返回 None。
+
+        同步规则：
+        - 如果 source_item 不存在，则创建新的 source_item，并标记为 PENDING
+        - 如果抓取结果为 304，则更新 metadata 并跳
+        - 如果 source_item 正在 indexing 阶段， 则跳过修改，避免内容和索引不一致
+        - 如果 source_item 存在且页面未修改，则更新 metadata 并跳过 COMPLETED 状态的 source_item；对于其他状态的 source_item，更新状态为 PENDING
+        - 如果 source_item 存在且页面已修改，则更新内容和 metadata，并标记为 PENDING
+        """
+        existing_item = await self.source_crud.get_source_item_by_item_key(
+            source=source,
+            item_key=result.item_key,
+        )
+
+        # 不存在 source_item 情况
+        if not existing_item:
+            parsed_page = cast(
+                ParsedPage, result
+            )  # 类型断言，确保 result 是 ParsedPage
+
+            # 创建新 source_item，并标记为需要 index
+            source_item = await self.source_crud.upsert_source_item_by_item_key(
+                source=source,
+                item_data=SourceItemInternal(
+                    item_key=parsed_page.item_key,
+                    title=parsed_page.parsed_document.title,
+                    filename=None,
+                    storage_key=None,
+                    origin_url=parsed_page.discovered_url,
+                    item_hash=parsed_page.parsed_markdown_hash,
+                    metadata_json=asdict(parsed_page.fetch_metadata),
+                    status=SourceItemProcessStatus.PENDING,
+                ),
+            )
+            # 创建 DocumentContent
+            await self.source_crud.upsert_document_content(
+                source_item=source_item,
+                content_data=DocumentContentInternal(
+                    content=parsed_page.parsed_document.text,
+                    metadata_json={
+                        "sections": [
+                            asdict(section)
+                            for section in parsed_page.parsed_document.sections or []
+                        ],
+                        "page_boundaries": parsed_page.parsed_document.page_boundaries
+                        or [],
+                    },
+                ),
+            )
+
+            counters.upserted += 1
+            return result.item_key
+
+        # fetched 页面 304 未修改情况
+        if isinstance(result, FetchedPage) and result.not_modified:
+            # 更新 checked metadata
+            await self._update_checked_metadata(
+                source=source,
+                source_item=existing_item,
+                extra_metadata=WebPageMetadata(
+                    etag=result.etag,
+                    last_modified=result.last_modified,
+                    last_fetch_status=result.status_code,
+                    content_type=result.content_type,
+                ),
+            )
+            counters.skipped += 1
+            return None
+
+        parsed_page = cast(ParsedPage, result)  # 类型断言，确保 result 是 ParsedPage
+
+        # 如果目标 source_item 正在 index 中，跳过修改
+        if existing_item and existing_item.status in _INDEX_BUSY_STATUSES:
+            logger.warning(
+                f"SourceItem {existing_item.uid} is busy ({existing_item.status}); "
+                "skip web materialization to avoid content/index mismatch"
+            )
+            counters.skipped += 1
+            return None
+
+        # 存在 source_item，但页面内容未修改，更新 metadata 并跳过
+        if existing_item.item_hash == parsed_page.parsed_markdown_hash:
+            # 更新 checked metadata
+            await self._update_checked_metadata(
+                source=source,
+                source_item=existing_item,
+                extra_metadata=WebPageMetadata(
+                    etag=parsed_page.fetch_metadata.etag,
+                    last_modified=parsed_page.fetch_metadata.last_modified,
+                    last_fetch_status=parsed_page.fetch_metadata.last_fetch_status,
+                    content_type=parsed_page.fetch_metadata.content_type,
+                ),
+            )
+
+            # 跳过 COMPLETED 状态的 source_item
+            if existing_item.status == SourceItemProcessStatus.COMPLETED:
+                counters.skipped += 1
+                return None
+
+            # 对于其他状态的 source_item，更新状态为 PENDING
+            await self.source_crud.update_source_item_status(
+                source_item=existing_item,
+                new_status=SourceItemProcessStatus.PENDING,
+            )
+            counters.upserted += 1
+            return existing_item.uid
+
+        # 处理页面内容发生变化的 source_item
+        await self.source_crud.upsert_source_item_by_item_key(
             source=source,
             item_data=SourceItemInternal(
                 item_key=parsed_page.item_key,
                 title=parsed_page.parsed_document.title,
-                origin_url=parsed_page.origin_url,
+                filename=None,
+                storage_key=None,
+                origin_url=parsed_page.discovered_url,
                 item_hash=parsed_page.parsed_markdown_hash,
-                metadata_json=parsed_page.fetch_metadata,
+                metadata_json=asdict(parsed_page.fetch_metadata),
+                status=SourceItemProcessStatus.PENDING,
             ),
         )
-
-        # 1.1 标记 source_item 状态
-        await self.ingest_item_state_service.mark_processing(source_item=source_item)
-
-        # 1.2 暂停检查点
-        await self.ingest_item_state_service.pause_checkpoint(
-            source_item_id=source_item.id
-        )
-
-        yield IngestProgressEvent(
-            event=RAGIngestEventType.INGEST_PROGRESS,
-            source_uid=source.uid,
-            source_item_uid=source_item.uid,
-            ingest_stage=IngestStage.PARSING,
-            process_status=SourceItemProcessStatus.PROCESSING,
-            item_progress=0.15,
-            message="Web page parsed",
-        )
-
-        # 2. 调用 document_index 服务处理文档内容，生成索引
-        async for event in self.document_index.index_parsed_document(
-            source=source,
-            source_item=source_item,
-            parsed_doc=parsed_page.parsed_document,
-            cover_content=True,
-            checkpoint=lambda: self.ingest_item_state_service.pause_checkpoint(
-                source_item_id=source_item.id
+        # 更新 DocumentContent
+        await self.source_crud.upsert_document_content(
+            source_item=existing_item,
+            content_data=DocumentContentInternal(
+                content=parsed_page.parsed_document.text,
+                # metadata_json 后续通过明确类型定义声明
+                metadata_json={
+                    "sections": [
+                        asdict(section)
+                        for section in parsed_page.parsed_document.sections or []
+                    ],
+                    "page_boundaries": parsed_page.parsed_document.page_boundaries
+                    or [],
+                },
             ),
-        ):
-            yield event
-
-        # 3. 完成文档处理，更新状态并发送完成事件
-        await self.ingest_item_state_service.mark_completed(source_item=source_item)
-        yield IngestProgressEvent(
-            event=RAGIngestEventType.INGEST_PROGRESS,
-            source_uid=source.uid,
-            source_item_uid=source_item.uid,
-            ingest_stage=IngestStage.COMPLETED,
-            process_status=SourceItemProcessStatus.COMPLETED,
-            item_progress=1.0,
-            message="Web page ingest completed",
-        )
-
-    async def _handle_crawled_page_exception(
-        self, source: Source, parsed_page: ParsedPage, exc: Exception
-    ) -> AsyncIterable[IngestProgressEvent]:
-        """异常处理回调函数；处理 index 过程中的异常"""
-        source_item = await self.source_crud.get_source_item_by_item_key(
-            source=source, item_key=parsed_page.item_key
-        )
-
-        if isinstance(exc, DocumentPausedException):
-            # 处理用户主动暂停的情况，更新状态并发送事件
-            yield IngestProgressEvent(
-                event=RAGIngestEventType.ITEM_PAUSED,
-                source_uid=source.uid,
-                source_item_uid=source_item.uid if source_item else None,
-                ingest_stage=IngestStage.PAUSED,
-                process_status=SourceItemProcessStatus.PAUSED,
-                message="Web page ingest paused",
-            )
-            return
-
-        logger.error(f"Error processing web page {parsed_page.item_key}: {exc}")
-
-        if source_item:
-            # 更新状态为失败
-            await self.ingest_item_state_service.mark_failed(source_item=source_item)
-
-        yield IngestProgressEvent(
-            event=RAGIngestEventType.ITEM_FAILED,
-            source_uid=source.uid,
-            source_item_uid=source_item.uid if source_item else None,
-            ingest_stage=IngestStage.FAILED,
-            process_status=SourceItemProcessStatus.FAILED,
-            message="Web page ingest failed",
-            error=str(exc),
         )
 
     async def _load_previous_metadata_by_item_key(
         self, source: Source
-    ) -> dict[str, dict]:
+    ) -> dict[str, WebPageMetadata]:
         """加载指定 source 的历史爬取元数据"""
         source_items = await self.source_crud.list_source_items_by_source_id(
             source_id=source.id,
@@ -224,49 +398,32 @@ class WebCrawlSyncService:
         )
         # 将 source_item.metadata_json 转换为 item_key -> metadata 的字典
         return {
-            item.item_key: item.metadata_json or {}
+            item.item_key: WebPageMetadata.from_dict(item.metadata_json)
             for item in source_items
-            if item.metadata_json
         }
 
-    async def _is_unchanged(
-        self, *, existing_item: SourceItem, parsed_page: ParsedPage
-    ) -> bool:
-        """判断爬取到的页面是否与已存在的 source_item 对应的页面相同"""
-        return existing_item.item_hash == parsed_page.parsed_markdown_hash
-
     async def _update_checked_metadata(
-        self, *, source: Source, source_item: SourceItem, parsed_page: ParsedPage
-    ) -> None:
-        """更新 source_item 的现有字段"""
-        await self.source_crud.upsert_source_item_by_item_key(
-            source=source,
-            item_data=SourceItemInternal(
-                item_key=parsed_page.item_key,
-                title=source_item.title,
-                filename=source_item.filename,
-                origin_url=source_item.origin_url,
-                item_hash=source_item.item_hash,
-                metadata_json={
-                    **(source_item.metadata_json or {}),
-                    **parsed_page.fetch_metadata,
-                },
-            ),
-        )
-
-    def _skipped_event(
         self,
         *,
         source: Source,
         source_item: SourceItem,
-        message: str,
-    ) -> IngestProgressEvent:
-        """构建跳过事件"""
-        return IngestProgressEvent(
-            event=RAGIngestEventType.ITEM_SKIPPED,
-            source_uid=source.uid,
-            source_item_uid=source_item.uid,
-            ingest_stage=IngestStage.SKIPPED,
-            process_status=source_item.status,
-            message=message,
+        extra_metadata: WebPageMetadata,
+    ) -> SourceItem:
+        """更新 source_item 的现有字段"""
+        metadata = {
+            **(source_item.metadata_json or {}),
+            **asdict(extra_metadata),
+        }
+
+        return await self.source_crud.upsert_source_item_by_item_key(
+            source=source,
+            item_data=SourceItemInternal(
+                item_key=source_item.item_key,
+                title=source_item.title,
+                filename=source_item.filename,
+                storage_key=source_item.storage_key,
+                origin_url=source_item.origin_url,
+                item_hash=source_item.item_hash,
+                metadata_json=metadata,
+            ),
         )
