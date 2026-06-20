@@ -1,9 +1,9 @@
 from typing import Annotated
 
 from fastapi import Depends, Request, HTTPException, Path
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db import get_db
+from app.db import get_db, get_session_factory
 from app.db.models import Project
 from app.crud import (
     ProjectCRUD,
@@ -16,6 +16,7 @@ from app.crud import (
 )
 from app.storage import FileStorage
 from app.ingestion.parser import FileParserFactory
+from app.ingestion.crawler import WebCrawler, HTMLPageParser
 from app.rag import (
     VectorDatabase,
     TextSplitter,
@@ -25,11 +26,9 @@ from app.rag import (
     QueryExpander,
 )
 from app.utils import TokenCounter
-from app.services.rag import (
-    DocumentIngestService,
-    HybridSearchService,
-    RAGRetrievalService,
-)
+from app.services.sources import SourceItemUploadService, WebCrawlSyncService
+from app.services.indexing import SourceItemIndexingService
+from app.services.search import HybridSearchService, RAGRetrievalService
 from app.services.chat import (
     ChatOrchestratorService,
     CompactionService,
@@ -88,6 +87,16 @@ def get_file_storage(request: Request) -> FileStorage:
 def get_file_parser_factory(request: Request) -> FileParserFactory:
     """返回全局挂载的文件解析器工厂实例"""
     return request.app.state.file_parser_factory
+
+
+def get_web_crawler(request: Request) -> WebCrawler:
+    """返回全局挂载的 WebCrawler 实例"""
+    return request.app.state.web_crawler
+
+
+def get_html_page_parser(request: Request) -> HTMLPageParser:
+    """返回全局挂载的 HTMLPageParser 实例"""
+    return request.app.state.html_page_parser
 
 
 def get_token_counter(request: Request) -> TokenCounter:
@@ -188,24 +197,48 @@ async def valid_project_with_settings(
 
 
 # =========== Service 层依赖注入接口 ===========
-def get_document_ingest_service(
+def get_source_item_upload_service(
     source_crud: "SourceCRUDeps",
     file_storage: "FileStorageDeps",
+) -> SourceItemUploadService:
+    """SourceItemUploadService 依赖注入接口"""
+    return SourceItemUploadService(
+        source_crud=source_crud,
+        file_storage=file_storage,
+    )
+
+
+def get_web_crawl_sync_service(
+    source_crud: "SourceCRUDeps",
+    crawler: "WebCrawlerDeps",
+    html_parser: "HTMLPageParserDeps",
+) -> WebCrawlSyncService:
+    """WebCrawlSyncService 依赖注入接口"""
+    return WebCrawlSyncService(
+        source_crud=source_crud,
+        crawler=crawler,
+        html_parser=html_parser,
+    )
+
+
+def get_source_item_indexing_service(
+    session_factory: "SessionFactoryDeps",
+    file_storage: "FileStorageDeps",
+    file_parser_factory: "FileParserFactoryDeps",
     vector_db: "VectorDBDeps",
     text_splitter: "TextSplitterDeps",
     embedding: "EmbeddingProviderDeps",
     fts_provider: "FTSProviderDeps",
-    file_parser_factory: "FileParserFactoryDeps",
-) -> DocumentIngestService:
-    """DocumentIngestService 依赖注入接口"""
-    return DocumentIngestService(
-        source_crud=source_crud,
+) -> SourceItemIndexingService:
+    """SourceItemIndexingService 依赖注入接口"""
+    return SourceItemIndexingService(
+        session_factory=session_factory,
         file_storage=file_storage,
+        file_parser_factory=file_parser_factory,
         vector_db=vector_db,
         text_splitter=text_splitter,
         embedding=embedding,
         fts_provider=fts_provider,
-        file_parser_factory=file_parser_factory,
     )
 
 
@@ -287,6 +320,9 @@ def get_chat_orchestrator_service(
 # =========== 组合依赖 ===========
 # 数据库会话依赖
 SessionDeps = Annotated[AsyncSession, Depends(get_db)]
+SessionFactoryDeps = Annotated[
+    async_sessionmaker[AsyncSession], Depends(get_session_factory)
+]
 
 APIKeyCipherDeps = Annotated[ProviderAPIKeyCipher, Depends(get_api_key_cipher)]
 FileStorageDeps = Annotated[FileStorage, Depends(get_file_storage)]
@@ -299,6 +335,8 @@ EmbeddingProviderDeps = Annotated[EmbeddingProvider, Depends(get_embedding_provi
 QueryExpanderDeps = Annotated[QueryExpander, Depends(get_query_expander)]
 RerankProviderDeps = Annotated[RerankProvider, Depends(get_rerank_provider)]
 FileParserFactoryDeps = Annotated[FileParserFactory, Depends(get_file_parser_factory)]
+WebCrawlerDeps = Annotated[WebCrawler, Depends(get_web_crawler)]
+HTMLPageParserDeps = Annotated[HTMLPageParser, Depends(get_html_page_parser)]
 TokenCounterDeps = Annotated[TokenCounter, Depends(get_token_counter)]
 
 # CRUD 依赖
@@ -315,9 +353,17 @@ ValidProjectDeps = Annotated[Project, Depends(valid_project)]
 ValidVisitorChatProjectDeps = Annotated[Project, Depends(valid_project_with_settings)]
 
 # Service 依赖
-DocumentIngestServiceDeps = Annotated[
-    DocumentIngestService,
-    Depends(get_document_ingest_service),
+SourceItemUploadServiceDeps = Annotated[
+    SourceItemUploadService,
+    Depends(get_source_item_upload_service),
+]
+WebCrawlSyncServiceDeps = Annotated[
+    WebCrawlSyncService,
+    Depends(get_web_crawl_sync_service),
+]
+SourceItemIndexingServiceDeps = Annotated[
+    SourceItemIndexingService,
+    Depends(get_source_item_indexing_service),
 ]
 HybridSearchServiceDeps = Annotated[
     HybridSearchService,
