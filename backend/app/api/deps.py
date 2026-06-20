@@ -26,7 +26,11 @@ from app.rag import (
     QueryExpander,
 )
 from app.utils import TokenCounter
-from app.services.sources import SourceItemUploadService, WebCrawlSyncService
+from app.services.sources import (
+    SourceItemUploadService,
+    WebCrawlSyncService,
+    SourceCreationService,
+)
 from app.services.indexing import SourceItemIndexingService
 from app.services.search import HybridSearchService, RAGRetrievalService
 from app.services.chat import (
@@ -197,6 +201,17 @@ async def valid_project_with_settings(
 
 
 # =========== Service 层依赖注入接口 ===========
+def get_source_creation_service(
+    source_crud: "SourceCRUDeps",
+    vector_db: "VectorDBDeps",
+) -> SourceCreationService:
+    """SourceCreationService 依赖注入接口"""
+    return SourceCreationService(
+        source_crud=source_crud,
+        vector_db=vector_db,
+    )
+
+
 def get_source_item_upload_service(
     source_crud: "SourceCRUDeps",
     file_storage: "FileStorageDeps",
@@ -353,6 +368,10 @@ ValidProjectDeps = Annotated[Project, Depends(valid_project)]
 ValidVisitorChatProjectDeps = Annotated[Project, Depends(valid_project_with_settings)]
 
 # Service 依赖
+SourceCreationServiceDeps = Annotated[
+    SourceCreationService,
+    Depends(get_source_creation_service),
+]
 SourceItemUploadServiceDeps = Annotated[
     SourceItemUploadService,
     Depends(get_source_item_upload_service),

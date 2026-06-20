@@ -1,6 +1,5 @@
 from typing import Annotated, AsyncIterable
 from pathlib import Path
-import asyncio
 
 from fastapi import (
     APIRouter,
@@ -18,7 +17,7 @@ from loguru import logger
 from ...deps import (
     SourceCRUDeps,
     VectorDBDeps,
-    FileStorageDeps,
+    SourceCreationServiceDeps,
     SourceItemUploadServiceDeps,
     WebCrawlSyncServiceDeps,
     SourceItemIndexingServiceDeps,
@@ -34,6 +33,12 @@ from app.db.schemas import (
 )
 from app.utils import hostname_from_url, path_prefix_from_url
 from app.core.constants import ALLOWED_FILE_TYPES, SourceType, CrawlEntryType
+from app.core.exceptions import (
+    SourceCreateError,
+    SourceCreateStorageError,
+    SourceCreateValidationError,
+    SourceCreateConflictError,
+)
 from app.core.config import settings
 
 
@@ -249,127 +254,21 @@ ValidSourceDeps = Annotated[Source, Depends(valid_source)]
 # ===============================
 # API 端点实现
 # ===============================
-async def validate_and_normalize_config(
-    source: ValidSourceDeps,
-) -> WebCrawlConfig:
-    """验证爬虫配置，并进行必要的规范化处理"""
-    # 验证 source 类型是否支持 Web Crawl
-    if source.source_type != SourceType.WEB_CRAWL:
-        logger.warning(
-            f"数据源 '{source.source_name}' 的类型 '{source.source_type}' 不支持 Web Crawl 同步"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Source type does not support web crawl sync",
-        )
-
-    # 验证并规范化配置
-    config = WebCrawlConfig.model_validate(source.web_crawl_config)
-
-    if config.entry_type == CrawlEntryType.URL_LIST and not config.urls:
-        raise ValueError("urls is required when entry_type is url_list")
-    if config.entry_type == CrawlEntryType.SITEMAP_URL and not config.sitemap_url:
-        raise ValueError("sitemap_url is required when entry_type is sitemap_url")
-    if config.entry_type not in {
-        CrawlEntryType.URL_LIST,
-        CrawlEntryType.SITEMAP_URL,
-    }:
-        raise ValueError(f"Unsupported entry_type: {config.entry_type}")
-
-    # 确保 config 配置字段的全面
-    seed_urls: list[str] = []
-
-    if config.urls:
-        seed_urls.extend(str(url) for url in config.urls)
-    if config.sitemap_url:
-        seed_urls.append(str(config.sitemap_url))
-    if config.site_root_url:
-        seed_urls.append(str(config.site_root_url))
-
-    # 推断 allowed_domains 配置
-    allowed_domains = config.allowed_domains or sorted(
-        {hostname_from_url(url) for url in seed_urls}
-    )
-
-    # 推断 include_paths 配置
-    include_paths = config.include_paths
-    if config.entry_type == CrawlEntryType.SITE_ROOT and not include_paths:
-        include_paths = sorted(
-            {path_prefix_from_url(url) for url in seed_urls}
-        )  # 默认使用 site_root_url 的路径前缀作为 include_paths
-
-    return config.model_copy(
-        update={
-            "allowed_domains": allowed_domains,
-            "include_paths": include_paths,
-        }
-    )
-
-
-# TODO: /new 需要重构，基于 source_type 实现不同的创建逻辑
-@router.post("/new", response_model=SourceRead)
+@router.post("/", response_model=SourceRead)
 async def create_source(
     source_data: SourceCreate,
-    source_crud: SourceCRUDeps,
-    vector_db: VectorDBDeps,
+    source_creation_service: SourceCreationServiceDeps,
 ):
-    """
-    创建新的数据源
-    """
-
-    logger.info(
-        f"创建新的数据源，名称：{source_data.source_name}，类型：{source_data.source_type}"
-    )
-
-    # 检查同名数据源是否已存在
-    existing_source = await source_crud.get_source_by_name(
-        source_name=source_data.source_name
-    )
-    if existing_source:
-        logger.warning(
-            f"数据源名称 '{source_data.source_name}' 已存在，无法创建重复名称的数据源"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="source with the same name already exists",
-        )
-
-    # 创建向量集合
     try:
-        # 生成系统内部使用的数据源模型
-        source_internal = SourceInternal(**source_data.model_dump())
-        await asyncio.to_thread(
-            vector_db.create_collection, collection_name=source_internal.collection_name
-        )
-    except Exception as e:
-        logger.error(f"创建向量集合失败：{e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create vector collection",
-        )
+        source = await source_creation_service.create_source(source_data=source_data)
+    except SourceCreateConflictError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SourceCreateValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SourceCreateStorageError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    # 创建数据库记录
-    try:
-        new_source = await source_crud.create_source(source_data=source_internal)
-        logger.info(
-            f"数据源 '{source_data.source_name}' 创建成功，UID：{new_source.uid}"
-        )
-        return SourceRead.model_validate(new_source)
-    except Exception as e:
-        # 回滚向量集合
-        logger.error(f"创建数据源记录失败：{e}，正在回滚向量集合...")
-        try:
-            await asyncio.to_thread(
-                vector_db.delete_collection,
-                collection_name=source_internal.collection_name,
-            )
-            logger.info(f"已回滚向量集合 '{source_internal.collection_name}'")
-        except Exception as rollback_error:
-            logger.error(f"回滚向量集合失败：{rollback_error}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create source and rollback vector collection",
-            ) from rollback_error
+    return SourceRead.model_validate(source)
 
 
 @router.get("/list", response_model=list[SourceRead])
@@ -391,9 +290,24 @@ async def list_sources(
     return [SourceRead.model_validate(source) for source in sources]
 
 
-@router.post("/{source_uid}/items/upload", response_model=SourceItemRead)
-async def upload_source_item(
+async def valid_local_file_source(
     source: ValidSourceDeps,
+) -> Source:
+    """验证数据源是否为本地文件类型，返回 source 实例或抛出 HTTPException"""
+    if source.source_type != SourceType.LOCAL_FILE:
+        logger.warning(
+            f"数据源 '{source.source_name}' 的类型 '{source.source_type}' 不支持文件上传"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Source type does not support file upload",
+        )
+    return source
+
+
+@router.post("/{source_uid}/items/upload", response_model=list[SourceItemRead])
+async def upload_source_item(
+    source: Annotated[Source, Depends(valid_local_file_source)],
     validated_files: Annotated[list[UploadFile], Depends(valid_files)],
     source_item_upload_service: SourceItemUploadServiceDeps,
 ):
@@ -415,11 +329,10 @@ async def upload_source_item(
     )
 
 
-async def get_web_crawl_config(
+async def valid_web_crawl_source(
     source: ValidSourceDeps,
-) -> WebCrawlConfig:
-    """依赖注入接口：获取已验证的 WebCrawlConfig 实例"""
-    # 验证 source 类型是否支持 Web Crawl
+) -> Source:
+    """验证数据源是否为 Web Crawl 类型，返回 source 实例或抛出 HTTPException"""
     if source.source_type != SourceType.WEB_CRAWL:
         logger.warning(
             f"数据源 '{source.source_name}' 的类型 '{source.source_type}' 不支持 Web Crawl 同步"
@@ -428,10 +341,15 @@ async def get_web_crawl_config(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Source type does not support web crawl sync",
         )
+    return source
 
+
+async def get_web_crawl_config(
+    source: Annotated[Source, Depends(valid_web_crawl_source)],
+) -> WebCrawlConfig:
+    """依赖注入接口：获取已验证的 WebCrawlConfig 实例"""
     # 获取对应配置
-    config = WebCrawlConfig.model_validate(source.web_crawl_config)
-    if not config:
+    if not source.web_crawl_config:
         logger.warning(
             f"数据源 '{source.source_name}' 的 Web Crawl 配置为空，无法进行同步"
         )
@@ -440,12 +358,12 @@ async def get_web_crawl_config(
             detail="Web crawl config is empty for this source",
         )
 
-    return config
+    return WebCrawlConfig.model_validate(source.web_crawl_config)
 
 
 @router.post("/{source_uid}/crawl/sync", response_class=EventSourceResponse)
 async def sync_web_crawl(
-    source: ValidSourceDeps,
+    source: Annotated[Source, Depends(valid_web_crawl_source)],
     config: Annotated[WebCrawlConfig, Depends(get_web_crawl_config)],
     web_crawl_sync_service: WebCrawlSyncServiceDeps,
 ) -> AsyncIterable[ServerSentEvent]:
@@ -466,8 +384,8 @@ async def sync_web_crawl(
 
 
 # TODO: 缺少文件存在验证，如果用户上传了相同的文件，应该复用已经存在的文件
-@router.post("/{source_uid}/items/indexing", response_class=EventSourceResponse)
-async def indexing_source_items(
+@router.post("/{source_uid}/document/indexing", response_class=EventSourceResponse)
+async def indexing_documents(
     source_uid: Annotated[str, Depends(valid_source_uid)],
     source_item_uids: Annotated[
         list[str],
@@ -491,7 +409,7 @@ async def indexing_source_items(
         )
 
 
-@router.post("/{source_uid}/items/pause", response_model=list[IngestPausedResponse])
+@router.post("/{source_uid}/document/pause", response_model=list[IngestPausedResponse])
 async def pause_ingest(
     source_crud: SourceCRUDeps,
     source: ValidSourceDeps,
