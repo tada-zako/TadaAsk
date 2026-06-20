@@ -12,7 +12,7 @@ from app.db.schemas import (
     DocumentChunkInternal,
     DocumentContentInternal,
 )
-from app.core.constants import SourceItemProcessStatus
+from app.core.constants import SourceItemProcessStatus, SourceProcessStatus
 
 
 class SourceCRUD:
@@ -89,6 +89,13 @@ class SourceCRUD:
             await self.session.delete(source)
             return True
         return False
+    
+    async def update_source_status(
+        self, source: Source, new_status: SourceProcessStatus
+    ) -> Source:
+        """更新数据源的处理状态"""
+        source.status = new_status
+        return source
 
     # =====================
     # SourceItem 相关操作
