@@ -91,3 +91,4 @@ Router (HTTP, thin)  →  Service (orchestration)  →  Provider / RAG / CRUD (l
 - Avoid shortcut coupling that bypasses existing layers; document the reason if it is truly necessary.
 - For architecture-impacting changes, include a brief note on extensibility impact.
 - Only make changes that are directly requested or clearly necessary; do not add comments, type annotations, or error handling to code that was not part of the change.
+- `backend/tests` is not a trusted correctness source. This project is not TDD, and tests are not kept up to date in real time; do not use tests for debug, review, or development validation unless the user explicitly asks for it.
