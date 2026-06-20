@@ -251,28 +251,6 @@ class SourceCRUD:
         )
         return result.scalars().all()
 
-    async def get_source_items_by_uids_with_document_for_source(
-        self, source_id: int, item_uids: list[str]
-    ) -> Sequence[SourceItem]:
-        """
-        基于数据源 ID 和数据项 UID 列表获取数据项详情列表
-        级联查询 document 字段内容
-        """
-        if not item_uids:
-            return []
-
-        result = await self.session.execute(
-            select(SourceItem)
-            .options(
-                selectinload(SourceItem.document_content)  # 级联加载 document 字段
-            )
-            .where(
-                SourceItem.uid.in_(item_uids),
-                SourceItem.source_id == source_id,
-            )
-        )
-        return result.scalars().all()
-
     async def update_source_item_status(
         self, source_item: SourceItem, new_status: SourceItemProcessStatus
     ) -> SourceItem:

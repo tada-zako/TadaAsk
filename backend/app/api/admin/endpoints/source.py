@@ -16,7 +16,6 @@ from loguru import logger
 
 from ...deps import (
     SourceCRUDeps,
-    VectorDBDeps,
     SourceCreationServiceDeps,
     SourceItemUploadServiceDeps,
     WebCrawlSyncServiceDeps,
@@ -27,14 +26,11 @@ from app.db.models import Source, SourceItem
 from app.db.schemas import (
     SourceCreate,
     SourceRead,
-    SourceInternal,
     SourceItemRead,
     WebCrawlConfig,
 )
-from app.utils import hostname_from_url, path_prefix_from_url
-from app.core.constants import ALLOWED_FILE_TYPES, SourceType, CrawlEntryType
+from app.core.constants import ALLOWED_FILE_TYPES, SourceType
 from app.core.exceptions import (
-    SourceCreateError,
     SourceCreateStorageError,
     SourceCreateValidationError,
     SourceCreateConflictError,
@@ -254,7 +250,7 @@ ValidSourceDeps = Annotated[Source, Depends(valid_source)]
 # ===============================
 # API 端点实现
 # ===============================
-@router.post("/", response_model=SourceRead)
+@router.post("/new", response_model=SourceRead)
 async def create_source(
     source_data: SourceCreate,
     source_creation_service: SourceCreationServiceDeps,
