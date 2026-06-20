@@ -81,65 +81,71 @@ class SourceItemIndexingService:
         self,
         *,
         source_crud: SourceCRUD,
-        source_uid: str,
-        source_item_uid: str,
-    ) -> IngestPausedResponse:
-        """请求暂停文档处理"""
-        # 获取 source, source_item
-        result = await source_crud.get_source_and_item_by_uid(
-            source_uid=source_uid,
-            source_item_uid=source_item_uid,
-        )
-        if not result:
-            raise ValueError("Source item not found")
-        source, source_item = result
-
-        # 只有在 PROCESSING 状态下才允许请求暂停
-        if source_item.status != SourceItemProcessStatus.PROCESSING:
-            return IngestPausedResponse(
-                source_uid=source.uid,
-                source_item_uid=source_item.uid,
-                process_status=source_item.status,
-                message="No running ingest to pause",
+        source: Source,
+        source_items: list[SourceItem],
+    ) -> list[IngestPausedResponse]:
+        """批量请求暂停文档处理。"""
+        processing_uids = [
+            item.uid
+            for item in source_items
+            if item.status == SourceItemProcessStatus.PROCESSING
+        ]
+        if processing_uids:
+            await source_crud.bulk_update_source_items_status(
+                source=source,
+                source_item_uids=processing_uids,
+            )
+            logger.info(
+                f"SourceItems {processing_uids} 已标记为 PAUSE_REQUESTED，等待处理流程检查点生效"
             )
 
-        # 更新数据库状态，等待处理流程检查点生效
-        await source_crud.update_source_item_status(
-            source_item, SourceItemProcessStatus.PAUSE_REQUESTED
-        )
-        logger.info(
-            f"SourceItem {source_item.uid} 已标记为 PAUSE_REQUESTED，等待处理流程检查点生效"
-        )
+        # 返回所有请求暂停的 source_items 的状态
+        responses = []
+        for item in source_items:
+            # NOTE: 这里没有实时查询数据库获取最新状态，
+            # 而是基于 source_item 初始状态进行的推断，
+            # 可能存在不一致问题
+            if item.uid in processing_uids:
+                responses.append(
+                    IngestPausedResponse(
+                        source_uid=source.uid,
+                        source_item_uid=item.uid,
+                        process_status=SourceItemProcessStatus.PAUSE_REQUESTED,
+                        message="Ingest pause requested, waiting for checkpoint",
+                    )
+                )
+                continue
 
-        return IngestPausedResponse(
-            source_uid=source.uid,
-            source_item_uid=source_item.uid,
-            process_status=SourceItemProcessStatus.PAUSE_REQUESTED,
-            message="Ingest pause requested, waiting for checkpoint",
-        )
+            responses.append(
+                IngestPausedResponse(
+                    source_uid=source.uid,
+                    source_item_uid=item.uid,
+                    process_status=item.status,  # 返回当前状态
+                    message="No running ingest to pause",
+                )
+            )
+
+        return responses
 
     async def resume_ingest(
         self,
         *,
-        source_crud: SourceCRUD,
         source_uid: str,
-        source_item_uid: str,
+        source_items: list[SourceItem],
     ) -> AsyncIterable[RAGSyncEvent]:
-        """恢复文档处理"""
-        source_item = await source_crud.get_source_item_by_uid_for_source_uid(
-            source_uid=source_uid,
-            item_uid=source_item_uid,
-        )
-
-        if not source_item:
-            raise ValueError("Source item not found")
-        if source_item.status != SourceItemProcessStatus.PAUSED:
-            raise ValueError("Source item is not paused")
+        """批量恢复文档处理。"""
+        not_paused_uids = [
+            item.uid
+            for item in source_items
+            if item.status != SourceItemProcessStatus.PAUSED
+        ]
+        if not_paused_uids:
+            raise ValueError(f"Source items are not paused: {not_paused_uids}")
 
         # 恢复处理流程
         async for event in self.ingest_source_items(
             source_uid=source_uid,
-            source_item_uids=[source_item_uid],
+            source_item_uids=[item.uid for item in source_items],
         ):
             yield event
 
