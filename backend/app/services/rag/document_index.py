@@ -15,7 +15,7 @@ from app.rag import (
 )
 from app.ingestion import ParsedDocument, ParsedSection
 from app.db.models import Source, SourceItem
-from app.db.schemas import DocumentChunkInternal, DocumentContentInternal
+from app.db.schemas import DocumentChunkInternal
 from app.crud import SourceCRUD
 from app.api.schemas import RAGSyncEvent
 from app.utils import calculate_text_hash
@@ -60,7 +60,6 @@ class DocumentIndexService:
         source: Source,
         source_item: SourceItem,
         parsed_doc: ParsedDocument,
-        cover_content: bool = True,
         checkpoint: PauseCheckPoint | None = None,
     ) -> AsyncIterable[RAGSyncEvent]:
         """处理单个文档的完整流程，返回处理进度事件的异步生成器"""
@@ -68,26 +67,6 @@ class DocumentIndexService:
         async def maybe_checkpoint() -> None:
             if checkpoint:
                 await checkpoint()
-
-        if cover_content:
-            # 1.0 覆盖文档时，将文档解析结果入库
-            await self.source_crud.upsert_document_content(
-                source_item=source_item,
-                content_data=DocumentContentInternal(
-                    content=parsed_doc.text,
-                    metadata_json={
-                        # TODO: metadata 后续使用类型严格约束
-                        "sections": [
-                            section.__dict__ for section in parsed_doc.sections or []
-                        ],
-                        "page_boundaries": parsed_doc.page_boundaries or [],
-                        "parser_metadata": parsed_doc.metadata or {},
-                    },
-                ),
-            )
-
-        # 1.5 暂停请求检查
-        await maybe_checkpoint()
 
         # 2.0 发送分块事件
         yield RAGSyncEvent(

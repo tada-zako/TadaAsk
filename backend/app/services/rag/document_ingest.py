@@ -1,7 +1,7 @@
 import asyncio
 from typing import AsyncIterable
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from loguru import logger
@@ -18,9 +18,15 @@ from app.ingestion import ParsedDocument, ParsedSection
 from app.ingestion.parser import FileParserFactory
 from app.storage import FileStorage
 from app.db.models import Source, SourceItem
+from app.db.schemas import DocumentContentInternal
 from app.crud import SourceCRUD
 from app.api.schemas import IngestPausedResponse, RAGSyncCounters, RAGSyncEvent
-from app.core.constants import SourceItemProcessStatus, IngestStage, RAGSyncEventType
+from app.core.constants import (
+    SourceItemProcessStatus,
+    IngestStage,
+    RAGSyncEventType,
+    SourceType,
+)
 from app.core.exceptions import DocumentPausedException
 
 
@@ -227,7 +233,11 @@ class DocumentIngestService:
             document_index_service = self._new_document_index_service(source_crud)
 
             try:
-                source, source_item, should_process = await self._resolve_source_and_item(
+                (
+                    source,
+                    source_item,
+                    should_process,
+                ) = await self._resolve_source_and_item(
                     source_crud=source_crud,
                     source_uid=source_uid,
                     source_item_uid=source_item_uid,
@@ -272,18 +282,20 @@ class DocumentIngestService:
                     )
 
                 # 1.1 获取解析后的对象
-                parsed_doc = await self._load_or_parse_document(
+                parsed_doc = await self._ensure_parsed_document(
+                    source_crud=source_crud,
                     source=source,
                     source_item=source_item,
                 )
+
+                # 1.2 暂停请求检查
+                await self._pause_checkpoint(source_item_id=source_item.id)
 
                 # 2. 处理解析结果，进行分块、FTS 分词、向量化并入库
                 async for event in document_index_service.index_parsed_document(
                     source=source,
                     source_item=source_item,
                     parsed_doc=parsed_doc,
-                    cover_content=source_item.document_content
-                    is None,  # 只有在之前没有解析过的情况下才入库内容
                     checkpoint=lambda: self._pause_checkpoint(
                         source_item_id=source_item.id
                     ),
@@ -335,8 +347,10 @@ class DocumentIngestService:
                     await session.rollback()
 
                 # 确保 source_item 被绑定
-                refetched_item = await source_crud.get_source_item_by_uid_for_source_uid(
-                    source_uid=source_uid, item_uid=source_item_uid
+                refetched_item = (
+                    await source_crud.get_source_item_by_uid_for_source_uid(
+                        source_uid=source_uid, item_uid=source_item_uid
+                    )
                 )
                 if refetched_item:
                     await self._mark_item_status(
@@ -368,8 +382,8 @@ class DocumentIngestService:
         should_process = await source_crud.claim_source_item_for_ingest(
             source_uid=source_uid,
             source_item_uid=source_item_uid,
-        )   # NOTE: claim 操作并不能保证数据存在
-        
+        )  # NOTE: claim 操作并不能保证数据存在
+
         if not should_process:
             # claim 失败，不进行带有 document_content 的查询，
             # 通过轻量级查询 source, source_item 的状态，触发后续的跳过逻辑
@@ -401,13 +415,21 @@ class DocumentIngestService:
         source, source_item = result
         return source, source_item, True
 
-    async def _load_or_parse_document(
+    async def _ensure_parsed_document(
         self,
         *,
+        source_crud: SourceCRUD,
         source: Source,
         source_item: SourceItem,
     ) -> ParsedDocument:
-        """加载或解析文档内容"""
+        """
+        加载或解析文档内容，确保基于 source_item 构建对应的 ParsedDocument 对象
+
+        检查规则：
+        - 已有 DocumentContent: 直接恢复 ParsedDocument 对象
+        - LOCAL_FILE 且缺少 DocumentContent: 解析文件内容构建 ParsedDocument 对象
+        - 其它 SourceType: 需要确保在进入 ingest 之前，构建完整的 DocumentContent
+        """
         # 检查是否已经解析过文件
         # 这里的 document_content 字段在 Depends 中提前加载到 SourceItem；
         # 后续如果 ingest 业务流程并发量较大，耗时较长，
@@ -421,9 +443,42 @@ class DocumentIngestService:
                 # 恢复 sections, page_boundaries
                 sections=self._restore_sections(metadata),
                 page_boundaries=self._restore_page_boundaries(metadata),
-                metadata=metadata.get("parser_metadata", metadata),
             )
 
+        if source.source_type != SourceType.LOCAL_FILE:
+            raise ValueError(
+                f"Source item {source_item.uid} has no materialized document content; "
+                f"run source materialization before indexing"
+            )
+
+        # 构建 LOCAL_FILE 类型的 ParsedDocument 对象
+        parsed_doc = await self._parse_local_file_source_item(
+            source_item=source_item,
+        )
+
+        # ParsedDocument 入库操作
+        await source_crud.upsert_document_content(
+            source_item=source_item,
+            content_data=DocumentContentInternal(
+                content=parsed_doc.text,
+                metadata_json={
+                    # TODO: metadata 后续使用类型严格约束
+                    "sections": [
+                        asdict(section) for section in parsed_doc.sections or []
+                    ],
+                    "page_boundaries": parsed_doc.page_boundaries or [],
+                },
+            ),
+        )
+
+        return parsed_doc
+
+    async def _parse_local_file_source_item(
+        self,
+        *,
+        source_item: SourceItem,
+    ) -> ParsedDocument:
+        """LOCAL_FILE 类型调用：解析文件并构建 ParsedDocument 对象"""
         if not source_item.storage_key:
             raise ValueError("Local file source item requires storage_key")
         if not source_item.filename:
