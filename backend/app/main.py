@@ -17,6 +17,7 @@ from app.ingestion.parser import (
     FileParserFactory,
     create_default_file_parser_factory,
 )
+from app.ingestion.crawler import WebCrawler, HTMLPageParser
 from app.rag import (
     vector_db_factory,
     VectorDatabase,
@@ -80,6 +81,15 @@ async def lifespan(app: FastAPI):
     # 挂载文件解析器注册工厂
     file_parser_factory: FileParserFactory = create_default_file_parser_factory()
     app.state.file_parser_factory = file_parser_factory
+
+    # 挂载 WebCrawler 实例
+    app.state.web_crawler = WebCrawler(
+        timeout=20.0,
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    )
+
+    # 挂载 HTMLPageParser 实例
+    app.state.html_page_parser = HTMLPageParser()
 
     # 挂载密钥加密器实例
     api_key_cipher = ProviderAPIKeyCipher(
