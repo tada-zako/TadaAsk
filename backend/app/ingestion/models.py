@@ -24,4 +24,3 @@ class ParsedDocument:
         None  # 文档文本块的页码边界列表（仅适用于 PDF 等分页文档；page: (start, end)）
     )
     sections: list[ParsedSection] | None = None  # 文档章节列表
-    metadata: dict | None = None  # 解析过程中提取的额外元信息

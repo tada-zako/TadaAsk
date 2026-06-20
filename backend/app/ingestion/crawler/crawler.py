@@ -1,5 +1,4 @@
 import asyncio
-from typing import AsyncIterable
 from fnmatch import fnmatch
 from urllib.parse import urlparse
 
@@ -9,13 +8,13 @@ from . import (
     PageExtractionOptions,
     DiscoveredURL,
     FetchedPage,
+    WebPageMetadata,
 )
 from app.db.schemas import WebCrawlConfig, WebCrawlExtractionRule
 from app.utils import (
     normalize_url,
     hostname_from_url,
     path_prefix_from_url,
-    calculate_text_hash,
 )
 from app.core.constants import CrawlEntryType
 
@@ -75,7 +74,7 @@ class WebCrawler:
             }
         )
 
-    def discover_urls(self, config: WebCrawlConfig) -> list[DiscoveredURL]:
+    async def discover_urls(self, config: WebCrawlConfig) -> list[DiscoveredURL]:
         """根据 WebCrawlConfig 进行 URL 发现，返回待爬取的 URL 列表"""
         if config.entry_type == CrawlEntryType.URL_LIST:
             return self._discover_url_list(config)
@@ -104,7 +103,9 @@ class WebCrawler:
                 continue
 
             seen.add(item_key)
-            discovered.append(DiscoveredURL(item_key=item_key, url=url))
+            discovered.append(
+                DiscoveredURL(item_key=item_key, discovered_url=url, depth=0)
+            )
             # 限制最大爬取页面数
             if len(discovered) >= config.max_pages:
                 break
@@ -149,15 +150,15 @@ class WebCrawler:
         client: httpx.AsyncClient,
         discovered: DiscoveredURL,
         config: WebCrawlConfig,
-        previous_metadata: dict | None,
+        previous_metadata: WebPageMetadata | None,
     ) -> FetchedPage:
         """抓取页面内容，并返回 FetchedPage"""
         # 构建请求头，包含 If-None-Match 和 If-Modified-Since
         headers = {}
         if previous_metadata:
-            if etag := previous_metadata.get("etag"):
+            if etag := previous_metadata.etag:
                 headers["If-None-Match"] = etag
-            if last_modified := previous_metadata.get("last_modified"):
+            if last_modified := previous_metadata.last_modified:
                 headers["If-Modified-Since"] = last_modified
 
         # 爬取延迟
@@ -165,20 +166,19 @@ class WebCrawler:
             await asyncio.sleep(config.request_delay_ms / 1000.0)
 
         # 发起请求
-        response = await client.get(discovered.url, headers=headers)
+        response = await client.get(discovered.discovered_url, headers=headers)
 
         if response.status_code == 304:
             # 页面未修改
             return FetchedPage(
                 item_key=discovered.item_key,
-                url=discovered.url,
+                discovered_url=discovered.discovered_url,
                 final_url=str(response.url),
                 status_code=304,
                 html=None,
                 content_type=response.headers.get("content-type"),
                 etag=response.headers.get("etag"),
                 last_modified=response.headers.get("last-modified"),
-                raw_html_hash=None,
                 not_modified=True,
             )
 
@@ -187,14 +187,13 @@ class WebCrawler:
 
         return FetchedPage(
             item_key=discovered.item_key,
-            url=discovered.url,
+            discovered_url=discovered.discovered_url,
             final_url=str(response.url),
             status_code=response.status_code,
             html=html,
             content_type=response.headers.get("content-type"),
             etag=response.headers.get("etag"),
             last_modified=response.headers.get("last-modified"),
-            raw_html_hash=calculate_text_hash(html),
             not_modified=False,
         )
 

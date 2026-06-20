@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup, Tag
 from markdownify import MarkdownConverter
 
-from . import FetchedPage, ParsedPage, PageExtractionOptions
+from . import FetchedPage, ParsedPage, PageExtractionOptions, WebPageMetadata
 from .. import ParsedDocument, ParsedSection
 from app.utils import calculate_text_hash
 from app.core.constants import SourceType
@@ -36,7 +36,9 @@ class HTMLPageParser:
             # 不解析未修改的页面
             raise ValueError("Cannot parse a not-modified page")
         if not page.html:
-            raise ValueError(f"Fetched page {page.url} has no HTML content to parse")
+            raise ValueError(
+                f"Fetched page {page.discovered_url} has no HTML content to parse"
+            )
 
         # 转换为 BeautifulSoup 对象进行解析
         soup = BeautifulSoup(page.html, "lxml")
@@ -55,32 +57,21 @@ class HTMLPageParser:
             title=title,
             source_type=SourceType.WEB_CRAWL,
             sections=sections,
-            metadata={
-                "origin_url": page.url,
-                "final_url": page.final_url,
-                "content_type": page.content_type,
-                "matched_extraction_rule": options.matched_rule_name,
-            },
         )
 
         return ParsedPage(
             item_key=page.item_key,
-            origin_url=page.url,
+            discovered_url=page.discovered_url,
             final_url=page.final_url,
             parsed_document=parsed_document,
-            raw_html_hash=page.raw_html_hash or "",
             parsed_markdown_hash=parsed_markdown_hash,
-            # TODO: 这里的 metadata 之后使用明确的类型定义创建
-            fetch_metadata={
-                "etag": page.etag,
-                "last_modified": page.last_modified,
-                "raw_html_hash": page.raw_html_hash,
-                "parsed_markdown_hash": parsed_markdown_hash,
-                "last_fetch_status": page.status_code,
-                "final_url": page.final_url,
-                "content_type": page.content_type,
-                "matched_extraction_rule": options.matched_rule_name,
-            },
+            fetch_metadata=WebPageMetadata(
+                etag=page.etag,
+                last_modified=page.last_modified,
+                last_fetch_status=page.status_code,
+                content_type=page.content_type,
+                matched_extraction_rule=options.matched_rule_name,
+            ),
         )
 
     def _extract_title(
