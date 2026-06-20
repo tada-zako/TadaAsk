@@ -300,7 +300,7 @@ class WebCrawlSyncService:
             )
 
             counters.upserted += 1
-            return result.item_key
+            return source_item.uid
 
         # fetched 页面 304 未修改情况
         if isinstance(result, FetchedPage) and result.not_modified:
@@ -386,6 +386,9 @@ class WebCrawlSyncService:
                 },
             ),
         )
+
+        counters.upserted += 1
+        return existing_item.uid
 
     async def _load_previous_metadata_by_item_key(
         self, source: Source
