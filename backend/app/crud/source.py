@@ -26,7 +26,14 @@ class SourceCRUD:
     # =====================
     async def create_source(self, source_data: SourceInternal) -> Source:
         """创建新的数据源记录"""
-        new_source = Source(**source_data.model_dump())
+        data = source_data.model_dump()
+        if source_data.web_crawl_config is not None:
+            # 避免 AnyHttpUrl 类型字段直接转换为 ORM 对象
+            data["web_crawl_config"] = source_data.web_crawl_config.model_dump(
+                mode="json"
+            )
+
+        new_source = Source(**data)
         self.session.add(new_source)
         await self.session.flush()  # 获取新数据源的 UID
         return new_source
