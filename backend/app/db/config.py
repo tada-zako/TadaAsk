@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import AsyncIterable
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
 from .models import Base
 from .fts import init_fts_tables
@@ -20,6 +21,11 @@ engine = create_async_engine(
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
 
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """获取 SQLAlchemy 异步会话工厂"""
+    return async_session
+
+
 async def init_db():
     """初始化 SQLAlchemy 数据库连接并创建表"""
 
@@ -36,7 +42,7 @@ async def drop_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
-async def get_db():
+async def get_db() -> AsyncIterable[AsyncSession]:
     """
     获取 SQLAlchemy 异步会话，
     用于 FastAPI 依赖注入
