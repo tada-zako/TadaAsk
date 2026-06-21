@@ -252,7 +252,7 @@ ValidSourceDeps = Annotated[Source, Depends(valid_source)]
 # ===============================
 @router.post("/new", response_model=SourceRead)
 async def create_source(
-    source_data: SourceCreate,
+    source_data: Annotated[SourceCreate, Body(..., description="数据源创建信息")],
     source_creation_service: SourceCreationServiceDeps,
 ):
     try:
