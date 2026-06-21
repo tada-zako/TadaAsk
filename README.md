@@ -1,4 +1,4 @@
-# OpenKapa (暂命名)
+# TadaWidget (暂命名)
 
 定位：轻量级、可定制的开源 AI 知识库助手。
 

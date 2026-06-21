@@ -95,7 +95,7 @@ class FileParserFactory:
 
 
 def create_default_file_parser_factory() -> FileParserFactory:
-    """创建 OpenKapa 默认文件解析器注册表"""
+    """创建 TadaWidget 默认文件解析器注册表"""
     factory = FileParserFactory()
 
     markitdown_parser = MarkItDownParser()
