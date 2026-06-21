@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import AsyncIterable
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
 from .models import Base
@@ -17,6 +18,16 @@ engine = create_async_engine(
     f"sqlite+aiosqlite:///{database_path}",  # 使用 SQLite 数据库
     echo=True,  # 打印 SQL 语句
 )
+
+
+@event.listens_for(engine.sync_engine, "connect")
+def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    """监听 SQLite 连接事件，启用外键支持"""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 # 异步会话工厂
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
