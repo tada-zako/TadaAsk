@@ -9,7 +9,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.security import get_password_hash, ProviderAPIKeyCipher
-from app.crud import AdminCRUD
+from app.crud import AdminCRUD, ModelProfileCRUD
 from app.db import init_db, async_session
 from app.db.schemas import AdminCreate
 from app.storage import FileStorage, file_storage_factory
@@ -34,6 +34,7 @@ from app.rag import (
 from app.rag.utils import FTSTokenizer, JiebaFTSTokenizer
 from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer, TokenCounter
 from app.services.chat import GenerationRegistry
+from app.services.model_profiles import ModelProfileService
 from app.api import admin, visitor
 
 
@@ -61,6 +62,18 @@ async def valid_or_create_admin():
             logger.info(f"默认管理员账号已创建，用户名：{new_admin.username}")
 
 
+async def sync_model_catalog():
+    """在应用启动时同步 provider/model_profile 模型目录。"""
+    async with async_session() as session:
+        async with session.begin():
+            model_profile_service = ModelProfileService(
+                model_profile_crud=ModelProfileCRUD(session=session)
+            )
+            await model_profile_service.sync_model_catalog(
+                models_url=settings.models_url
+            )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -71,6 +84,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up the application...")
     # ======= 系统重要配置挂载 =======
     await init_db()
+    await sync_model_catalog()
 
     # 挂载文件存储实例
     file_storage: FileStorage = file_storage_factory(
@@ -85,7 +99,7 @@ async def lifespan(app: FastAPI):
     # 挂载 WebCrawler 实例
     app.state.web_crawler = WebCrawler(
         timeout=20.0,
-        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        user_agent="TadaWidget/0.1",
     )
 
     # 挂载 HTMLPageParser 实例

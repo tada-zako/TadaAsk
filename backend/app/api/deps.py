@@ -33,6 +33,7 @@ from app.services.sources import (
 )
 from app.services.indexing import SourceItemIndexingService
 from app.services.search import HybridSearchService, RAGRetrievalService
+from app.services.model_profiles import ModelProfileService
 from app.services.chat import (
     ChatOrchestratorService,
     CompactionService,
@@ -212,6 +213,13 @@ def get_source_creation_service(
     )
 
 
+def get_model_profile_service(
+    model_profile_crud: "ModelProfileCRUDeps",
+) -> ModelProfileService:
+    """ModelProfileService 依赖注入接口"""
+    return ModelProfileService(model_profile_crud=model_profile_crud)
+
+
 def get_source_item_upload_service(
     source_crud: "SourceCRUDeps",
     file_storage: "FileStorageDeps",
@@ -371,6 +379,10 @@ ValidVisitorChatProjectDeps = Annotated[Project, Depends(valid_project_with_sett
 SourceCreationServiceDeps = Annotated[
     SourceCreationService,
     Depends(get_source_creation_service),
+]
+ModelProfileServiceDeps = Annotated[
+    ModelProfileService,
+    Depends(get_model_profile_service),
 ]
 SourceItemUploadServiceDeps = Annotated[
     SourceItemUploadService,
