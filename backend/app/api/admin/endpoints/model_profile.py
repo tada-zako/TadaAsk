@@ -81,39 +81,23 @@ async def create_provider(
 
 
 @router.get("/provider/list", response_model=list[ProviderRead])
-async def list_providers(
+async def list_enabled_providers(
     model_profile_crud: ModelProfileCRUDeps,
 ):
     """获取提供商列表"""
-    providers = await model_profile_crud.list_providers()
+    providers = await model_profile_crud.list_enabled_providers()
     return [ProviderRead.model_validate(provider) for provider in providers]
 
 
 @router.get("/provider/list/models", response_model=list[ProviderWithModelProfilesRead])
-async def list_providers_with_models(
+async def list_enabled_providers_with_models(
     model_profile_crud: ModelProfileCRUDeps,
 ):
     """获取提供商列表及其模型配置列表。"""
-    providers = await model_profile_crud.list_providers_with_model_profiles()
+    providers = await model_profile_crud.list_enabled_providers_with_model_profiles()
     return [
         ProviderWithModelProfilesRead.model_validate(provider) for provider in providers
     ]
-
-
-@router.get("/provider/{provider_uid}", response_model=ProviderWithModelProfilesRead)
-async def get_provider_with_models(
-    provider: ValidProviderDeps,
-    model_profile_crud: ModelProfileCRUDeps,
-):
-    """获取模型提供商详情及其模型配置列表。"""
-    provider_with_profiles = (
-        await model_profile_crud.get_provider_with_model_profiles_by_uid(
-            provider_uid=provider.uid
-        )
-    )
-    return ProviderWithModelProfilesRead.model_validate(
-        provider_with_profiles or provider
-    )
 
 
 @router.patch("/provider/{provider_uid}", response_model=ProviderRead)
@@ -204,21 +188,6 @@ async def create_model_profile(
 
 
 @router.get(
-    "/provider/{provider_uid}/models",
-    response_model=list[ModelProfileRead],
-)
-async def list_model_profiles(
-    provider: ValidProviderDeps,
-    model_profile_crud: ModelProfileCRUDeps,
-):
-    """获取指定 provider 下的模型配置列表。"""
-    model_profiles = await model_profile_crud.list_model_profiles_by_provider_id(
-        provider_id=provider.id,
-    )
-    return [ModelProfileRead.model_validate(profile) for profile in model_profiles]
-
-
-@router.get(
     "/provider/{provider_uid}/models/{model_uid}",
     response_model=ModelProfileRead,
 )
@@ -227,6 +196,9 @@ async def get_model_profile(
     model_profile: ValidModelProfileDeps,
 ):
     """获取模型配置详情。"""
+    if provider.is_enabled is False:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
     return ModelProfileRead.model_validate(model_profile)
 
 

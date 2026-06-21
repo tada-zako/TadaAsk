@@ -55,10 +55,29 @@ class ModelProfileCRUD:
         )
         return result.scalars().all()
 
+    async def list_enabled_providers(self) -> Sequence[Provider]:
+        """获取启用状态的提供商列表"""
+        result = await self.session.execute(
+            select(Provider)
+            .where(Provider.is_enabled)
+            .order_by(Provider.created_at.desc())
+        )
+        return result.scalars().all()
+
     async def list_providers_with_model_profiles(self) -> Sequence[Provider]:
         """获取带有模型配置列表的提供商列表"""
         result = await self.session.execute(
             select(Provider)
+            .options(selectinload(Provider.model_profiles))
+            .order_by(Provider.created_at.desc())
+        )
+        return result.scalars().all()
+
+    async def list_enabled_providers_with_model_profiles(self) -> Sequence[Provider]:
+        """获取带有模型配置列表的启用状态的提供商列表"""
+        result = await self.session.execute(
+            select(Provider)
+            .where(Provider.is_enabled)
             .options(selectinload(Provider.model_profiles))
             .order_by(Provider.created_at.desc())
         )
