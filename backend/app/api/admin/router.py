@@ -3,7 +3,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 
-from .endpoints import auth, project, chat, session as session_endpoints, source
+from .endpoints import (
+    auth,
+    project,
+    chat,
+    model_profile,
+    session as session_endpoints,
+    source,
+)
 from ..deps import AdminCRUDeps
 from ..schemas import TokenData
 from app.db.models import Admin
@@ -49,6 +56,12 @@ router.include_router(
     source.router,
     prefix="/source",
     tags=["Source"],
+    dependencies=[Depends(get_current_admin)],
+)
+router.include_router(
+    model_profile.router,
+    prefix="/model-profile",
+    tags=["Model Profile"],
     dependencies=[Depends(get_current_admin)],
 )
 router.include_router(
