@@ -104,6 +104,7 @@ class ProjectSettingsBase(BaseModel):
     visitor_top_p: float
     visitor_timeout: float
     visitor_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"]
+
     rag_mode: SearchMode
     rag_top_k: int
 
@@ -119,6 +120,7 @@ class ProjectSettingsBase(BaseModel):
 
 
 class ProjectSettingsRead(ProjectSettingsBase):
+    visitor_default_provider: "ProviderRead | None" = None
     visitor_default_model_profile: "ModelProfileRead | None" = None
 
     model_config = ConfigDict(

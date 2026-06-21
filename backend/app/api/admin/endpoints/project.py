@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, HTTPException
 
 from ...deps import ValidProjectDeps, ProjectCRUDeps
-from app.db.schemas import ProjectCreate, ProjectRead
+from app.db.schemas import ProjectCreate, ProjectRead, ProjectSettingsRead
 
 router = APIRouter()
 
@@ -86,3 +86,18 @@ async def delete_project(
         }
     else:
         raise HTTPException(status_code=500, detail="Failed to delete project")
+
+
+@router.get("/{project_uid}/settings", response_model=ProjectSettingsRead)
+async def get_project_settings(
+    project: ValidProjectDeps,
+    project_crud: ProjectCRUDeps,
+):
+    """获取 project settings 详情，包括关联的默认 provider 和 model profile 信息"""
+    project_with_settings = await project_crud.get_project_with_settings_by_uid(
+        project_uid=project.uid
+    )
+    if not project_with_settings or not project_with_settings.project_settings:
+        raise HTTPException(status_code=404, detail="Project settings not found")
+
+    return project_with_settings.project_settings
