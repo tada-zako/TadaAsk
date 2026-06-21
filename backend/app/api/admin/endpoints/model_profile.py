@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
@@ -11,7 +11,7 @@ from app.db.schemas import (
     ModelProfileInternal,
     ModelProfileRead,
     ModelProfileUpdate,
-    ProviderCreate,
+    ProviderCreateWithModels,
     ProviderRead,
     ProviderUpdate,
     ProviderWithModelProfilesRead,
@@ -53,17 +53,18 @@ ValidModelProfileDeps = Annotated[ModelProfile, Depends(valid_model_profile)]
 
 @router.post("/provider/new", response_model=ProviderWithModelProfilesRead)
 async def create_provider(
-    payload: ProviderCreate,
+    payload: ProviderCreateWithModels,
     model_profile_service: ModelProfileServiceDeps,
     api_key_cipher: APIKeyCipherDeps,
 ):
     """
-    创建新的模型提供商。
+    创建或启用模型提供商。
 
-    内置 provider 会自动创建默认模型配置；例如 openai 只需要前端提交 name 和 api_key。
+    已由模型目录缓存的 provider 会更新 API key 并启用；
+    custom provider 可同时提交 model_profile。
     """
     try:
-        provider = await model_profile_service.create_provider_with_default_profiles(
+        provider = await model_profile_service.create_or_enable_provider(
             provider_data=payload,
             api_key_cipher=api_key_cipher,
         )
@@ -100,7 +101,7 @@ async def list_providers_with_models(
 
 
 @router.get("/provider/{provider_uid}", response_model=ProviderWithModelProfilesRead)
-async def get_provider(
+async def get_provider_with_models(
     provider: ValidProviderDeps,
     model_profile_crud: ModelProfileCRUDeps,
 ):
@@ -157,7 +158,9 @@ async def delete_provider(
     provider: ValidProviderDeps,
     model_profile_crud: ModelProfileCRUDeps,
 ):
-    """删除模型提供商及其模型配置。"""
+    """删除模型提供商及其模型配置
+    NOTE: 暂时不要使用
+    """
     success = await model_profile_crud.delete_provider_by_id(provider_id=provider.id)
     if success:
         return {"uid": provider.uid, "status": "deleted"}
@@ -207,14 +210,10 @@ async def create_model_profile(
 async def list_model_profiles(
     provider: ValidProviderDeps,
     model_profile_crud: ModelProfileCRUDeps,
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
-    offset: Annotated[int, Query(ge=0)] = 0,
 ):
     """获取指定 provider 下的模型配置列表。"""
     model_profiles = await model_profile_crud.list_model_profiles_by_provider_id(
         provider_id=provider.id,
-        limit=limit,
-        offset=offset,
     )
     return [ModelProfileRead.model_validate(profile) for profile in model_profiles]
 
@@ -223,7 +222,10 @@ async def list_model_profiles(
     "/provider/{provider_uid}/models/{model_uid}",
     response_model=ModelProfileRead,
 )
-async def get_model_profile(model_profile: ValidModelProfileDeps):
+async def get_model_profile(
+    provider: ValidProviderDeps,
+    model_profile: ValidModelProfileDeps,
+):
     """获取模型配置详情。"""
     return ModelProfileRead.model_validate(model_profile)
 
@@ -273,7 +275,9 @@ async def delete_model_profile(
     model_profile: ValidModelProfileDeps,
     model_profile_crud: ModelProfileCRUDeps,
 ):
-    """删除模型配置。"""
+    """删除模型配置
+    NOTE: 暂时不要使用
+    """
     success = await model_profile_crud.delete_model_profile_by_id(
         model_profile_id=model_profile.id
     )
