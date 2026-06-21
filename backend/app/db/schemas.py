@@ -447,11 +447,24 @@ class ProviderCreate(ProviderBase):
     )
 
 
+class ProviderUpdate(BaseModel):
+    name: str | None = None
+    base_url: str | None = None
+    api_key: SecretStr | None = None
+    is_enabled: bool | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 class ProviderRead(ProviderBase):
     uid: str
 
-    encrypted_api_key: str = Field(
-        ...,
+    encrypted_api_key: str | None = Field(
+        default=None,
         description="Encrypted API key; the actual API key is not exposed for security reasons",
     )  # NOTE: 安全考虑，前端是否展示 api_key；API Key 解密在前端完成
     created_at: datetime
@@ -489,6 +502,30 @@ class ModelProfileCreate(ModelProfileBase):
     model_config = ConfigDict(
         alias_generator=to_camel,
         validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class ModelProfileUpdate(BaseModel):
+    model: str | None = None
+    context_window_tokens: int | None = Field(
+        default=None,
+        gt=0,
+        description="Model context window size in tokens",
+    )
+    max_output_tokens: int | None = Field(
+        default=None,
+        gt=0,
+        description="Maximum output tokens allowed for the model",
+    )
+    supports_stream: bool | None = None
+    supports_structured: bool | None = None
+    is_enabled: bool | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
     )
 
 
@@ -519,10 +556,10 @@ class ProviderWithModelInternalRead(ProviderRead):
     model_profile: ModelProfileRead
 
 
-class ProviderWithModelProfileRead(ProviderRead):
-    """包含模型配置的 Provider 读取模型；对外接口使用"""
+class ProviderWithModelProfilesRead(ProviderRead):
+    """包含模型配置列表的 Provider 读取模型；对外接口使用"""
 
-    model_profile: ModelProfileRead
+    model_profiles: list[ModelProfileRead] = Field(default_factory=list)
 
 
 # ======= Chat Sessions Schemas =======
