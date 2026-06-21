@@ -141,7 +141,7 @@ class ProjectSettings(Base):
     visitor_temperature: Mapped[float] = mapped_column(Float, default=0.3)
     visitor_top_p: Mapped[float] = mapped_column(Float, default=0.9)
     visitor_timeout: Mapped[float] = mapped_column(Float, default=45.0)
-    visitor_thinking: Mapped[bool | str] = mapped_column(JSON, default="low")
+    visitor_thinking: Mapped[bool | str] = mapped_column(JSON, default=False)
 
     # RAG 策略配置
     rag_mode: Mapped[SearchMode] = mapped_column(
