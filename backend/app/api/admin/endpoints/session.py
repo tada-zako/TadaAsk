@@ -44,6 +44,7 @@ async def list_chat_sessions(
 
 
 async def valid_admin_chat_session(
+    project: ValidProjectDeps,
     chat_session_crud: ChatSessionCRUDeps,
     chat_session_uid: Annotated[
         str,
@@ -60,7 +61,7 @@ async def valid_admin_chat_session(
     如果 chat_session_uid 为空或无效，报错
     """
     chat_session = await chat_session_crud.get_chat_session_by_uid(
-        chat_session_uid=chat_session_uid
+        project_id=project.id, chat_session_uid=chat_session_uid
     )
 
     if not chat_session:
@@ -69,14 +70,14 @@ async def valid_admin_chat_session(
     return chat_session
 
 
-ChatSessionDeps = Annotated[ChatSession, Depends(valid_admin_chat_session)]
+ValidChatSessionDeps = Annotated[ChatSession, Depends(valid_admin_chat_session)]
 
 
 @router.get(
     "/session/{chat_session_uid}/messages", response_model=list[ChatMessageRead]
 )
 async def list_chat_messages(
-    chat_session: ChatSessionDeps,
+    chat_session: ValidChatSessionDeps,
     chat_message_crud: ChatMessageCRUDeps,
     # 这里会话消息不允许外部分页，内部处理
     # limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -94,7 +95,7 @@ async def list_chat_messages(
     Returns:
         消息列表
     """
-    # TODO: 这里的分页逻辑暂时固定为内部设置
+    # TODO: 这里的分页逻辑暂时固定为内部设置，后续改成基于 token 计算上限
     messages = await chat_message_crud.list_messages_for_display(
         chat_session_id=chat_session.id, limit=20, offset=0
     )
@@ -103,7 +104,7 @@ async def list_chat_messages(
 
 @router.delete("/session/{chat_session_uid}")
 async def delete_chat_session(
-    chat_session: ChatSessionDeps,
+    chat_session: ValidChatSessionDeps,
     chat_session_crud: ChatSessionCRUDeps,
 ):
     """
