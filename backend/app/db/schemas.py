@@ -437,6 +437,7 @@ class ProviderBase(BaseModel):
     base_url: str | None = None
 
     is_enabled: bool = True
+    is_custom: bool = False  # 是否为自定义 provider
 
 
 class ProviderCreate(ProviderBase):
@@ -447,6 +448,12 @@ class ProviderCreate(ProviderBase):
         validate_by_alias=True,
         validate_by_name=True,
     )
+
+
+class ProviderCreateWithModels(ProviderCreate):
+    """包含模型配置的 Provider 创建模型"""
+
+    model_profiles: list["ModelProfileCreate"] = Field(default_factory=list)
 
 
 class ProviderUpdate(BaseModel):
@@ -508,6 +515,25 @@ class ModelProfileCreate(ModelProfileBase):
     )
 
 
+class ModelProfileInternal(ModelProfileBase):
+    """系统内部使用的模型"""
+
+    provider_id: int  # 关联的 Provider ID
+
+
+class ModelProfileRead(ModelProfileBase):
+    uid: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 class ModelProfileUpdate(BaseModel):
     model: str | None = None
     context_window_tokens: int | None = Field(
@@ -525,25 +551,6 @@ class ModelProfileUpdate(BaseModel):
     is_enabled: bool | None = None
 
     model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
-
-
-class ModelProfileInternal(ModelProfileBase):
-    """系统内部使用的模型"""
-
-    provider_id: int  # 关联的 Provider ID
-
-
-class ModelProfileRead(ModelProfileBase):
-    uid: str
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(
-        from_attributes=True,
         alias_generator=to_camel,
         validate_by_alias=True,
         validate_by_name=True,

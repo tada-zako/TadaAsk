@@ -469,6 +469,9 @@ class Provider(Base):
     )  # NOTE: 保留字段；配置 header 等，暂不使用
 
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_custom: Mapped[bool] = mapped_column(
+        Boolean, default=False
+    )  # 是否为自定义 provider
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

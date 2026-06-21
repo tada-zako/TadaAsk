@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     llm_default_thinking: (
         bool | Literal["minimal", "low", "medium", "high", "xhigh"]
     ) = "medium"
+    models_url: str = "https://models.dev/api.json"
 
     # =======================================
     # RAG 相关配置
