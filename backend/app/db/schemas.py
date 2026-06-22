@@ -627,7 +627,7 @@ class ChatSessionBase(BaseModel):
 
 
 class ChatSessionInternal(ChatSessionBase):
-    project_id: int
+    project_id: int | None = None
     visitor_id: str | None = Field(
         default=None, description="Visitor ID: An optional field for anonymous users"
     )

@@ -104,7 +104,7 @@ class Project(Base):
         back_populates="project",
         cascade="all, delete-orphan",
         passive_deletes=True,
-    )  # 项目下的对话列表
+    )  # 项目上下文下的对话列表
 
     # 中间表关联
     source_links: Mapped[list["ProjectSourceLink"]] = relationship(
@@ -575,11 +575,13 @@ class ChatSession(Base):
     )
 
     # ---- 关系字段 ----
-    project_id: Mapped[int] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE")
+    project_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )
 
-    project: Mapped["Project"] = relationship(back_populates="chat_sessions")
+    project: Mapped[Optional["Project"]] = relationship(back_populates="chat_sessions")
     chat_messages: Mapped[list["ChatMessage"]] = relationship(
         back_populates="chat_session",
         cascade="all, delete-orphan",
