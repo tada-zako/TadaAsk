@@ -24,7 +24,9 @@ router = APIRouter()
 
 
 async def resolve_default_model_refs(
-    payload: ProjectSettingsUpdate,
+    payload: Annotated[
+        ProjectSettingsUpdate, Body(..., description="Project settings 更新数据")
+    ],
     model_profile_crud: ModelProfileCRUDeps,
 ) -> tuple[bool, Provider | None, ModelProfile | None]:
     """解析 visitor 默认 provider/model 的 UID 输入。"""
@@ -107,7 +109,7 @@ RequestSourcesDeps = Annotated[list[Source], Depends(resolve_sources_from_body)]
 
 @router.post("/new", response_model=ProjectRead)
 async def create_project(
-    payload: ProjectCreate,
+    payload: Annotated[ProjectCreate, Body(..., description="Project 创建数据")],
     project_crud: ProjectCRUDeps,
 ):
     """
@@ -172,7 +174,7 @@ async def get_project(
 @router.patch("/{project_uid}", response_model=ProjectRead)
 async def update_project(
     project: ValidProjectDeps,
-    payload: ProjectUpdate,
+    payload: Annotated[ProjectUpdate, Body(..., description="Project 更新数据")],
     project_crud: ProjectCRUDeps,
 ):
     """更新项目基础信息"""
@@ -232,7 +234,9 @@ async def get_project_settings(
 @router.patch("/{project_uid}/settings", response_model=ProjectSettingsRead)
 async def update_project_settings(
     project: ValidProjectDeps,
-    payload: ProjectSettingsUpdate,
+    payload: Annotated[
+        ProjectSettingsUpdate, Body(..., description="Project settings 更新数据")
+    ],
     project_crud: ProjectCRUDeps,
     model_profile_crud: ModelProfileCRUDeps,
 ):

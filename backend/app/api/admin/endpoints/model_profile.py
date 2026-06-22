@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status, Body
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
@@ -53,7 +53,10 @@ ValidModelProfileDeps = Annotated[ModelProfile, Depends(valid_model_profile)]
 
 @router.post("/provider/new", response_model=ProviderWithModelProfilesRead)
 async def create_provider(
-    payload: ProviderCreateWithModels,
+    payload: Annotated[
+        ProviderCreateWithModels,
+        Body(..., description="Provider 创建数据"),
+    ],
     model_profile_service: ModelProfileServiceDeps,
     api_key_cipher: APIKeyCipherDeps,
 ):
@@ -103,7 +106,7 @@ async def list_enabled_providers_with_models(
 @router.patch("/provider/{provider_uid}", response_model=ProviderRead)
 async def update_provider(
     provider: ValidProviderDeps,
-    payload: ProviderUpdate,
+    payload: Annotated[ProviderUpdate, Body(..., description="Provider 更新数据")],
     model_profile_crud: ModelProfileCRUDeps,
     api_key_cipher: APIKeyCipherDeps,
 ):
@@ -164,7 +167,7 @@ async def delete_provider(
 )
 async def create_model_profile(
     provider: ValidProviderDeps,
-    payload: ModelProfileCreate,
+    payload: Annotated[ModelProfileCreate, Body(..., description="Model 创建数据")],
     model_profile_crud: ModelProfileCRUDeps,
 ):
     """在指定 provider 下创建模型配置。"""
@@ -216,7 +219,7 @@ async def get_model_profile(
 async def update_model_profile(
     provider: ValidProviderDeps,
     model_profile: ValidModelProfileDeps,
-    payload: ModelProfileUpdate,
+    payload: Annotated[ModelProfileUpdate, Body(..., description="Model 配置更新数据")],
     model_profile_crud: ModelProfileCRUDeps,
 ):
     """更新模型配置；前端可通过 is_enabled 控制模型是否启用。"""
