@@ -68,16 +68,94 @@ class ChatSessionCRUD:
         )
         return result.scalars().all()
 
+    async def list_admin_project_sessions(
+        self,
+        *,
+        project_id: int,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> Sequence[ChatSession]:
+        """获取指定项目上下文下的 Admin 聊天会话列表"""
+        return await self.list_chat_sessions_by_type_and_project_id(
+            project_id=project_id,
+            owner_type=ChatSessionType.ADMIN,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def list_admin_global_sessions(
+        self,
+        *,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> Sequence[ChatSession]:
+        """获取不带项目上下文的 Admin 聊天会话列表"""
+        result = await self.session.execute(
+            select(ChatSession)
+            .where(
+                ChatSession.owner_type == ChatSessionType.ADMIN,
+                ChatSession.project_id.is_(None),
+                not_(ChatSession.is_archived),
+            )
+            .offset(offset)
+            .limit(limit)
+            .order_by(ChatSession.updated_at.desc())
+        )
+        return result.scalars().all()
+
     async def get_chat_session_by_uid(
+        self,
+        *,
+        chat_session_uid: str,
+    ) -> ChatSession | None:
+        """根据聊天会话 UID 获取聊天会话实例，如果未找到则返回 None"""
+        result = await self.session.execute(
+            select(ChatSession).where(ChatSession.uid == chat_session_uid)
+        )
+        return result.scalars().first()
+
+    async def get_admin_project_session_by_uid(
         self,
         *,
         project_id: int,
         chat_session_uid: str,
     ) -> ChatSession | None:
-        """根据聊天会话 UID 获取聊天会话实例，如果未找到则返回 None"""
+        """根据 UID 获取指定项目上下文下的 Admin 聊天会话"""
         result = await self.session.execute(
             select(ChatSession).where(
                 ChatSession.uid == chat_session_uid,
+                ChatSession.owner_type == ChatSessionType.ADMIN,
+                ChatSession.project_id == project_id,
+            )
+        )
+        return result.scalars().first()
+
+    async def get_admin_global_session_by_uid(
+        self,
+        *,
+        chat_session_uid: str,
+    ) -> ChatSession | None:
+        """根据 UID 获取不带项目上下文的 Admin 聊天会话"""
+        result = await self.session.execute(
+            select(ChatSession).where(
+                ChatSession.uid == chat_session_uid,
+                ChatSession.owner_type == ChatSessionType.ADMIN,
+                ChatSession.project_id.is_(None),
+            )
+        )
+        return result.scalars().first()
+
+    async def get_visitor_session_by_uid(
+        self,
+        *,
+        project_id: int,
+        chat_session_uid: str,
+    ) -> ChatSession | None:
+        """根据 UID 获取指定项目下的 Visitor 聊天会话"""
+        result = await self.session.execute(
+            select(ChatSession).where(
+                ChatSession.uid == chat_session_uid,
+                ChatSession.owner_type == ChatSessionType.VISITOR,
                 ChatSession.project_id == project_id,
             )
         )

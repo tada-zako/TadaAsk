@@ -78,6 +78,35 @@ class RAGSearchCRUD:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def resolve_admin_project_sources(self, project_id: int) -> list[Source]:
+        """
+        根据 project_id 获取当前项目下所有可用于 Admin 搜索的 sources。
+        Admin 项目上下文不要求 source.is_public，只要求 source 有已完成的数据项。
+        """
+
+        stmt = (
+            select(Source)
+            .join(ProjectSourceLink, ProjectSourceLink.source_id == Source.id)
+            .where(
+                and_(
+                    ProjectSourceLink.project_id == project_id,
+                    Source.source_items.any(
+                        SourceItem.status == SourceItemProcessStatus.COMPLETED
+                    ),
+                )
+            )
+            .options(
+                selectinload(
+                    Source.source_items.and_(
+                        SourceItem.status == SourceItemProcessStatus.COMPLETED
+                    )
+                )
+            )
+        )
+
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def get_chunk_ids_by_vector_ids(
         self, vector_ids: list[str]
     ) -> dict[str, int]:
