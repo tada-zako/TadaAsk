@@ -605,7 +605,9 @@ class ChatMessage(Base):
         default=lambda: str(uuid.uuid4()),
     )
 
-    sequence: Mapped[int] = mapped_column(Integer, nullable=False)  # 消息在对话中的顺序
+    sequence: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )  # 消息在对话中的顺序；从 1 开始递增
 
     role: Mapped[ChatMessageRole] = mapped_column(Enum(ChatMessageRole))
     message: Mapped[str]

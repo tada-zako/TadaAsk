@@ -8,7 +8,7 @@ from ...deps import (
     ChatMessageCRUDeps,
 )
 from app.db.models import ChatSession
-from app.db.schemas import ChatSessionRead, ChatMessageRead
+from app.db.schemas import ChatSessionRead, ChatMessageRead, ChatMessagesPage
 
 
 router = APIRouter()
@@ -84,33 +84,67 @@ async def valid_admin_chat_session(
 ValidChatSessionDeps = Annotated[ChatSession, Depends(valid_admin_chat_session)]
 
 
-@router.get(
-    "/session/{chat_session_uid}/messages", response_model=list[ChatMessageRead]
-)
+@router.get("/session/{chat_session_uid}/messages", response_model=ChatMessagesPage)
 async def list_chat_messages(
     chat_session: ValidChatSessionDeps,
     chat_message_crud: ChatMessageCRUDeps,
-    # 这里会话消息不允许外部分页，内部处理
-    # limit: Annotated[int, Query(ge=1, le=100)] = 20,
-    # offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    before_sequence: Annotated[
+        int | None,
+        Query(alias="beforeSequence", ge=1),
+    ] = None,
+    after_sequence: Annotated[
+        int | None,
+        Query(alias="afterSequence", ge=1),
+    ] = None,
+    include_internal: Annotated[
+        bool,
+        Query(alias="includeInternal", description="是否包含 compaction 等内部消息"),
+    ] = False,
 ):
     """
-    获取聊天会话下的消息列表
+    获取聊天会话下的消息 timeline 页面
 
     Args:
         chat_session: 通过依赖注入获取的有效聊天会话实例
-        session: 数据库会话，通过依赖注入获取
-        limit: 分页参数，限制返回的消息数量
-        offset: 分页参数，指定返回消息的起始位置
+        chat_message_crud: 通过依赖注入获取的 ChatMessageCRUD 实例
+        limit: 单次返回的消息数量
+        before_sequence: 向前加载指定 sequence 之前的消息
+        after_sequence: 加载指定 sequence 之后的新消息
+        include_internal: 是否包含 compaction 等内部消息
+
+    NOTE:
+        - before_sequence 和 after_sequence 都不传时，返回最新的 limit 条消息
+        - before_sequence 和 after_sequence 不能同时使用，否则报错
+        - 返回结果不包含 before_sequence 和 after_sequence 消息本身
 
     Returns:
-        消息列表
+        消息分页数据查找
     """
-    # TODO: 这里的分页逻辑暂时固定为内部设置，后续改成基于 token 计算上限
-    messages = await chat_message_crud.list_messages_for_display(
-        chat_session_id=chat_session.id, limit=20, offset=0
+    if before_sequence is not None and after_sequence is not None:
+        # 不能同时传输 before_sequence 和 after_sequence
+        raise HTTPException(
+            status_code=400,
+            detail="beforeSequence and afterSequence cannot be used together",
+        )
+
+    # 分页方式查找消息记录
+    page = await chat_message_crud.list_messages_page(
+        chat_session_id=chat_session.id,
+        limit=limit,
+        before_sequence=before_sequence,
+        after_sequence=after_sequence,
+        include_internal=include_internal,
     )
-    return [ChatMessageRead.model_validate(message) for message in messages]
+    messages = [ChatMessageRead.model_validate(message) for message in page.messages]
+
+    return ChatMessagesPage(
+        messages=messages,
+        has_more_before=page.has_more_before,
+        has_more_after=page.has_more_after,
+        oldest_sequence=messages[0].sequence if messages else None,
+        newest_sequence=messages[-1].sequence if messages else None,
+    )
 
 
 @router.delete("/session/{chat_session_uid}")

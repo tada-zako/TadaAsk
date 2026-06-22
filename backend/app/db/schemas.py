@@ -684,6 +684,22 @@ class ChatMessageRead(ChatMessageBase):
     )
 
 
+class ChatMessagesPage(BaseModel):
+    """对话消息分页数据结构"""
+
+    messages: list[ChatMessageRead]
+    has_more_before: bool
+    has_more_after: bool
+    oldest_sequence: int | None = None
+    newest_sequence: int | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 # ======= RAG Schemas =======
 @dataclass
 class HybridSearchResult:
