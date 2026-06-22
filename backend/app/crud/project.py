@@ -13,7 +13,6 @@ from app.db.models import (
 )
 from app.db.schemas import (
     ProjectCreate,
-    ProjectSettingsCreate,
     ProjectSettingsUpdate,
     ProjectUpdate,
 )
@@ -26,8 +25,9 @@ class ProjectCRUD:
         self.session = session
 
     async def create_project(self, project_data: ProjectCreate) -> Project:
-        """创建新的项目，并返回创建的项目实例"""
+        """创建新的项目，并同时创建默认项目设置"""
         new_project = Project(**project_data.model_dump())
+        new_project.project_settings = ProjectSettings()
         self.session.add(new_project)
         await self.session.flush()  # 获取新项目的 UID
         return new_project
@@ -104,35 +104,9 @@ class ProjectCRUD:
     # ====================
     # ProjectSettings 相关操作
     # ====================
-    async def create_project_settings(
-        self,
-        *,
-        project: Project,
-        settings_data: ProjectSettingsCreate,
-        visitor_default_provider: Provider | None = None,
-        visitor_default_model_profile: ModelProfile | None = None,
-    ) -> ProjectSettings:
-        """创建项目设置"""
-        data = settings_data.model_dump(
-            exclude_unset=True,
-            exclude={
-                "visitor_default_provider_uid",
-                "visitor_default_model_profile_uid",
-            },
-        )
-        new_settings = ProjectSettings(
-            **data,
-            project_id=project.id,
-            visitor_default_provider=visitor_default_provider,
-            visitor_default_model_profile=visitor_default_model_profile,
-        )
-        self.session.add(new_settings)
-        await self.session.flush()
-        return new_settings
-
     async def get_project_settings_by_project_id(
         self, *, project_id: int
-    ) -> ProjectSettings | None:
+    ) -> ProjectSettings:
         """根据项目 ID 获取项目设置，并加载默认 provider 与 model profile"""
         stmt = (
             select(ProjectSettings)
@@ -143,7 +117,7 @@ class ProjectCRUD:
             )
         )
         result = await self.session.execute(stmt)
-        return result.scalars().first()
+        return result.scalars().one()
 
     async def update_project_settings(
         self,
@@ -173,14 +147,3 @@ class ProjectCRUD:
 
         await self.session.flush()
         return project_settings
-
-    async def delete_project_settings_by_id(self, project_settings_id: int) -> bool:
-        """根据项目设置 ID 删除项目设置，返回是否删除成功"""
-        result = await self.session.execute(
-            select(ProjectSettings).where(ProjectSettings.id == project_settings_id)
-        )
-        project_settings = result.scalars().first()
-        if project_settings:
-            await self.session.delete(project_settings)
-            return True
-        return False
