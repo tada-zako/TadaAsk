@@ -45,6 +45,16 @@ class SourceCRUD:
         )
         return result.scalars().first()
 
+    async def get_sources_by_uids(self, *, source_uids: list[str]) -> Sequence[Source]:
+        """根据数据源 UID 列表批量获取数据源详情"""
+        if not source_uids:
+            return []
+
+        result = await self.session.execute(
+            select(Source).where(Source.uid.in_(source_uids))
+        )
+        return result.scalars().all()
+
     async def list_sources(
         self, *, limit: int = 10, offset: int = 0
     ) -> Sequence[Source]:

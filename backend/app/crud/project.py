@@ -1,6 +1,7 @@
 from typing import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from app.db.models import (
     ProjectSourceLink,
     ProjectSettings,
     Provider,
+    Source,
 )
 from app.db.schemas import (
     ProjectCreate,
@@ -142,12 +144,60 @@ class ProjectCRUD:
     # ====================
     # Project-Source 关联操作
     # ====================
+    async def list_sources_by_project_id(self, *, project_id: int) -> Sequence[Source]:
+        """获取项目绑定的数据源列表"""
+        stmt = (
+            select(Source)
+            .join(ProjectSourceLink, ProjectSourceLink.source_id == Source.id)
+            .where(ProjectSourceLink.project_id == project_id)
+            .order_by(Source.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
 
-    async def bind_source_to_project(
-        self, *, project_id: int, source_id: int
-    ) -> ProjectSourceLink:
-        """将数据源绑定到项目，返回绑定关系实例"""
-        link = ProjectSourceLink(project_id=project_id, source_id=source_id)
-        self.session.add(link)
-        await self.session.flush()
-        return link
+    async def list_project_source_links(
+        self, *, project_id: int, source_ids: list[int]
+    ) -> Sequence[ProjectSourceLink]:
+        """批量获取项目与数据源的绑定关系"""
+        if not source_ids:
+            return []
+
+        stmt = select(ProjectSourceLink).where(
+            ProjectSourceLink.project_id == project_id,
+            ProjectSourceLink.source_id.in_(source_ids),
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def bind_sources_to_project(
+        self, *, project_id: int, source_ids: list[int]
+    ) -> int:
+        """将多个数据源批量绑定到项目，忽略已存在的绑定关系"""
+        source_ids = list(dict.fromkeys(source_ids))
+        if not source_ids:
+            return 0
+
+        values = [
+            {"project_id": project_id, "source_id": source_id}
+            for source_id in source_ids
+        ]
+        stmt = insert(ProjectSourceLink).values(values)
+        # 使用 on_conflict_do_nothing 忽略已存在的绑定关系，确保幂等性
+        stmt = stmt.on_conflict_do_nothing(index_elements=["project_id", "source_id"])
+        result = await self.session.execute(stmt)
+        return result.rowcount or 0  # type: ignore[attr-defined]
+
+    async def unbind_sources_from_project(
+        self, *, project_id: int, source_ids: list[int]
+    ) -> int:
+        """批量解除项目与数据源的绑定关系，返回删除数量"""
+        source_ids = list(dict.fromkeys(source_ids))
+        if not source_ids:
+            return 0
+
+        stmt = delete(ProjectSourceLink).where(
+            ProjectSourceLink.project_id == project_id,
+            ProjectSourceLink.source_id.in_(source_ids),
+        )
+        result = await self.session.execute(stmt)
+        return result.rowcount or 0  # type: ignore[attr-defined]
