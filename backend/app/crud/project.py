@@ -62,25 +62,6 @@ class ProjectCRUD:
         )
         return result.scalars().first()
 
-    async def get_project_with_settings_by_uid(
-        self, project_uid: str
-    ) -> Project | None:
-        """联合查询：加载 Project -> ProjectSettings -> Provider & ModelProfile"""
-        stmt = (
-            select(Project)
-            .where(Project.uid == project_uid)
-            .options(
-                # 联合加载 ProjectSettings
-                joinedload(Project.project_settings).options(
-                    # 联合加载 Provider 和 ModelProfile
-                    joinedload(ProjectSettings.visitor_default_provider),
-                    joinedload(ProjectSettings.visitor_default_model_profile),
-                )
-            )
-        )
-        result = await self.session.execute(stmt)
-        return result.scalars().first()
-
     async def delete_project_by_id(self, project_id: int) -> bool:
         """根据项目 ID 删除项目，返回是否删除成功"""
         result = await self.session.execute(
@@ -91,15 +72,6 @@ class ProjectCRUD:
             await self.session.delete(project)
             return True
         return False
-
-    async def bind_source_to_project(
-        self, *, project_id: int, source_id: int
-    ) -> ProjectSourceLink:
-        """将数据源绑定到项目，返回绑定关系实例"""
-        link = ProjectSourceLink(project_id=project_id, source_id=source_id)
-        self.session.add(link)
-        await self.session.flush()
-        return link
 
     # ====================
     # ProjectSettings 相关操作
@@ -147,3 +119,35 @@ class ProjectCRUD:
 
         await self.session.flush()
         return project_settings
+
+    async def get_project_with_settings_by_uid(
+        self, project_uid: str
+    ) -> Project | None:
+        """联合查询：加载 Project -> ProjectSettings -> Provider & ModelProfile"""
+        stmt = (
+            select(Project)
+            .where(Project.uid == project_uid)
+            .options(
+                # 联合加载 ProjectSettings
+                joinedload(Project.project_settings).options(
+                    # 联合加载 Provider 和 ModelProfile
+                    joinedload(ProjectSettings.visitor_default_provider),
+                    joinedload(ProjectSettings.visitor_default_model_profile),
+                )
+            )
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    # ====================
+    # Project-Source 关联操作
+    # ====================
+
+    async def bind_source_to_project(
+        self, *, project_id: int, source_id: int
+    ) -> ProjectSourceLink:
+        """将数据源绑定到项目，返回绑定关系实例"""
+        link = ProjectSourceLink(project_id=project_id, source_id=source_id)
+        self.session.add(link)
+        await self.session.flush()
+        return link

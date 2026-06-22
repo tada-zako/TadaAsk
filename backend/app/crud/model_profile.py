@@ -16,7 +16,6 @@ from app.db.schemas import (
     ProviderWithModelInternalRead,
 )
 from app.core.security import ProviderAPIKeyCipher
-from app.core.config import settings
 
 
 class ModelProfileCRUD:
@@ -355,6 +354,29 @@ class ModelProfileCRUD:
         )
 
         return ProviderWithModelInternalRead.model_validate(provider_dict)
+
+    async def get_provider_with_model_profile_by_uid(
+        self,
+        *,
+        provider_uid: str,
+        model_uid: str,
+    ) -> Provider | None:
+        """根据提供商 UID 和模型 UID 获取包含提供商信息和模型配置详情的 ORM 数据结构"""
+        stmt = (
+            select(Provider)
+            .join(Provider.model_profiles)
+            .where(
+                and_(
+                    Provider.uid == provider_uid,
+                    ModelProfile.uid == model_uid,
+                )
+            )
+            # 预加载关联的单个 model_profiles
+            .options(contains_eager(Provider.model_profiles))
+        )
+
+        result = await self.session.execute(stmt)
+        return result.unique().scalars().first()
 
     async def bulk_upsert_catalog_with_models(
         self,
