@@ -94,7 +94,7 @@ class Project(Base):
     )
 
     # ---- 关系字段 ----
-    project_settings: Mapped[Optional["ProjectSettings"]] = relationship(
+    project_settings: Mapped["ProjectSettings"] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
         passive_deletes=True,

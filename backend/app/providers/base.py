@@ -213,7 +213,7 @@ class ModelSettings:
         cls,
         *,
         profile: "ModelProfileRead",
-        project_settings: "ProjectSettings | None" = None,
+        project_settings: "ProjectSettings",
     ) -> "ModelSettings":
         """
         Visitor Chat 的模型配置入口。
@@ -222,27 +222,27 @@ class ModelSettings:
         """
         max_tokens = (
             project_settings.visitor_max_output_tokens
-            if project_settings and project_settings.visitor_max_output_tokens
+            if project_settings.visitor_max_output_tokens
             else profile.max_output_tokens or settings.llm_default_max_output_tokens
         )
         temperature = (
             project_settings.visitor_temperature
-            if project_settings and project_settings.visitor_temperature is not None
+            if project_settings.visitor_temperature is not None
             else settings.llm_default_temperature
         )
         top_p = (
             project_settings.visitor_top_p
-            if project_settings and project_settings.visitor_top_p is not None
+            if project_settings.visitor_top_p is not None
             else settings.llm_default_top_p
         )
         timeout = (
             project_settings.visitor_timeout
-            if project_settings and project_settings.visitor_timeout is not None
+            if project_settings.visitor_timeout is not None
             else settings.llm_default_timeout
         )
         thinking = (
             project_settings.visitor_thinking
-            if project_settings and project_settings.visitor_thinking is not None
+            if project_settings.visitor_thinking is not None
             else settings.llm_default_thinking
         )
 

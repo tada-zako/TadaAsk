@@ -14,7 +14,7 @@ from ...deps import (
 from ...schemas import VisitorChatRequest
 from app.services.chat import ChatInput, RAGChatPlugin
 from app.providers import FullCompleter, completer_factory, ModelSettings
-from app.db.models import ProjectSettings, Provider, ModelProfile
+from app.db.models import Provider, ModelProfile
 from app.db.schemas import (
     HybridSearchOptions,
     ProviderWithModelInternalRead,
@@ -34,7 +34,7 @@ async def get_visitor_provider_with_model(
     """
     Visitor: 从 Project 实例中装配 ProviderWithModelInternalRead 实例
     """
-    settings = cast(ProjectSettings, project.project_settings)
+    settings = project.project_settings
 
     provider = cast(Provider, settings.visitor_default_provider)
     model_profile = cast(ModelProfile, settings.visitor_default_model_profile)
@@ -84,7 +84,7 @@ async def get_rag_plugin(
     ],
 ) -> RAGChatPlugin | None:
     """根据项目配置动态生成 RAGChatPlugin"""
-    settings = cast(ProjectSettings, project.project_settings)
+    settings = project.project_settings
     if not settings.visitor_rag_enabled:
         logger.info(f"Project {project.uid} RAG plugin not enabled for visitor chat")
         return None

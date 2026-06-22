@@ -168,12 +168,6 @@ async def valid_project_with_settings(
         raise HTTPException(status_code=404, detail="Project not found")
 
     settings = project.project_settings
-    if not settings:
-        raise HTTPException(
-            status_code=400,
-            detail="Project settings not found for the project, please check if the project settings are properly initialized.",
-        )
-
     provider = settings.visitor_default_provider
     model_profile = settings.visitor_default_model_profile
 
