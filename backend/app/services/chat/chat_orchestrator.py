@@ -104,7 +104,7 @@ class ChatOrchestratorService:
     async def _valid_or_create_chat_session(
         self,
         *,
-        project: Project,
+        project: Project | None,
         chat_input: ChatInput,
         provider: str,
         model: str,
@@ -116,22 +116,38 @@ class ChatOrchestratorService:
         - 如果 chat_session_uid 为空或无效，则创建新的 ChatSession 实例并返回。
         - 返回值包含 ChatSession 实例和一个布尔值，指示是否新创建了会话。
         """
+        project_id = project.id if project else None
+        if requester_type == ChatSessionType.VISITOR and project_id is None:
+            # visitor 侧必须带有 project 上下文
+            raise ValueError("Visitor chat requires project context")
+
         chat_session_uid = chat_input.chat_session_uid
         if chat_session_uid:
-            chat_session = await self.chat_session_crud.get_chat_session_by_uid(
-                project_id=project.id,
-                chat_session_uid=chat_session_uid,
-            )
+            if requester_type == ChatSessionType.VISITOR:
+                # 查询 visitor session
+                assert project_id is not None
+                chat_session = await self.chat_session_crud.get_visitor_session_by_uid(
+                    project_id=project_id,
+                    chat_session_uid=chat_session_uid,
+                )
+            elif project_id is not None:
+                # 查询带 project 上下文的 admin session
+                chat_session = (
+                    await self.chat_session_crud.get_admin_project_session_by_uid(
+                        project_id=project_id,
+                        chat_session_uid=chat_session_uid,
+                    )
+                )
+            else:
+                # 查询 global 上下文 admin session
+                chat_session = (
+                    await self.chat_session_crud.get_admin_global_session_by_uid(
+                        chat_session_uid=chat_session_uid,
+                    )
+                )
+
             if not chat_session:
                 raise ValueError("Invalid chat_session_uid")
-
-            # 会话权限限制：Admin 允许访问 admin/visitor 类型会话；
-            # Visitor 仅允许访问 visitor 类型会话；如果不符合则抛出异常
-            if (
-                requester_type == ChatSessionType.VISITOR
-                and chat_session.owner_type != ChatSessionType.VISITOR
-            ):
-                raise ValueError("Invalid chat_session_uid for visitor")
 
             return chat_session, False
 
@@ -143,7 +159,7 @@ class ChatOrchestratorService:
                 owner_type=requester_type,
                 provider=provider,
                 model=model,
-                project_id=project.id,
+                project_id=project_id,
             )
         )
         return new_chat_session, True
@@ -230,7 +246,7 @@ class ChatOrchestratorService:
     async def stream_rag_chat(
         self,
         *,
-        project: Project,
+        project: Project | None,
         chat_input: ChatInput,
         completer: FullCompleter,
         provider_with_model: ProviderWithModelInternalRead,
