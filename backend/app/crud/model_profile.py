@@ -120,13 +120,16 @@ class ModelProfileCRUD:
         for key, value in data.items():
             setattr(provider, key, value)
 
-        if "api_key" in provider_data.model_fields_set:
-            encrypted_api_key = None
-            if provider_data.api_key is not None:
-                encrypted_api_key = api_key_cipher.encrypt(
-                    provider_data.api_key.get_secret_value()
-                )
-            provider.encrypted_api_key = encrypted_api_key
+        # NOTE: api_key 不允许设置为 None
+        if not provider_data.api_key:
+            raise ValueError(
+                "API key cannot be empty; provide a valid API key to update"
+            )
+
+        encrypted_api_key = api_key_cipher.encrypt(
+            provider_data.api_key.get_secret_value()
+        )
+        provider.encrypted_api_key = encrypted_api_key
 
         await self.session.flush()
         return provider
@@ -211,35 +214,11 @@ class ModelProfileCRUD:
 
             if existing_model_profile:
                 # 已存在同名 model_profile，执行更新操作
-                existing_model_profile.context_window_tokens = (
-                    model_profile_data.context_window_tokens
-                    or existing_model_profile.context_window_tokens
-                )
-                existing_model_profile.max_output_tokens = (
-                    model_profile_data.max_output_tokens
-                    or existing_model_profile.max_output_tokens
-                )
-                existing_model_profile.supports_stream = (
-                    model_profile_data.supports_stream
-                    if model_profile_data.supports_stream is not None
-                    else existing_model_profile.supports_stream
-                )
-                existing_model_profile.supports_structured = (
-                    model_profile_data.supports_structured
-                    if model_profile_data.supports_structured is not None
-                    else existing_model_profile.supports_structured
-                )
+                for key, value in model_profile_data.model_dump(
+                    exclude_unset=True, exclude={"model", "is_enabled"}
+                ).items():
+                    setattr(existing_model_profile, key, value)
                 continue
-
-            # 设置默认配置
-            if not model_profile_data.context_window_tokens:
-                model_profile_data.context_window_tokens = (
-                    settings.llm_default_context_window_tokens
-                )
-            if not model_profile_data.max_output_tokens:
-                model_profile_data.max_output_tokens = (
-                    settings.llm_default_max_output_tokens
-                )
 
             # 创建关联 model_profile
             provider.model_profiles.append(
@@ -418,18 +397,11 @@ class ModelProfileCRUD:
 
                     if existing_model_profile:
                         # 更新已有模型配置的字段
-                        existing_model_profile.context_window_tokens = (
-                            model_data.context_window_tokens
-                        )
-                        existing_model_profile.max_output_tokens = (
-                            model_data.max_output_tokens
-                        )
-                        existing_model_profile.supports_stream = (
-                            model_data.supports_stream
-                        )
-                        existing_model_profile.supports_structured = (
-                            model_data.supports_structured
-                        )
+                        for key, value in model_data.model_dump(
+                            exclude_unset=True, exclude={"model", "is_enabled"}
+                        ).items():
+                            setattr(existing_model_profile, key, value)
+                        continue
 
                     # 创建新模型记录
                     existing_provider.model_profiles.append(
@@ -438,7 +410,6 @@ class ModelProfileCRUD:
                             is_enabled=False,
                         )
                     )
-                    continue
 
                 # 创建新的 provider 及其 model profiles
                 provider = Provider(

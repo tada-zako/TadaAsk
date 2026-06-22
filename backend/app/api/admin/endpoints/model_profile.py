@@ -121,6 +121,13 @@ async def update_provider(
             )
         payload = payload.model_copy(update={"name": provider_name})
 
+    # 检查是否提供 API_Key，禁止清空 API_Key
+    if payload.api_key is None:
+        raise HTTPException(
+            status_code=400,
+            detail="API key cannot be empty; provide a valid API key to update",
+        )
+
     try:
         updated_provider = await model_profile_crud.update_provider(
             provider=provider,
