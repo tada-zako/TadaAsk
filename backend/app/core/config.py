@@ -87,6 +87,23 @@ class Settings(BaseSettings):
     )  # SQLite FTS 数据库路径
 
     # =======================================
+    # visitor 侧请求限制
+    # =======================================
+    visitor_rate_limit_enabled: bool = True  # 是否启用 visitor 请求限制
+
+    visitor_rate_limit_ip_project_per_minute: int = 6  # 每 IP + project：6 次 / 分钟
+    visitor_rate_limit_ip_project_per_hour: int = 60  # 每 IP + project：60 次 / 小时
+    visitor_rate_limit_ip_per_minute: int = 20  # 每 IP 全局：20 次 / 分钟
+    visitor_rate_limit_project_per_minute: int = 120  # 每 project 全局：120 次 / 分钟
+
+    visitor_stream_concurrency_per_ip: int = 2  # 每 IP 同时 stream：2
+    visitor_stream_concurrency_per_project: int = 20  # 每 project 同时 stream：20
+
+    visitor_message_max_chars: int = 800  # visitor 侧单条消息最大字符数
+
+    visitor_trust_proxy_headers: bool = False  # 是否信任代理头部信息（X-Forwarded-For）；无可信代理时 fallback 到 request.client.host
+
+    # =======================================
     # 权限配置
     # =======================================
 
