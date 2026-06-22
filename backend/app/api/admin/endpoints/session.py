@@ -7,7 +7,6 @@ from ...deps import (
     ChatSessionCRUDeps,
     ChatMessageCRUDeps,
 )
-from app.core.constants import ChatSessionType
 from app.db.models import ChatSession
 from app.db.schemas import ChatSessionRead, ChatMessageRead
 
@@ -34,9 +33,24 @@ async def list_chat_sessions(
     Returns:
         聊天会话列表
     """
-    sessions = await chat_session_crud.list_chat_sessions_by_type_and_project_id(
+    sessions = await chat_session_crud.list_admin_project_sessions(
         project_id=project.id,
-        owner_type=ChatSessionType.ADMIN,
+        limit=limit,
+        offset=offset,
+    )
+    return [ChatSessionRead.model_validate(session) for session in sessions]
+
+
+@router.get("/sessions", response_model=list[ChatSessionRead])
+async def list_global_chat_sessions(
+    chat_session_crud: ChatSessionCRUDeps,
+    limit: Annotated[int, Query(ge=1, le=100)] = 10,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    """
+    获取不带项目上下文的 Admin 聊天会话列表
+    """
+    sessions = await chat_session_crud.list_admin_global_sessions(
         limit=limit,
         offset=offset,
     )
@@ -44,13 +58,10 @@ async def list_chat_sessions(
 
 
 async def valid_admin_chat_session(
-    project: ValidProjectDeps,
     chat_session_crud: ChatSessionCRUDeps,
     chat_session_uid: Annotated[
         str,
         Path(
-            embed=True,
-            alias="chatSessionUid",
             description="前端传递的 chat_session_uid",
         ),
     ],
@@ -61,7 +72,7 @@ async def valid_admin_chat_session(
     如果 chat_session_uid 为空或无效，报错
     """
     chat_session = await chat_session_crud.get_chat_session_by_uid(
-        project_id=project.id, chat_session_uid=chat_session_uid
+        chat_session_uid=chat_session_uid
     )
 
     if not chat_session:
