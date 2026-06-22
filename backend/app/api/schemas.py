@@ -40,7 +40,8 @@ class AdminRAGChatRequest(AdminChatRequest):
 
     # RAG 相关参数配置
     source_uids: list[str] = Field(
-        ..., min_length=1, description="RAG 检索使用的 source_uids 列表"
+        default_factory=list,
+        description="RAG 检索使用的 source_uids 列表；project-scoped chat 中表示额外 sources",
     )
     rag_options: HybridSearchRequest = Field(default_factory=HybridSearchRequest)
 
