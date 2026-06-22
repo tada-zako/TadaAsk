@@ -9,7 +9,6 @@ from app.db.models import ModelProfile, Provider
 from app.db.schemas import (
     ProjectCreate,
     ProjectRead,
-    ProjectSettingsCreate,
     ProjectSettingsRead,
     ProjectSettingsUpdate,
     ProjectUpdate,
@@ -19,10 +18,16 @@ router = APIRouter()
 
 
 async def resolve_default_model_refs(
-    payload: ProjectSettingsCreate | ProjectSettingsUpdate,
+    payload: ProjectSettingsUpdate,
     model_profile_crud: ModelProfileCRUDeps,
 ) -> tuple[bool, Provider | None, ModelProfile | None]:
     """解析 visitor 默认 provider/model 的 UID 输入。"""
+    provider_and_model_exception = HTTPException(
+        status_code=400,
+        detail="visitor default provider and model profile must be configured together",
+    )
+
+    # 判断 provider, model_profile 字段是否由前端主动设置
     provider_field_set = "visitor_default_provider_uid" in payload.model_fields_set
     model_field_set = "visitor_default_model_profile_uid" in payload.model_fields_set
 
@@ -30,34 +35,33 @@ async def resolve_default_model_refs(
         return False, None, None
 
     if provider_field_set != model_field_set:
-        raise HTTPException(
-            status_code=400,
-            detail="visitor default provider and model profile must be configured together",
-        )
+        # provider 和 model_profile 必须同时更新
+        raise provider_and_model_exception
 
     provider_uid = payload.visitor_default_provider_uid
     model_uid = payload.visitor_default_model_profile_uid
 
     if provider_uid is None and model_uid is None:
+        # 允许主动设置为 None
         return True, None, None
 
     if not provider_uid or not model_uid:
+        # provider 和 model_profile 必须同时更新
+        raise provider_and_model_exception
+
+    provider_and_model = (
+        await model_profile_crud.get_provider_with_model_profile_by_uid(
+            provider_uid=provider_uid,
+            model_uid=model_uid,
+        )
+    )
+    if provider_and_model is None:
         raise HTTPException(
-            status_code=400,
-            detail="visitor default provider and model profile must be configured together",
+            status_code=404,
+            detail="visitor default provider or model profile not found",
         )
 
-    provider = await model_profile_crud.get_provider_by_uid(provider_uid=provider_uid)
-    if not provider:
-        raise HTTPException(status_code=404, detail="Provider not found")
-
-    model_profile = await model_profile_crud.get_model_profile_by_uid(
-        provider_uid=provider.uid,
-        model_uid=model_uid,
-    )
-    if not model_profile:
-        raise HTTPException(status_code=404, detail="Model profile not found")
-
+    provider, model_profile = provider_and_model, provider_and_model.model_profiles[0]
     return True, provider, model_profile
 
 
@@ -172,42 +176,6 @@ async def delete_project(
         raise HTTPException(status_code=500, detail="Failed to delete project")
 
 
-@router.post("/{project_uid}/settings", response_model=ProjectSettingsRead)
-async def create_project_settings(
-    project: ValidProjectDeps,
-    payload: ProjectSettingsCreate,
-    project_crud: ProjectCRUDeps,
-    model_profile_crud: ModelProfileCRUDeps,
-):
-    """创建 project settings"""
-    existing_settings = await project_crud.get_project_settings_by_project_id(
-        project_id=project.id
-    )
-    if existing_settings:
-        raise HTTPException(status_code=400, detail="Project settings already exists")
-
-    _, provider, model_profile = await resolve_default_model_refs(
-        payload=payload,
-        model_profile_crud=model_profile_crud,
-    )
-
-    try:
-        project_settings = await project_crud.create_project_settings(
-            project=project,
-            settings_data=payload,
-            visitor_default_provider=provider,
-            visitor_default_model_profile=model_profile,
-        )
-    except IntegrityError as exc:
-        logger.warning(f"创建 project settings 失败，存在唯一约束冲突：{exc}")
-        raise HTTPException(
-            status_code=400,
-            detail="project settings already exists for this project",
-        ) from exc
-
-    return ProjectSettingsRead.model_validate(project_settings)
-
-
 @router.get("/{project_uid}/settings", response_model=ProjectSettingsRead)
 async def get_project_settings(
     project: ValidProjectDeps,
@@ -217,8 +185,6 @@ async def get_project_settings(
     project_settings = await project_crud.get_project_settings_by_project_id(
         project_id=project.id
     )
-    if not project_settings:
-        raise HTTPException(status_code=404, detail="Project settings not found")
 
     return ProjectSettingsRead.model_validate(project_settings)
 
@@ -234,9 +200,8 @@ async def update_project_settings(
     project_settings = await project_crud.get_project_settings_by_project_id(
         project_id=project.id
     )
-    if not project_settings:
-        raise HTTPException(status_code=404, detail="Project settings not found")
 
+    # 解析 visitor 默认 provider/model 的 UID 输入
     update_default_model, provider, model_profile = await resolve_default_model_refs(
         payload=payload,
         model_profile_crud=model_profile_crud,
@@ -246,8 +211,8 @@ async def update_project_settings(
         updated_settings = await project_crud.update_project_settings(
             project_settings=project_settings,
             settings_data=payload,
-            update_default_model=update_default_model,
-            visitor_default_provider=provider,
+            update_default_model=update_default_model,  # 是否更新模型配置
+            visitor_default_provider=provider,  # 允许为 None -> 不设置 provider-model
             visitor_default_model_profile=model_profile,
         )
     except IntegrityError as exc:
@@ -258,27 +223,3 @@ async def update_project_settings(
         ) from exc
 
     return ProjectSettingsRead.model_validate(updated_settings)
-
-
-@router.delete("/{project_uid}/settings")
-async def delete_project_settings(
-    project: ValidProjectDeps,
-    project_crud: ProjectCRUDeps,
-):
-    """删除 project settings"""
-    project_settings = await project_crud.get_project_settings_by_project_id(
-        project_id=project.id
-    )
-    if not project_settings:
-        raise HTTPException(status_code=404, detail="Project settings not found")
-
-    success = await project_crud.delete_project_settings_by_id(
-        project_settings_id=project_settings.id
-    )
-    if success:
-        return {
-            "projectUid": project.uid,
-            "status": "deleted",
-        }
-
-    raise HTTPException(status_code=500, detail="Failed to delete project settings")
