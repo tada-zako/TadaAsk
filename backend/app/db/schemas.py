@@ -75,6 +75,17 @@ class ProjectCreate(ProjectBase):
     )
 
 
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    site_url: str | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+    )
+
+
 class ProjectRead(ProjectBase):
     uid: str
     created_at: datetime
@@ -117,6 +128,76 @@ class ProjectSettingsBase(BaseModel):
     rag_max_keywords: int
 
     rag_standalone_enabled: bool
+
+
+class ProjectSettingsCreate(BaseModel):
+    visitor_rag_enabled: bool = True
+    visitor_system_prompt: str | None = None
+
+    visitor_max_output_tokens: int = 1536
+    visitor_temperature: float = 0.3
+    visitor_top_p: float = 0.9
+    visitor_timeout: float = 45.0
+    visitor_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"] = (
+        False
+    )
+
+    rag_mode: SearchMode = SearchMode.FAST
+    rag_top_k: int = 8
+
+    rag_rerank_enabled: bool = True
+    rag_fts_k: int = 30
+    rag_vector_k: int = 20
+    rag_rerank_k: int = 12
+
+    rag_max_alternative_queries: int = 2
+    rag_max_keywords: int = 5
+
+    rag_standalone_enabled: bool = False
+
+    visitor_default_provider_uid: str | None = None
+    visitor_default_model_profile_uid: str | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class ProjectSettingsUpdate(BaseModel):
+    visitor_rag_enabled: bool | None = None
+    visitor_system_prompt: str | None = None
+
+    visitor_max_output_tokens: int | None = None
+    visitor_temperature: float | None = None
+    visitor_top_p: float | None = None
+    visitor_timeout: float | None = None
+    visitor_thinking: (
+        bool | Literal["minimal", "low", "medium", "high", "xhigh"] | None
+    ) = None
+
+    rag_mode: SearchMode | None = None
+    rag_top_k: int | None = None
+
+    rag_rerank_enabled: bool | None = None
+    rag_fts_k: int | None = None
+    rag_vector_k: int | None = None
+    rag_rerank_k: int | None = None
+
+    rag_max_alternative_queries: int | None = None
+    rag_max_keywords: int | None = None
+
+    rag_standalone_enabled: bool | None = None
+
+    visitor_default_provider_uid: str | None = None
+    visitor_default_model_profile_uid: str | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
 
 
 class ProjectSettingsRead(ProjectSettingsBase):
