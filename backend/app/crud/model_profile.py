@@ -432,18 +432,18 @@ class ModelProfileCRUD:
                             is_enabled=False,
                         )
                     )
-
-                # 创建新的 provider 及其 model profiles
-                provider = Provider(
-                    **provider_data.model_dump(exclude={"api_key"}),
-                )
-                provider.model_profiles = [
-                    ModelProfile(
-                        **model_data.model_dump(),
-                    )
-                    for model_data in model_data_list
-                ]
-                self.session.add(provider)
                 continue
+
+            # 创建新的 provider 及其 model profiles
+            provider = Provider(
+                **provider_data.model_dump(exclude={"api_key"}),
+            )
+            provider.model_profiles = [
+                ModelProfile(
+                    **model_data.model_dump(),
+                )
+                for model_data in model_data_list
+            ]
+            self.session.add(provider)
 
         await self.session.flush()
