@@ -1,11 +1,13 @@
-from typing import AsyncIterable, Annotated, cast
+from typing import AsyncIterable, Annotated, cast, AsyncIterator
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.sse import ServerSentEvent, EventSourceResponse
 from loguru import logger
 
 from ...deps import (
+    VisitorRateLimiterDeps,
     APIKeyCipherDeps,
+    ClientIPDeps,
     ValidVisitorChatProjectDeps,
     RAGSearchCRUDeps,
     ChatOrchestratorServiceDeps,
@@ -21,10 +23,22 @@ from app.db.schemas import (
     ProviderRead,
     ModelProfileRead,
 )
+from app.core.config import settings
+from app.core.exceptions import VisitorRateLimitError
+from app.core.rate_limit import VisitorStreamLease
 from app.core.constants import ChatSessionType, SearchMode
 
 
 router = APIRouter()
+
+
+async def get_visitor_chat_request(
+    chat_request: Annotated[
+        VisitorChatRequest, Body(..., description="VisitorChatRequest 请求体")
+    ],
+) -> VisitorChatRequest:
+    """从请求体中解析 VisitorChatRequest 对象，作为依赖注入接口"""
+    return chat_request
 
 
 async def get_visitor_provider_with_model(
@@ -133,11 +147,56 @@ async def get_rag_plugin(
     )
 
 
+async def enforce_visitor_rate_limit(
+    chat_request: Annotated[VisitorChatRequest, Depends(get_visitor_chat_request)],
+    visitor_rate_limiter: VisitorRateLimiterDeps,
+    client_ip: ClientIPDeps,
+    project_uid: Annotated[str, Path(..., description="Project UID")],
+) -> None:
+    """
+    强制执行 Visitor 侧的请求限流策略
+    """
+    if len(chat_request.message) > settings.visitor_message_max_chars:
+        # visitor 侧单条消息长度限制
+        raise HTTPException(
+            status_code=413,
+            detail="Visitor message is too large.",
+        )
+
+    try:
+        await visitor_rate_limiter.check_request(ip=client_ip, project_uid=project_uid)
+    except VisitorRateLimitError as exc:
+        # 直接上抛，交给全局异常处理器处理
+        raise exc
+
+
+async def visitor_stream_lease(
+    project_uid: Annotated[str, Path(..., description="Project UID")],
+    client_ip: ClientIPDeps,
+    rate_limiter: VisitorRateLimiterDeps,
+) -> AsyncIterator[VisitorStreamLease]:
+    """Visitor 侧的流式对话租约依赖"""
+    try:
+        # 获取 visitor stream 租约
+        lease = await rate_limiter.acquire_stream(
+            ip=client_ip,
+            project_uid=project_uid,
+        )
+    except VisitorRateLimitError as exc:
+        raise exc
+
+    try:
+        yield lease
+    finally:
+        # 释放 visitor stream 租约
+        await rate_limiter.release_stream(lease)
+
+
 @router.post("/project/{project_uid}/chat/stream", response_class=EventSourceResponse)
 async def stream_chat(
-    chat_request: Annotated[
-        VisitorChatRequest, Body(..., description="VisitorChatRequest 请求体")
-    ],
+    chat_request: Annotated[VisitorChatRequest, Depends(get_visitor_chat_request)],
+    _rate_limit: Annotated[None, Depends(enforce_visitor_rate_limit)],
+    _lease: Annotated[VisitorStreamLease, Depends(visitor_stream_lease)],
     project: ValidVisitorChatProjectDeps,
     completer: Annotated[FullCompleter, Depends(get_visitor_completer)],
     provider_with_model: Annotated[
