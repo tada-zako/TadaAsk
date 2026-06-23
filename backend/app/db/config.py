@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import AsyncIterable
+from typing import AsyncIterator
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
@@ -53,7 +53,7 @@ async def drop_db():
         await conn.run_sync(Base.metadata.drop_all)
 
 
-async def get_db() -> AsyncIterable[AsyncSession]:
+async def get_db() -> AsyncIterator[AsyncSession]:
     """
     获取 SQLAlchemy 异步会话，
     用于 FastAPI 依赖注入
