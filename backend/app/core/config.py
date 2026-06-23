@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 后端项目根路径，指向 backend/ 目录
 PROJECT_ROOT = pathlib.Path(__file__).parents[2]
+DEFAULT_EMBEDDING_MODEL_NAME = "BAAI/bge-small-en-v1.5"
+DEFAULT_RERANK_MODEL_NAME = "Xenova/ms-marco-MiniLM-L-6-v2"
 
 # 类型别名
 type EmbeddingBackend = Literal["fastembed", "llamacpp"]  # 文本嵌入后端
@@ -49,8 +51,8 @@ class Settings(BaseSettings):
     rerank_backend: RerankBackend = "fastembed"  # Rerank 后端
     hyde_enabled: bool = False  # 是否启用 HyDE 生成虚拟文档增强检索，默认为 False
 
-    embedding_model_name: str = ""  # 文本嵌入模型名称，默认由具体嵌入实现内部处理
-    rerank_model_name: str = ""  # Rerank 模型名称，默认由具体实现内部处理
+    embedding_model_name: str = DEFAULT_EMBEDDING_MODEL_NAME  # 文本嵌入模型名称
+    rerank_model_name: str = DEFAULT_RERANK_MODEL_NAME  # Rerank 模型名称
 
     chunk_size_tokens: int = 1000  # 文本块的目标 token 长度
     chunk_overlap_tokens: int = 0  # 文本块之间的重叠 token 数量
@@ -121,6 +123,15 @@ class Settings(BaseSettings):
     # ================================
     # 验证逻辑
     # ================================
+    @model_validator(mode="after")
+    def normalize_model_defaults(self) -> "Settings":
+        """允许 .env 显式留空时继续使用内置默认模型。"""
+        if not self.embedding_model_name.strip():
+            self.embedding_model_name = DEFAULT_EMBEDDING_MODEL_NAME
+        if not self.rerank_model_name.strip():
+            self.rerank_model_name = DEFAULT_RERANK_MODEL_NAME
+        return self
+
     @model_validator(mode="after")
     def compute_chunk_defaults(self) -> "Settings":
         """计算文本切割相关的默认值，并进行合法性检查"""
