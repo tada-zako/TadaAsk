@@ -40,10 +40,17 @@ from app.services.chat import (
     ContextBuilder,
     GenerationRegistry,
 )
+from app.core.config import settings
 from app.core.security import ProviderAPIKeyCipher
+from app.core.rate_limit import VisitorRateLimiter
 
 
 # =========== 全局服务依赖注入接口 ============
+def get_visitor_rate_limiter(request: Request) -> VisitorRateLimiter:
+    """返回全局挂载的 VisitorRateLimiter 实例"""
+    return request.app.state.visitor_rate_limiter
+
+
 def get_api_key_cipher(request: Request) -> ProviderAPIKeyCipher:
     """返回全局挂载的 ProviderAPIKeyCipher 实例"""
     return request.app.state.api_key_cipher
@@ -143,6 +150,28 @@ async def get_rag_search_crud(session: "SessionDeps") -> RAGSearchCRUD:
 async def get_model_profile_crud(session: "SessionDeps") -> ModelProfileCRUD:
     """依赖注入接口：提供 ModelProfileCRUD 实例"""
     return ModelProfileCRUD(session=session)
+
+
+# =========== 工具函数封装依赖注入接口 ===========
+def get_client_ip(request: Request) -> str:
+    """获取客户端 IP 地址"""
+    if settings.visitor_trust_proxy_headers:
+        # 信任代理头部信息
+        # 优先尝试信任 Cloudflare
+        cf_ip = request.headers.get("CF-Connecting-IP")
+        if cf_ip:
+            return cf_ip.strip()
+
+        x_forwarded_for = request.headers.get("X-Forwarded-For")
+        if x_forwarded_for:
+            # 取第一个 IP
+            return x_forwarded_for.split(",", 1)[0].strip()
+
+    # fallback 到 request.client.host
+    if request.client:
+        return request.client.host
+
+    return "unknown"
 
 
 async def valid_project(
@@ -341,6 +370,9 @@ SessionFactoryDeps = Annotated[
     async_sessionmaker[AsyncSession], Depends(get_session_factory)
 ]
 
+VisitorRateLimiterDeps = Annotated[
+    VisitorRateLimiter, Depends(get_visitor_rate_limiter)
+]
 APIKeyCipherDeps = Annotated[ProviderAPIKeyCipher, Depends(get_api_key_cipher)]
 FileStorageDeps = Annotated[FileStorage, Depends(get_file_storage)]
 
@@ -365,6 +397,8 @@ SourceCRUDeps = Annotated[SourceCRUD, Depends(get_source_crud)]
 RAGSearchCRUDeps = Annotated[RAGSearchCRUD, Depends(get_rag_search_crud)]
 ModelProfileCRUDeps = Annotated[ModelProfileCRUD, Depends(get_model_profile_crud)]
 
+
+ClientIPDeps = Annotated[str, Depends(get_client_ip)]
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
 ValidVisitorChatProjectDeps = Annotated[Project, Depends(valid_project_with_settings)]

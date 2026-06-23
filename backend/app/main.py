@@ -8,7 +8,9 @@ from fastapi.exceptions import HTTPException as StarletteHTTPException
 from loguru import logger
 
 from app.core.config import settings
+from app.core.exceptions import RateLimitExceededError
 from app.core.security import get_password_hash, ProviderAPIKeyCipher
+from app.core.rate_limit import VisitorRateLimiter
 from app.crud import AdminCRUD, ModelProfileCRUD
 from app.db import init_db, async_session
 from app.db.schemas import AdminCreate
@@ -85,6 +87,17 @@ async def lifespan(app: FastAPI):
     # ======= 系统重要配置挂载 =======
     await init_db()
     await sync_model_catalog()
+
+    # 挂载 visitor 限流器实例
+    app.state.visitor_rate_limiter = VisitorRateLimiter(
+        enabled=settings.visitor_rate_limit_enabled,
+        ip_project_per_minute=settings.visitor_rate_limit_ip_project_per_minute,
+        ip_project_per_hour=settings.visitor_rate_limit_ip_project_per_hour,
+        ip_per_minute=settings.visitor_rate_limit_ip_per_minute,
+        project_per_minute=settings.visitor_rate_limit_project_per_minute,
+        stream_per_ip=settings.visitor_stream_concurrency_per_ip,
+        stream_per_project=settings.visitor_stream_concurrency_per_project,
+    )
 
     # 挂载文件存储实例
     file_storage: FileStorage = file_storage_factory(
@@ -205,6 +218,21 @@ app.add_middleware(
 async def value_error_handler(_: Request, exc: ValueError) -> JSONResponse:
     logger.warning(f"业务异常：{exc}")
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(RateLimitExceededError)
+async def rate_limit_exceeded_handler(
+    _: Request, exc: RateLimitExceededError
+) -> JSONResponse:
+    """处理请求被限流的异常"""
+    logger.warning(
+        f"请求被限流：{exc.message}，请在 {exc.retry_after_seconds} 秒后重试"
+    )
+    return JSONResponse(
+        status_code=429,
+        content={"detail": exc.message},
+        headers={"Retry-After": str(exc.retry_after_seconds)},
+    )
 
 
 @app.exception_handler(StarletteHTTPException)
