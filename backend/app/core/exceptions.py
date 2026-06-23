@@ -38,3 +38,22 @@ class SourceCreateStorageError(SourceCreateError):
     """Source 创建存储错误"""
 
     pass
+
+
+class RateLimitExceededError(Exception):
+    """请求被限流时抛出的异常，用于触发限流事件"""
+
+    def __init__(
+        self,
+        *,
+        retry_after_seconds: int = 60,
+        message: str = "Too many requests, please retry later.",
+    ):
+        self.retry_after_seconds = retry_after_seconds
+        self.message = message
+
+
+class VisitorRateLimitError(RateLimitExceededError):
+    """Visitor 侧请求被限流时抛出的异常，用于触发限流事件"""
+
+    pass
