@@ -22,7 +22,7 @@ _FAST_CHECK_CHARS = 300
 MAX_QUERY_TOKENS = 20
 
 # 默认停用词文件路径
-DEFAULT_STOP_WORDS_DIR = Path(__file__).parent / "resources"
+DEFAULT_STOP_WORDS_DIR = Path(__file__).parents[1] / "resources"
 HYBRID_STOP_WORDS_FILE = (
     DEFAULT_STOP_WORDS_DIR / "hybrid_stopwords.txt"
 )  # 中英文混合停用词

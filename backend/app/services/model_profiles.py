@@ -133,10 +133,12 @@ class ModelProfileService:
             model_creates = [
                 ModelProfileCreate(
                     model=model_id,
-                    context_window_tokens=(
-                        model_data.limit or CatalogModelLimit()
-                    ).context,
-                    max_output_tokens=(model_data.limit or CatalogModelLimit()).output,
+                    context_window_tokens=self._positive_limit_or_none(
+                        model_data.limit.context if model_data.limit else None
+                    ),
+                    max_output_tokens=self._positive_limit_or_none(
+                        model_data.limit.output if model_data.limit else None
+                    ),
                     supports_stream=True,
                     supports_structured=(
                         model_data.tool_call
@@ -144,7 +146,9 @@ class ModelProfileService:
                         else True
                     ),
                 )
-                for model_id, model_data in provider_catalog.models.items()
+                for model_id, model_data in self._select_recent_chat_models(
+                    provider_catalog.models
+                )
             ]
 
             catalog_items.append((provider_create, model_creates))
@@ -280,3 +284,9 @@ class ModelProfileService:
             return False
 
         return True
+
+    def _positive_limit_or_none(self, value: int | None) -> int | None:
+        """目录中 0 表示未知，本地模型配置用 None 表达未知。"""
+        if value is None or value <= 0:
+            return None
+        return value

@@ -71,7 +71,7 @@ def rerank_provider_factory(settings: Settings) -> RerankProvider:
         from .rerank import FastRerankAdapter
 
         return FastRerankAdapter(
-            model_name=settings.embedding_model_name,
+            model_name=settings.rerank_model_name,
             cache_dir=settings.fastembed_model_path,
         )
     raise ValueError(f"Unsupported rerank provider: {settings.rerank_backend}")
