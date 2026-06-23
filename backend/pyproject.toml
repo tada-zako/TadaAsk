@@ -51,5 +51,12 @@ dev = [
     "pytest>=9.0.2",
 ]
 
-[tool.pytest]
-asyncio_mode = "auto"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = [
+    ".venv",
+    ".pytest_cache",
+    ".ruff_cache",
+    "storages",
+    "models--*",
+]
