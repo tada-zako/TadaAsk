@@ -111,7 +111,6 @@ class ProjectWidgetBase(BaseModel):
     name: str
     site_origin: str
     is_enabled: bool = True
-    widget_config: dict[str, Any] | None = None
 
     @field_validator("site_origin")
     @classmethod
@@ -130,7 +129,6 @@ class ProjectWidgetUpdate(BaseModel):
     name: str | None = None
     site_origin: str | None = None
     is_enabled: bool | None = None
-    widget_config: dict[str, Any] | None = None
 
     @field_validator("site_origin")
     @classmethod

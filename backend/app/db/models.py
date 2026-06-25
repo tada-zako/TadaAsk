@@ -81,12 +81,6 @@ class Project(Base):
     )
 
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    _legacy_site_url: Mapped[Optional[str]] = mapped_column(
-        "site_url",
-        String,
-        unique=True,
-        nullable=True,
-    )  # 兼容旧 SQLite schema；业务代码应使用 ProjectWidget.site_origin
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -146,7 +140,9 @@ class ProjectWidget(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     site_origin: Mapped[str] = mapped_column(String, nullable=False, index=True)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    widget_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    widget_config: Mapped[Optional[dict]] = mapped_column(
+        JSON, nullable=True
+    )  # NOTE: 保留字段；widget 配置参数，暂不使用
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

@@ -1,4 +1,3 @@
-import uuid
 from typing import Sequence
 
 from sqlalchemy import delete, select
@@ -32,12 +31,7 @@ class ProjectCRUD:
 
     async def create_project(self, project_data: ProjectCreate) -> Project:
         """创建新的项目，并同时创建默认项目设置"""
-        project_uid = str(uuid.uuid4())
-        new_project = Project(
-            uid=project_uid,
-            **project_data.model_dump(),
-        )
-        new_project._legacy_site_url = f"project://{project_uid}"
+        new_project = Project(**project_data.model_dump())
         new_project.project_settings = ProjectSettings()
         self.session.add(new_project)
         await self.session.flush()  # 获取新项目的 UID
