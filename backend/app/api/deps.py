@@ -4,7 +4,7 @@ from fastapi import Depends, Request, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_db, get_session_factory
-from app.db.models import Project
+from app.db.models import Project, ProjectWidget
 from app.crud import (
     ProjectCRUD,
     AdminCRUD,
@@ -26,6 +26,7 @@ from app.rag import (
     QueryExpander,
 )
 from app.utils import TokenCounter
+from app.utils import origins_match
 from app.services.sources import (
     SourceItemUploadService,
     WebCrawlSyncService,
@@ -224,6 +225,39 @@ async def valid_project_with_settings(
     return project
 
 
+async def valid_visitor_widget(
+    request: Request,
+    project: Annotated[Project, Depends(valid_project_with_settings)],
+    project_crud: Annotated[ProjectCRUD, Depends(get_project_crud)],
+    widget_uid: Annotated[str, Path(..., description="Widget UID")],
+) -> ProjectWidget:
+    """验证 visitor 请求中的 widget 是否属于 project 且允许当前 Origin"""
+    widget = await project_crud.get_project_widget_by_uid(
+        project_id=project.id,
+        widget_uid=widget_uid,
+    )
+    if not widget:
+        raise HTTPException(status_code=404, detail="Project widget not found")
+
+    if not widget.is_enabled:
+        raise HTTPException(status_code=403, detail="Project widget is disabled")
+
+    origin = request.headers.get("origin")
+    if not origin:
+        raise HTTPException(status_code=403, detail="Origin header is required")
+
+    try:
+        if not origins_match(origin, widget.site_origin):
+            raise HTTPException(
+                status_code=403,
+                detail="Origin is not allowed for this widget",
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Invalid Origin header") from exc
+
+    return widget
+
+
 # =========== Service 层依赖注入接口 ===========
 def get_source_creation_service(
     source_crud: "SourceCRUDeps",
@@ -402,6 +436,7 @@ ClientIPDeps = Annotated[str, Depends(get_client_ip)]
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
 ValidVisitorChatProjectDeps = Annotated[Project, Depends(valid_project_with_settings)]
+ValidVisitorWidgetDeps = Annotated[ProjectWidget, Depends(valid_visitor_widget)]
 
 # Service 依赖
 SourceCreationServiceDeps = Annotated[

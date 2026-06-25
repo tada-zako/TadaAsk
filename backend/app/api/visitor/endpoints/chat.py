@@ -9,6 +9,7 @@ from ...deps import (
     APIKeyCipherDeps,
     ClientIPDeps,
     ValidVisitorChatProjectDeps,
+    ValidVisitorWidgetDeps,
     RAGSearchCRUDeps,
     ChatOrchestratorServiceDeps,
     RAGRetrievalServiceDeps,
@@ -192,12 +193,16 @@ async def visitor_stream_lease(
         await rate_limiter.release_stream(lease)
 
 
-@router.post("/project/{project_uid}/chat/stream", response_class=EventSourceResponse)
+@router.post(
+    "/project/{project_uid}/widget/{widget_uid}/chat/stream",
+    response_class=EventSourceResponse,
+)
 async def stream_chat(
     chat_request: Annotated[VisitorChatRequest, Depends(get_visitor_chat_request)],
     _rate_limit: Annotated[None, Depends(enforce_visitor_rate_limit)],
     _lease: Annotated[VisitorStreamLease, Depends(visitor_stream_lease)],
     project: ValidVisitorChatProjectDeps,
+    _widget: ValidVisitorWidgetDeps,
     completer: Annotated[FullCompleter, Depends(get_visitor_completer)],
     provider_with_model: Annotated[
         ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
