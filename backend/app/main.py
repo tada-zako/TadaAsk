@@ -38,7 +38,7 @@ from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer, TokenCoun
 from app.services.chat import GenerationRegistry
 from app.services.model_profiles import ModelProfileService
 from app.api import admin, visitor
-from app.api.visitor.cors import WidgetScopedCORSMiddleware
+from app.api.visitor.widget_cors import WidgetScopedCORSMiddleware
 
 
 async def valid_or_create_admin():
@@ -206,6 +206,7 @@ origins = [
     "http://localhost:8080",
 ]
 
+# 跨域中间件执行顺序：widget 跨域中间件 -> 全局跨域中间件
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

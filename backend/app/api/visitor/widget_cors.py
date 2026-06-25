@@ -1,0 +1,177 @@
+import functools
+import re
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from starlette.datastructures import Headers, MutableHeaders
+from starlette.responses import PlainTextResponse, Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from app.db.models import Project, ProjectWidget
+from app.utils import normalize_origin
+
+
+class WidgetScopedCORSMiddleware:
+    """
+    visitor 侧 widget 请求 API 的 widget scoped CORS 中间件；
+
+    该中间件只处理 /visitor/project/{project_uid}/widget/{widget_uid}/... 的请求，
+    """
+
+    # 路径匹配正则
+    _path_pattern = re.compile(
+        r"^/visitor/project/(?P<project_uid>[^/]+)/widget/(?P<widget_uid>[^/]+)(?:/|$)"
+    )
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        session_factory: async_sessionmaker[AsyncSession],
+    ) -> None:
+        self.app = app
+        self.session_factory = session_factory
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """中间件入口函数，处理 CORS 逻辑"""
+        if scope["type"] != "http":  # 只处理 HTTP 请求
+            await self.app(scope, receive, send)
+            return
+
+        # 匹配请求路径
+        match = self._path_pattern.match(scope.get("path", ""))
+        if not match:
+            await self.app(scope, receive, send)
+            return
+
+        method = scope["method"]
+        headers = Headers(scope=scope)
+        origin = headers.get("origin")
+
+        if not origin:
+            await self.app(scope, receive, send)
+            return
+
+        # 处理预检请求
+        if method == "OPTIONS" and "access-control-request-method" in headers:
+            response = await self.preflight_response(
+                match=match,
+                request_headers=headers,
+            )
+            await response(scope, receive, send)
+            return
+
+        await self.simple_response(
+            scope, receive, send, request_headers=headers, match=match
+        )
+
+    async def _is_allowed_origin(
+        self,
+        *,
+        project_uid: str,
+        widget_uid: str,
+        request_origin: str,
+    ) -> bool:
+        """解析请求 origin，判断是否允许"""
+        try:
+            # 标准化 origin
+            normalized_origin = normalize_origin(request_origin)
+        except ValueError:
+            return False
+
+        # 查询数据库，判断 origin 是否属于对应 widget 的 site_origin
+        stmt = (
+            select(ProjectWidget.id)
+            .join(Project, Project.id == ProjectWidget.project_id)
+            .where(
+                Project.uid == project_uid,
+                ProjectWidget.uid == widget_uid,
+                ProjectWidget.site_origin == normalized_origin,
+                ProjectWidget.is_enabled.is_(True),
+            )
+        )
+        async with self.session_factory() as session:
+            result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    async def preflight_response(
+        self, *, match: re.Match, request_headers: Headers
+    ) -> Response:
+        """预检查请求响应"""
+        # 解析请求头
+        requested_origin = request_headers["origin"]
+        requested_headers = request_headers.get("access-control-request-headers")
+
+        preflight_headers = {
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Max-Age": "600",
+            "Vary": "Origin",
+        }
+        failures: list[str] = []
+
+        # 检查 origin 是否允许
+        if await self._is_allowed_origin(
+            project_uid=match.group("project_uid"),
+            widget_uid=match.group("widget_uid"),
+            request_origin=requested_origin,
+        ):
+            preflight_headers["Access-Control-Allow-Origin"] = requested_origin
+        else:
+            failures.append("origin")
+
+        # 处理 Access-Control-Allow-Headers
+        if requested_headers is not None:
+            preflight_headers["Access-Control-Allow-Headers"] = requested_headers
+
+        if failures:
+            # 失败响应
+            failure_text = "Disallowed CORS " + ", ".join(failures)
+            return PlainTextResponse(
+                failure_text, status_code=400, headers=preflight_headers
+            )
+
+        return Response(status_code=204, headers=preflight_headers)
+
+    async def simple_response(
+        self,
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+        request_headers: Headers,
+        match: re.Match,
+    ) -> None:
+        """
+        简单响应，处理非预检请求
+        复用 CORSMiddleware 实现
+        """
+        send = functools.partial(
+            self.send, send=send, request_headers=request_headers, match=match
+        )
+        await self.app(scope, receive, send)
+
+    async def send(
+        self, message: Message, send: Send, request_headers: Headers, match: re.Match
+    ) -> None:
+        if message["type"] != "http.response.start":
+            await send(message)
+            return
+
+        message.setdefault("headers", [])
+        headers = MutableHeaders(scope=message)
+        requested_origin = request_headers["Origin"]
+
+        if await self._is_allowed_origin(
+            project_uid=match.group("project_uid"),
+            widget_uid=match.group("widget_uid"),
+            request_origin=requested_origin,
+        ):
+            # 判断是否允许 origin
+            self.allow_explicit_origin(headers, requested_origin)
+
+        # 继续发送响应
+        await send(message)
+
+    @staticmethod
+    def allow_explicit_origin(headers: MutableHeaders, origin: str) -> None:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers.add_vary_header("Origin")
