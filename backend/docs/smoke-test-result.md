@@ -19,7 +19,7 @@ Final working command shape:
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
 $env:RERANK_MODEL_NAME='Xenova/ms-marco-MiniLM-L-6-v2'
-$env:SQLITE_PATH="$env:LOCALAPPDATA\Temp\tadawidget_sqlite_smoke.db"
+$env:SQLITE_DATABASE_PATH="$env:LOCALAPPDATA\Temp\tadawidget_sqlite_smoke.db"
 $env:CHROMADB_PATH="$env:LOCALAPPDATA\Temp\tadawidget_chromadb_smoke"
 .\.venv\Scripts\fastapi.exe run app\main.py --host 127.0.0.1 --port 8765
 ```
@@ -32,18 +32,18 @@ Notes:
 
 ## Manual API Smoke Results
 
-| Check | Result |
-| --- | --- |
-| `GET /` | `200`, returned `{"message":"Hello World"}` |
-| `POST /admin/auth/login` with wrong password | `401`, returned incorrect credentials |
-| `POST /admin/auth/login` with `admin/admin123` | `200`, returned bearer token |
-| `GET /admin/project/list` without token | `401`, auth protection works |
-| `GET /admin/project/list` with token | `200`, returned list |
-| `POST /admin/project/new` with token | `200`, created smoke project |
-| `GET /admin/project/{uid}` | `200`, returned smoke project |
-| `GET /admin/project/{uid}/settings` | `200`, returned default settings |
-| `POST /visitor/project/not-a-real-project/chat/stream` | `404`, project not found |
-| `POST /visitor/project/{uid}/chat/stream` without visitor model config | `400`, expected configuration error |
+| Check                                                                  | Result                                      |
+| ---------------------------------------------------------------------- | ------------------------------------------- |
+| `GET /`                                                                | `200`, returned `{"message":"Hello World"}` |
+| `POST /admin/auth/login` with wrong password                           | `401`, returned incorrect credentials       |
+| `POST /admin/auth/login` with `admin/admin123`                         | `200`, returned bearer token                |
+| `GET /admin/project/list` without token                                | `401`, auth protection works                |
+| `GET /admin/project/list` with token                                   | `200`, returned list                        |
+| `POST /admin/project/new` with token                                   | `200`, created smoke project                |
+| `GET /admin/project/{uid}`                                             | `200`, returned smoke project               |
+| `GET /admin/project/{uid}/settings`                                    | `200`, returned default settings            |
+| `POST /visitor/project/not-a-real-project/chat/stream`                 | `404`, project not found                    |
+| `POST /visitor/project/{uid}/chat/stream` without visitor model config | `400`, expected configuration error         |
 
 ## Pytest Result
 

@@ -1,6 +1,9 @@
 import pytest
 
-pytest.skip("legacy unit tests are outside the backend smoke-test scope", allow_module_level=True)
+pytest.skip(
+    "legacy unit tests are outside the backend smoke-test scope",
+    allow_module_level=True,
+)
 
 import app.rag.embedding.fast_embedding as fast_embedding_module
 
@@ -28,7 +31,7 @@ def test_init_uses_settings_when_model_name_is_empty(monkeypatch):
     monkeypatch.setattr(
         fast_embedding_module.settings, "embedding_model_name", "bge-small-zh"
     )
-    monkeypatch.setattr(fast_embedding_module.settings, "fastembed_model_path", "")
+    monkeypatch.setattr(fast_embedding_module.settings, "fastembed_model_cache_dir", "")
     adapter = _build_adapter(monkeypatch, model_name="")
 
     assert adapter.model_name == "bge-small-zh"
