@@ -48,6 +48,7 @@ customElements.define('tada-widget', defineCustomElement(TadaWidgetElement))
 <script src="https://example.com/widget/tada-widget.iife.js"></script>
 <tada-widget
   project-uid="project_xxx"
+  widget-uid="widget_xxx"
   api-base-url="https://api.example.com"
   language="zh-CN"
 ></tada-widget>
@@ -59,7 +60,7 @@ customElements.define('tada-widget', defineCustomElement(TadaWidgetElement))
 
 后端聊天与摄取接口都是 `POST` 请求，并返回 `text/event-stream`：
 
-- Visitor chat: `POST /visitor/project/{project_uid}/chat/stream`
+- Visitor chat: `POST /visitor/project/{project_uid}/widget/{widget_uid}/chat/stream`
 - Admin chat: `POST /admin/project/{project_uid}/chat/stream`
 - Document indexing: `POST /admin/source/{source_uid}/document/indexing`
 - Web crawl sync: `POST /admin/source/{source_uid}/crawl/sync`

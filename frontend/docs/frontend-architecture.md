@@ -233,12 +233,12 @@ Widget 状态自包含：
 - 当前输入框内容
 - message list
 - assistant generation 状态
-- 按 `projectUid` 持久化的 `chatSessionUid`
+- 按 `projectUid + widgetUid` 持久化的 `chatSessionUid`
 
 建议 localStorage key：
 
 ```txt
-tada-widget:{projectUid}:chat-session
+tada-widget:{projectUid}:{widgetUid}:chat-session
 ```
 
 即使同一个宿主页面出现多个 Widget 实例，也应该正常工作。每个实例通过 DOM attributes 获得自己的配置。
@@ -292,13 +292,13 @@ tada-widget:{projectUid}:chat-session
 
 - 项目列表、创建、编辑
 - 项目详情壳层
-- 项目创建后展示 Widget 部署片段
+- 管理项目下的 Widget 部署实例并展示部署片段
 
 部署片段示例：
 
 ```html
 <script src="https://your-domain/widget/tada-widget.iife.js"></script>
-<tada-widget project-uid="..." api-base-url="https://your-api"></tada-widget>
+<tada-widget project-uid="..." widget-uid="..." api-base-url="https://your-api"></tada-widget>
 ```
 
 ### 8.3 Project Settings
@@ -366,7 +366,7 @@ tada-widget:{projectUid}:chat-session
 
 后端 endpoints：
 
-- `POST /visitor/project/{project_uid}/chat/stream`
+- `POST /visitor/project/{project_uid}/widget/{widget_uid}/chat/stream`
 - `POST /admin/project/{project_uid}/chat/stream`
 
 前端职责：
