@@ -1,15 +1,17 @@
+import uuid
 from typing import Sequence
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert
-from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.db.models import (
     ModelProfile,
     Project,
-    ProjectSourceLink,
     ProjectSettings,
+    ProjectSourceLink,
+    ProjectWidget,
     Provider,
     Source,
 )
@@ -17,6 +19,8 @@ from app.db.schemas import (
     ProjectCreate,
     ProjectSettingsUpdate,
     ProjectUpdate,
+    ProjectWidgetCreate,
+    ProjectWidgetUpdate,
 )
 
 
@@ -28,7 +32,12 @@ class ProjectCRUD:
 
     async def create_project(self, project_data: ProjectCreate) -> Project:
         """创建新的项目，并同时创建默认项目设置"""
-        new_project = Project(**project_data.model_dump())
+        project_uid = str(uuid.uuid4())
+        new_project = Project(
+            uid=project_uid,
+            **project_data.model_dump(),
+        )
+        new_project._legacy_site_url = f"project://{project_uid}"
         new_project.project_settings = ProjectSettings()
         self.session.add(new_project)
         await self.session.flush()  # 获取新项目的 UID
@@ -140,6 +149,63 @@ class ProjectCRUD:
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    # ====================
+    # ProjectWidget 相关操作
+    # ====================
+    async def create_project_widget(
+        self, *, project: Project, widget_data: ProjectWidgetCreate
+    ) -> ProjectWidget:
+        """为 project 创建 widget 部署实例"""
+        new_widget = ProjectWidget(
+            project_id=project.id,
+            **widget_data.model_dump(),
+        )
+        self.session.add(new_widget)
+        await self.session.flush()
+        return new_widget
+
+    async def list_project_widgets(self, *, project_id: int) -> Sequence[ProjectWidget]:
+        """获取项目下的 widget 部署实例列表"""
+        stmt = (
+            select(ProjectWidget)
+            .where(ProjectWidget.project_id == project_id)
+            .order_by(ProjectWidget.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_project_widget_by_uid(
+        self, *, project_id: int, widget_uid: str
+    ) -> ProjectWidget | None:
+        """根据项目 ID 和 widget UID 获取部署实例"""
+        stmt = select(ProjectWidget).where(
+            ProjectWidget.project_id == project_id,
+            ProjectWidget.uid == widget_uid,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    async def update_project_widget(
+        self, *, widget: ProjectWidget, widget_data: ProjectWidgetUpdate
+    ) -> ProjectWidget:
+        """更新 widget 部署实例"""
+        for key, value in widget_data.model_dump(exclude_unset=True).items():
+            setattr(widget, key, value)
+
+        await self.session.flush()
+        return widget
+
+    async def delete_project_widget_by_id(self, *, widget_id: int) -> bool:
+        """根据 widget ID 删除部署实例，返回是否删除成功"""
+        result = await self.session.execute(
+            select(ProjectWidget).where(ProjectWidget.id == widget_id)
+        )
+        widget = result.scalars().first()
+        if widget:
+            await self.session.delete(widget)
+            return True
+        return False
 
     # ====================
     # Project-Source 关联操作
