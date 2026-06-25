@@ -13,9 +13,12 @@ from app.core.config import settings
 database_path = Path(settings.sqlite_path)
 database_path.parent.mkdir(parents=True, exist_ok=True)
 
+# 异步数据库 URL
+DATABASE_URL = f"sqlite+aiosqlite:///{database_path}"  # 使用 SQLite 数据库
+
 # 异步数据库引擎
 engine = create_async_engine(
-    f"sqlite+aiosqlite:///{database_path}",  # 使用 SQLite 数据库
+    url=DATABASE_URL,
     echo=True,  # 打印 SQL 语句
 )
 
