@@ -11,6 +11,7 @@ from app.db.models import Project, ProjectWidget
 from app.utils import normalize_origin
 
 
+# TODO: 这里查库的 IO 可能性能有消耗，MVP 阶段不加 Cache
 class WidgetScopedCORSMiddleware:
     """
     visitor 侧 widget 请求 API 的 widget scoped CORS 中间件；
@@ -144,13 +145,24 @@ class WidgetScopedCORSMiddleware:
         简单响应，处理非预检请求
         复用 CORSMiddleware 实现
         """
+        # 提前查询 DB，避免在底层 send 管道中执行慢速 IO
+        requested_origin = request_headers.get("origin", "")
+        is_allowed = await self._is_allowed_origin(
+            project_uid=match.group("project_uid"),
+            widget_uid=match.group("widget_uid"),
+            request_origin=requested_origin,
+        )
+
         send = functools.partial(
-            self.send, send=send, request_headers=request_headers, match=match
+            self.send,
+            send=send,
+            requested_origin=requested_origin,
+            is_allowed=is_allowed,
         )
         await self.app(scope, receive, send)
 
     async def send(
-        self, message: Message, send: Send, request_headers: Headers, match: re.Match
+        self, message: Message, send: Send, requested_origin: str, is_allowed: bool
     ) -> None:
         if message["type"] != "http.response.start":
             await send(message)
@@ -158,15 +170,12 @@ class WidgetScopedCORSMiddleware:
 
         message.setdefault("headers", [])
         headers = MutableHeaders(scope=message)
-        requested_origin = request_headers["Origin"]
 
-        if await self._is_allowed_origin(
-            project_uid=match.group("project_uid"),
-            widget_uid=match.group("widget_uid"),
-            request_origin=requested_origin,
-        ):
-            # 判断是否允许 origin
+        if is_allowed:
             self.allow_explicit_origin(headers, requested_origin)
+        else:
+            # Vary: Origin 响应头，防止 CDN 错误缓存
+            headers.add_vary_header("Origin")
 
         # 继续发送响应
         await send(message)
