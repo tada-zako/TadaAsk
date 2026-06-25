@@ -3,28 +3,28 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
-    ForeignKey,
-    func,
-    String,
-    Boolean,
-    UniqueConstraint,
     JSON,
-    Integer,
-    Float,
-    Enum,
+    Boolean,
     DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.core.constants import (
-    SourceType,
-    SourceProcessStatus,
-    SourceItemProcessStatus,
-    ChatSessionType,
-    SearchMode,
     ChatMessageRole,
     ChatMessageType,
+    ChatSessionType,
+    SearchMode,
+    SourceItemProcessStatus,
+    SourceProcessStatus,
+    SourceType,
 )
 
 
@@ -81,9 +81,12 @@ class Project(Base):
     )
 
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    site_url: Mapped[str] = mapped_column(
-        String, unique=True, nullable=False
-    )  # 项目对应的站点 URL
+    _legacy_site_url: Mapped[Optional[str]] = mapped_column(
+        "site_url",
+        String,
+        unique=True,
+        nullable=True,
+    )  # 兼容旧 SQLite schema；业务代码应使用 ProjectWidget.site_origin
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -105,6 +108,11 @@ class Project(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )  # 项目上下文下的对话列表
+    widgets: Mapped[list["ProjectWidget"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )  # 项目的 widget 部署实例列表
 
     # 中间表关联
     source_links: Mapped[list["ProjectSourceLink"]] = relationship(
@@ -117,6 +125,47 @@ class Project(Base):
         back_populates="projects",
         viewonly=True,  # 多对多关系只通过 ProjectSourceLink 进行维护
     )  # 项目下的数据来源列表
+
+
+class ProjectWidget(Base):
+    """
+    Project widget 部署实例表：一个 Project 可部署到多个站点/widget
+    """
+
+    __tablename__ = "project_widgets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    uid: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        nullable=False,
+        index=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    site_origin: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    widget_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    # ---- 关系字段 ----
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    project: Mapped["Project"] = relationship(back_populates="widgets")
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "name", name="_project_widget_name_uc"),
+    )
 
 
 class ProjectSettings(Base):

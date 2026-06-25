@@ -5,6 +5,7 @@ from .gen_collection_name import generate_collection_name
 from .tokenizer import EmbeddingTokenizer
 from .token_counter import TokenCounter
 from .normalize_url import normalize_url, hostname_from_url, path_prefix_from_url
+from .origin import normalize_origin, origins_match
 
 from app.core.config import EmbeddingBackend
 
@@ -21,6 +22,8 @@ __all__ = [
     "normalize_url",
     "hostname_from_url",
     "path_prefix_from_url",
+    "normalize_origin",
+    "origins_match",
 ]
 
 

@@ -1,21 +1,28 @@
-from typing import Literal, Any
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, AnyHttpUrl
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+)
 from pydantic.alias_generators import to_camel
 
 from app.core.constants import (
-    SourceType,
-    CrawlEntryType,
-    SourceProcessStatus,
-    SourceItemProcessStatus,
-    ChatSessionType,
-    SearchMode,
-    ChatMessageType,
     ChatMessageRole,
+    ChatMessageType,
+    ChatSessionType,
+    CrawlEntryType,
+    SearchMode,
+    SourceItemProcessStatus,
+    SourceProcessStatus,
+    SourceType,
 )
-from app.utils import generate_collection_name
+from app.utils import generate_collection_name, normalize_origin
 
 # =========================
 # System Schemas 设计
@@ -65,7 +72,6 @@ class AdminUpdate(BaseModel):
 class ProjectBase(BaseModel):
     name: str
     description: str | None = None
-    site_url: str
 
 
 class ProjectCreate(ProjectBase):
@@ -78,7 +84,6 @@ class ProjectCreate(ProjectBase):
 class ProjectUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
-    site_url: str | None = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -93,6 +98,55 @@ class ProjectRead(ProjectBase):
     visitor_default_model_profile: "ModelProfileRead | None" = None
 
     # TODO: 具体的 chat sessions 传递数据后续完善
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class ProjectWidgetBase(BaseModel):
+    name: str
+    site_origin: str
+    is_enabled: bool = True
+    widget_config: dict[str, Any] | None = None
+
+    @field_validator("site_origin")
+    @classmethod
+    def normalize_site_origin(cls, value: str) -> str:
+        return normalize_origin(value)
+
+
+class ProjectWidgetCreate(ProjectWidgetBase):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+    )
+
+
+class ProjectWidgetUpdate(BaseModel):
+    name: str | None = None
+    site_origin: str | None = None
+    is_enabled: bool | None = None
+    widget_config: dict[str, Any] | None = None
+
+    @field_validator("site_origin")
+    @classmethod
+    def normalize_site_origin(cls, value: str | None) -> str | None:
+        return normalize_origin(value) if value is not None else None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+    )
+
+
+class ProjectWidgetRead(ProjectWidgetBase):
+    uid: str
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(
         from_attributes=True,
