@@ -10,6 +10,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    MetaData,
     String,
     UniqueConstraint,
     func,
@@ -28,11 +29,20 @@ from app.core.constants import (
 )
 
 
+# sqlite 外键命名约束
+NAMING_CONVENTION = {
+    # 索引约束
+    "ix": "ix_%(column_0_label)s",
+    # 外键约束
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+}
+
+
 # =========================
 # System DDL 设计
 # =========================
 class Base(AsyncAttrs, DeclarativeBase):
-    pass
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 class Admin(Base):
