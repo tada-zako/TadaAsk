@@ -145,7 +145,7 @@ async def lifespan(app: FastAPI):
     embedding_tokenizer: EmbeddingTokenizer = embedding_tokenizer_factory(
         embedding_mode=settings.embedding_backend,
         model_name=settings.embedding_model_name,
-        cache_dir=settings.hf_hub_cache,
+        cache_dir=settings.hf_hub_cache_dir,
     )
 
     # 挂载文本分割器实例

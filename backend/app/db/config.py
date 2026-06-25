@@ -13,12 +13,12 @@ from app.core.config import PROJECT_ROOT, settings
 
 
 # 确保数据库文件存在
-database_path = Path(settings.sqlite_path)
+database_path = Path(settings.sqlite_database_path)
 database_path.parent.mkdir(parents=True, exist_ok=True)
-ALEMBIC_INI_PATH = PROJECT_ROOT / "alembic.ini"
 
+ALEMBIC_INI_PATH = PROJECT_ROOT / "alembic.ini"
 # 异步数据库 URL
-DATABASE_URL = f"sqlite+aiosqlite:///{database_path}"  # 使用 SQLite 数据库
+DATABASE_URL = f"sqlite+aiosqlite:///{database_path}"
 
 # 异步数据库引擎
 engine = create_async_engine(

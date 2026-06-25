@@ -1,9 +1,9 @@
-from typing import Literal
+from typing import Literal, cast
 
 import pathlib
 from loguru import logger
 
-from pydantic import model_validator
+from pydantic import model_validator, field_validator, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -84,14 +84,14 @@ class Settings(BaseSettings):
     vector_store_perf: str = "chromadb"  # 向量库配置
 
     # 模型缓存路径
-    fastembed_model_path: str = ""  # FastEmbed 模型路径
-    llamacpp_model_path: str = ""  # LLaMA.cpp 模型路径
-    hf_hub_cache: str = ""  # HuggingFace Hub 模型缓存路径
+    fastembed_model_cache_dir: str | None = None  # FastEmbed 模型缓存目录
+    llamacpp_model_cache_dir: str | None = None  # LLaMA.cpp 模型缓存目录
+    hf_hub_cache_dir: str | None = None  # HuggingFace Hub 模型缓存目录
 
     chromadb_path: str = str(
         PROJECT_ROOT / "storages" / "chromadb"
     )  # ChromaDB 数据存储路径
-    sqlite_path: str = str(
+    sqlite_database_path: str = str(
         PROJECT_ROOT / "storages" / "sqlite.db"
     )  # SQLite FTS 数据库路径
     sqlalchemy_echo: bool = False  # 是否输出 SQLAlchemy SQL 日志
@@ -175,31 +175,71 @@ class Settings(BaseSettings):
 
         return self
 
-    @model_validator(mode="after")
-    def validate_model_paths(self) -> "Settings":
-        """验证模型路径配置是否存在"""
-        # 验证 FastEmbed 模型路径是否存在（如果使用 fastembed 作为嵌入后端）
-        if (
-            self.embedding_backend == "fastembed"
-            or self.rerank_backend == "fastembed"
-            and self.fastembed_model_path
-        ):
-            if not pathlib.Path(self.fastembed_model_path).exists():
-                raise ValueError(
-                    f"FastEmbed model path does not exist: {self.fastembed_model_path}"
-                )
-        # 验证 LLaMA.cpp 模型路径是否存在（如果使用 llamacpp 作为 LLM 后端）
-        if (
-            self.embedding_backend == "llamacpp"
-            or self.rerank_backend == "llamacpp"
-            and self.llamacpp_model_path
-        ):
-            if not pathlib.Path(self.llamacpp_model_path).exists():
-                raise ValueError(
-                    f"LLaMA.cpp model path does not exist: {self.llamacpp_model_path}"
-                )
+    @field_validator(
+        "fastembed_model_cache_dir",
+        "llamacpp_model_cache_dir",
+        "hf_hub_cache_dir",
+        mode="before",
+    )
+    @classmethod
+    def process_model_paths(cls, v: str | None) -> str | None:
+        """如果为空白字符或None，返回None；
+        否则对路径进行规范化"""
+        if v is None or str(v).strip() == "":
+            return None
 
-        return self
+        path = pathlib.Path(str(v).strip())
+        if path.is_absolute():
+            # 绝对路径
+            # 确保路径存在
+            path.mkdir(parents=True, exist_ok=True)
+            return str(path)
+
+        # 相对路径 -> 拼接 PROJECT_ROOT 并 resolve 规范化
+        path = (PROJECT_ROOT / path).resolve()
+        # 确保路径存在
+        path.mkdir(parents=True, exist_ok=True)
+        return str(path)
+
+    @classmethod
+    def _resolve_path(cls, v: str | None, info: ValidationInfo) -> pathlib.Path:
+        """将相对路径解析为绝对路径"""
+        field_name = info.field_name
+        if field_name is None:
+            raise ValueError("Field name should not be None")
+
+        if v is None or str(v).strip() == "":
+            # 如果传入为空或 None，获取该字段在类中定义的默认值
+            default_val = cls.model_fields[field_name].default
+            if default_val is None:
+                raise ValueError(f"Field '{field_name}' has no default value.")
+            path = cast(str, default_val)
+            raw_path = pathlib.Path(str(path).strip())
+        else:
+            raw_path = pathlib.Path(str(v).strip())
+
+        if raw_path.is_absolute():
+            # 绝对路径
+            return raw_path
+
+        # 相对路径 -> 拼接 PROJECT_ROOT 并 resolve 规范化
+        return (PROJECT_ROOT / raw_path).resolve()
+
+    @field_validator("upload_folder_path", "chromadb_path", mode="before")
+    @classmethod
+    def process_dir_paths(cls, v: str | None, info: ValidationInfo) -> str:
+        """处理 dir 路径"""
+        path = cls._resolve_path(v, info)
+        path.mkdir(parents=True, exist_ok=True)
+        return str(path)
+
+    @field_validator("sqlite_database_path", mode="before")
+    @classmethod
+    def process_file_paths(cls, v: str | None, info: ValidationInfo) -> str:
+        """处理 file 路径"""
+        path = cls._resolve_path(v, info)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return str(path)
 
 
 settings = Settings()
