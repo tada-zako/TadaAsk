@@ -38,6 +38,7 @@ from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer, TokenCoun
 from app.services.chat import GenerationRegistry
 from app.services.model_profiles import ModelProfileService
 from app.api import admin, visitor
+from app.api.visitor.cors import WidgetScopedCORSMiddleware
 
 
 async def valid_or_create_admin():
@@ -212,6 +213,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(WidgetScopedCORSMiddleware, session_factory=async_session)
 
 
 @app.exception_handler(ValueError)
