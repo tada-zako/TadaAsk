@@ -1,6 +1,6 @@
 from typing import AsyncIterable, Annotated, cast, AsyncIterator
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
 from fastapi.sse import ServerSentEvent, EventSourceResponse
 from loguru import logger
 
@@ -9,7 +9,7 @@ from ...deps import (
     APIKeyCipherDeps,
     ClientIPDeps,
     ValidVisitorChatProjectDeps,
-    ValidVisitorWidgetDeps,
+    ProjectCRUDeps,
     RAGSearchCRUDeps,
     ChatOrchestratorServiceDeps,
     RAGRetrievalServiceDeps,
@@ -17,7 +17,7 @@ from ...deps import (
 from ...schemas import VisitorChatRequest
 from app.services.chat import ChatInput, RAGChatPlugin
 from app.providers import FullCompleter, completer_factory, ModelSettings
-from app.db.models import Provider, ModelProfile
+from app.db.models import Provider, ModelProfile, ProjectWidget
 from app.db.schemas import (
     HybridSearchOptions,
     ProviderWithModelInternalRead,
@@ -28,6 +28,7 @@ from app.core.config import settings
 from app.core.exceptions import VisitorRateLimitError
 from app.core.rate_limit import VisitorStreamLease
 from app.core.constants import ChatSessionType, SearchMode
+from app.utils import normalize_origin
 
 
 router = APIRouter()
@@ -40,6 +41,43 @@ async def get_visitor_chat_request(
 ) -> VisitorChatRequest:
     """从请求体中解析 VisitorChatRequest 对象，作为依赖注入接口"""
     return chat_request
+
+
+async def valid_visitor_widget(
+    request: Request,
+    project: ValidVisitorChatProjectDeps,
+    project_crud: ProjectCRUDeps,
+    widget_uid: Annotated[str, Path(..., description="Widget UID")],
+) -> ProjectWidget:
+    """验证 visitor 请求中的 widget 是否属于 project 且允许当前 Origin"""
+    widget = await project_crud.get_project_widget_by_uid(
+        project_id=project.id,
+        widget_uid=widget_uid,
+    )
+    if not widget:
+        raise HTTPException(status_code=404, detail="Project widget not found")
+
+    if not widget.is_enabled:
+        # 判断 widget 是否启用
+        raise HTTPException(status_code=403, detail="Project widget is disabled")
+
+    # 额外检查 origin 是否匹配 widget 的 site_origin
+    # NOTE: 关于 Depends 中的 origin 检查是否必要，后续再分析
+    # 这里的检查逻辑可能是不必要的
+    origin = request.headers.get("origin")
+    if not origin:
+        raise HTTPException(status_code=403, detail="Origin header is required")
+
+    try:
+        if not normalize_origin(origin) == widget.site_origin:
+            raise HTTPException(
+                status_code=403,
+                detail="Origin is not allowed for this widget",
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Invalid Origin header") from exc
+
+    return widget
 
 
 async def get_visitor_provider_with_model(
@@ -202,7 +240,7 @@ async def stream_chat(
     _rate_limit: Annotated[None, Depends(enforce_visitor_rate_limit)],
     _lease: Annotated[VisitorStreamLease, Depends(visitor_stream_lease)],
     project: ValidVisitorChatProjectDeps,
-    _widget: ValidVisitorWidgetDeps,
+    _widget: Annotated[ProjectWidget, Depends(valid_visitor_widget)],
     completer: Annotated[FullCompleter, Depends(get_visitor_completer)],
     provider_with_model: Annotated[
         ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
