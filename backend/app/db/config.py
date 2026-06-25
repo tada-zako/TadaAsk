@@ -1,17 +1,21 @@
 from pathlib import Path
 from typing import AsyncIterator
+import asyncio
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
 from .models import Base
 from .fts import init_fts_tables
-from app.core.config import settings
+from app.core.config import PROJECT_ROOT, settings
 
 
 # 确保数据库文件存在
 database_path = Path(settings.sqlite_path)
 database_path.parent.mkdir(parents=True, exist_ok=True)
+ALEMBIC_INI_PATH = PROJECT_ROOT / "alembic.ini"
 
 # 异步数据库 URL
 DATABASE_URL = f"sqlite+aiosqlite:///{database_path}"  # 使用 SQLite 数据库
@@ -19,7 +23,7 @@ DATABASE_URL = f"sqlite+aiosqlite:///{database_path}"  # 使用 SQLite 数据库
 # 异步数据库引擎
 engine = create_async_engine(
     url=DATABASE_URL,
-    echo=True,  # 打印 SQL 语句
+    echo=settings.sqlalchemy_echo,
 )
 
 
@@ -40,12 +44,22 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return async_session
 
 
-async def init_db():
-    """初始化 SQLAlchemy 数据库连接并创建表"""
+def _run_alembic_upgrade() -> None:
+    """同步执行 Alembic upgrade"""
+    alembic_cfg = Config(str(ALEMBIC_INI_PATH))
+    command.upgrade(alembic_cfg, "head")
 
-    # 创建数据库表
+
+async def run_migrations() -> None:
+    """运行 Alembic schema migration 到最新版本"""
+    await asyncio.to_thread(_run_alembic_upgrade)
+
+
+async def init_db():
+    """初始化数据库附属结构；
+    NOTE(26-6-25): ORM 普通表由 Alembic migration 管理。"""
+
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
         await init_fts_tables(conn)  # 初始化 FTS5 虚表及相关触发器
 
 

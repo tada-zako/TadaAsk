@@ -12,7 +12,7 @@ from app.core.exceptions import RateLimitExceededError
 from app.core.security import get_password_hash, ProviderAPIKeyCipher
 from app.core.rate_limit import VisitorRateLimiter
 from app.crud import AdminCRUD, ModelProfileCRUD
-from app.db import init_db, async_session
+from app.db import init_db, run_migrations, async_session
 from app.db.schemas import AdminCreate
 from app.storage import FileStorage, file_storage_factory
 from app.ingestion.parser import (
@@ -86,6 +86,10 @@ async def lifespan(app: FastAPI):
 
     logger.info("Starting up the application...")
     # ======= 系统重要配置挂载 =======
+    if settings.database_auto_migrate:
+        logger.info("Running database migrations...")
+        await run_migrations()
+
     await init_db()
     await sync_model_catalog()
 

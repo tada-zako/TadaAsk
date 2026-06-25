@@ -94,6 +94,8 @@ class Settings(BaseSettings):
     sqlite_path: str = str(
         PROJECT_ROOT / "storages" / "sqlite.db"
     )  # SQLite FTS 数据库路径
+    sqlalchemy_echo: bool = False  # 是否输出 SQLAlchemy SQL 日志
+    database_auto_migrate: bool = True  # FastAPI 启动时自动执行 Alembic upgrade head
 
     # =======================================
     # visitor 侧请求限制
