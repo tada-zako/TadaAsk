@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Query, HTTPException
+from fastapi import APIRouter, Body, Depends, Query, HTTPException, Path
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
@@ -10,13 +10,16 @@ from ...deps import (
     SourceCRUDeps,
     ValidProjectDeps,
 )
-from app.db.models import ModelProfile, Provider, Source
+from app.db.models import ModelProfile, ProjectWidget, Provider, Source
 from app.db.schemas import (
     ProjectCreate,
     ProjectRead,
     ProjectSettingsRead,
     ProjectSettingsUpdate,
     ProjectUpdate,
+    ProjectWidgetCreate,
+    ProjectWidgetRead,
+    ProjectWidgetUpdate,
     SourceRead,
 )
 
@@ -107,6 +110,24 @@ async def resolve_sources_from_body(
 RequestSourcesDeps = Annotated[list[Source], Depends(resolve_sources_from_body)]
 
 
+async def valid_project_widget(
+    project: ValidProjectDeps,
+    project_crud: ProjectCRUDeps,
+    widget_uid: Annotated[str, Path(..., description="Widget UID")],
+) -> ProjectWidget:
+    """验证 widget UID 是否属于当前 project"""
+    widget = await project_crud.get_project_widget_by_uid(
+        project_id=project.id,
+        widget_uid=widget_uid,
+    )
+    if not widget:
+        raise HTTPException(status_code=404, detail="Project widget not found")
+    return widget
+
+
+ValidProjectWidgetDeps = Annotated[ProjectWidget, Depends(valid_project_widget)]
+
+
 @router.post("/new", response_model=ProjectRead)
 async def create_project(
     payload: Annotated[ProjectCreate, Body(..., description="Project 创建数据")],
@@ -128,7 +149,7 @@ async def create_project(
         logger.warning(f"创建 project 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=400,
-            detail="project with the same name or site url already exists",
+            detail="project with the same name already exists",
         ) from exc
 
     return ProjectRead.model_validate(project)
@@ -187,7 +208,7 @@ async def update_project(
         logger.warning(f"更新 project 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=400,
-            detail="project with the same name or site url already exists",
+            detail="project with the same name already exists",
         ) from exc
 
     return ProjectRead.model_validate(updated_project)
@@ -216,6 +237,82 @@ async def delete_project(
         }
     else:
         raise HTTPException(status_code=500, detail="Failed to delete project")
+
+
+@router.get("/{project_uid}/widgets", response_model=list[ProjectWidgetRead])
+async def list_project_widgets(
+    project: ValidProjectDeps,
+    project_crud: ProjectCRUDeps,
+):
+    """获取 project 下的 widget 部署实例列表"""
+    widgets = await project_crud.list_project_widgets(project_id=project.id)
+    return [ProjectWidgetRead.model_validate(widget) for widget in widgets]
+
+
+@router.post("/{project_uid}/widgets", response_model=ProjectWidgetRead)
+async def create_project_widget(
+    project: ValidProjectDeps,
+    payload: Annotated[
+        ProjectWidgetCreate, Body(..., description="Project widget 创建数据")
+    ],
+    project_crud: ProjectCRUDeps,
+):
+    """为 project 创建 widget 部署实例"""
+    try:
+        widget = await project_crud.create_project_widget(
+            project=project,
+            widget_data=payload,
+        )
+    except IntegrityError as exc:
+        logger.warning(f"创建 project widget 失败，存在唯一约束冲突：{exc}")
+        raise HTTPException(
+            status_code=400,
+            detail="project widget with the same name already exists",
+        ) from exc
+
+    return ProjectWidgetRead.model_validate(widget)
+
+
+@router.get("/{project_uid}/widgets/{widget_uid}", response_model=ProjectWidgetRead)
+async def get_project_widget(widget: ValidProjectWidgetDeps):
+    """获取 project widget 详情"""
+    return ProjectWidgetRead.model_validate(widget)
+
+
+@router.patch("/{project_uid}/widgets/{widget_uid}", response_model=ProjectWidgetRead)
+async def update_project_widget(
+    widget: ValidProjectWidgetDeps,
+    payload: Annotated[
+        ProjectWidgetUpdate, Body(..., description="Project widget 更新数据")
+    ],
+    project_crud: ProjectCRUDeps,
+):
+    """更新 project widget 部署实例"""
+    try:
+        updated_widget = await project_crud.update_project_widget(
+            widget=widget,
+            widget_data=payload,
+        )
+    except IntegrityError as exc:
+        logger.warning(f"更新 project widget 失败，存在唯一约束冲突：{exc}")
+        raise HTTPException(
+            status_code=400,
+            detail="project widget with the same name already exists",
+        ) from exc
+
+    return ProjectWidgetRead.model_validate(updated_widget)
+
+
+@router.delete("/{project_uid}/widgets/{widget_uid}")
+async def delete_project_widget(
+    widget: ValidProjectWidgetDeps,
+    project_crud: ProjectCRUDeps,
+):
+    """删除 project widget 部署实例"""
+    success = await project_crud.delete_project_widget_by_id(widget_id=widget.id)
+    if success:
+        return {"uid": widget.uid, "status": "deleted"}
+    raise HTTPException(status_code=500, detail="Failed to delete project widget")
 
 
 @router.get("/{project_uid}/settings", response_model=ProjectSettingsRead)
