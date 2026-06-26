@@ -437,9 +437,6 @@ class SourceItemIndexingService:
         - 其它 SourceType: 需要确保在进入 ingest 之前，构建完整的 DocumentContent
         """
         # 检查是否已经解析过文件
-        # 这里的 document_content 字段在 Depends 中提前加载到 SourceItem；
-        # 后续如果 ingest 业务流程并发量较大，耗时较长，
-        # 需要改成按需加载的方式，避免并发情况下数据不一致
         if source_item.document_content:
             metadata = source_item.document_content.metadata_json or {}
             return ParsedDocument(

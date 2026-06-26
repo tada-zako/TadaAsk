@@ -83,6 +83,14 @@ class RAGRetrievalService:
         )
         return messages
 
+    def _resolve_anchor(self, metadata: dict | None) -> str | None:
+        """从 chunk metadata 中读取前端可跳转的锚点"""
+        if not metadata:
+            return None
+
+        anchor = metadata.get("anchor")
+        return anchor if isinstance(anchor, str) and anchor else None
+
     async def retrieve_for_chat(
         self,
         *,
@@ -130,8 +138,17 @@ class RAGRetrievalService:
         snapshot_items: list[RAGSnapshotItem] = []
 
         for index, result in enumerate(search_results):
+            """
+            构建的 blocks 示例：
+            [1] Document Title / Section Header
+            Document content...
+            [2] Document2 Title / Section Header
+            Document2 content...
+            ...
+            """
+            citation_id = index + 1
             title = result.title or result.filename
-            header = f"[{index}] {title}"
+            header = f"[{citation_id}] {title}"
             if result.section_header:
                 header += f" / {result.section_header}"
 
@@ -139,11 +156,21 @@ class RAGRetrievalService:
             blocks.append(f"{header}\n{content}")
 
             snapshot_item = RAGSnapshotItem(
-                citation_id=index + 1,
+                citation_id=citation_id,
                 source_id=result.source_id,
                 source_item_id=result.source_item_id,
                 chunk_id=result.chunk_id,
                 vector_id=result.vector_id,
+                source_uid=result.source_uid,
+                source_name=result.source_name,
+                source_item_uid=result.source_item_uid,
+                title=result.title,
+                filename=result.filename,
+                origin_url=result.origin_url,
+                section_header=result.section_header,
+                page_number=result.page_number,
+                anchor=self._resolve_anchor(result.metadata),
+                excerpt=content,
                 rrf_score=result.rrf_score,
                 rerank_score=result.rerank_score,
                 used_in_context=True,  # 默认都使用，后续可以根据策略调整

@@ -852,15 +852,34 @@ class HybridSearchOptions(HybridSearchRequest):
 class RAGSnapshotItem(BaseModel):
     """RAG 检索结果快照项"""
 
+    # citation 基本信息
     citation_id: int
     source_id: int
     source_item_id: int
     chunk_id: int
     vector_id: str | None = None
 
+    # 富快照信息字段
+    source_uid: str | None = None
+    source_name: str | None = None
+    source_item_uid: str | None = None
+    title: str | None = None
+    filename: str | None = None
+    origin_url: str | None = None
+    section_header: str | None = None
+    page_number: int | None = None
+    anchor: str | None = None
+    excerpt: str | None = None
+
     rrf_score: float | None = None
     rerank_score: float | None = None
     used_in_context: bool = True
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
 
 
 class RAGSnapshot(BaseModel):
@@ -870,3 +889,9 @@ class RAGSnapshot(BaseModel):
     query: str
     standalone_query: str | None = None
     items: list[RAGSnapshotItem] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
