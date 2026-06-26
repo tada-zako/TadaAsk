@@ -452,6 +452,35 @@ async def revert_chat_session(
     )
 
 
+@router.get(
+    "/session/{chat_session_uid}/messages/{message_uid}/citations",
+    responses={
+        501: {
+            "description": "Reserved citation lazy-loading endpoint; implementation pending."
+        }
+    },
+)
+async def get_message_citations(
+    _chat_session: ValidChatSessionDeps,
+    message_uid: Annotated[
+        str,
+        Path(description="目标 assistant message UID"),
+    ],
+):
+    """
+    预留 citation 懒加载接口。
+
+    后续实现应验证 message 属于当前 session，读取 ChatMessage.rag_snapshot，
+    并在历史快照缺少展示字段时 join DocumentChunk / SourceItem / Source 补齐。
+    """
+    raise HTTPException(
+        status_code=501,
+        detail=(
+            "Citation lazy-loading endpoint is reserved for future implementation."
+        ),
+    )
+
+
 @router.post(
     "/session/{chat_session_uid}/generation/{generation_uid}/cancel",
     response_model=AdminChatCancelResponse,
