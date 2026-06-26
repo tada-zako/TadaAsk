@@ -1,4 +1,4 @@
-# TadaWidget — Agent Instructions
+# TadaAsk — Agent Instructions
 
 Applies to all AI agents (GitHub Copilot, Claude, Cursor, etc.).
 Full requirements document: `docs/requirements.md`. RAG implementation details: `backend/docs/rag-pipeline.md`.

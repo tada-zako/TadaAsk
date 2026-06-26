@@ -1,4 +1,4 @@
-# GitHub Copilot Instructions — TadaWidget
+# GitHub Copilot Instructions — TadaAsk
 
 All architectural rules, layer boundaries, async patterns, RAG constraints, and roadmap alignment
 are defined in [`AGENTS.md`](../AGENTS.md). Read that file first for full project context.

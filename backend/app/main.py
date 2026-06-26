@@ -117,7 +117,7 @@ async def lifespan(app: FastAPI):
     # 挂载 WebCrawler 实例
     app.state.web_crawler = WebCrawler(
         timeout=20.0,
-        user_agent="TadaWidget/0.1",
+        user_agent="TadaAsk/0.1",
     )
 
     # 挂载 HTMLPageParser 实例

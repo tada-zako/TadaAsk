@@ -1,4 +1,4 @@
-# TadaWidget 前端架构与代码组织
+# TadaAsk 前端架构与代码组织
 
 ## 1. 架构目标
 
@@ -25,11 +25,11 @@ frontend/
 dist/
   admin/                 Admin Console 静态资源
   widget/
-    tada-widget.iife.js  script-tag 使用的构建
-    tada-widget.es.js    可选 ESM 构建
+    tada-ask.iife.js  script-tag 使用的构建
+    tada-ask.es.js    可选 ESM 构建
 ```
 
-MVP 阶段 Admin Console 和 Widget 可以留在同一个 `frontend` package 中。后续如果 Widget 需要更强的体积优化，再拆成 workspace package，但保持公开 `<tada-widget>` API 不变。
+MVP 阶段 Admin Console 和 Widget 可以留在同一个 `frontend` package 中。后续如果 Widget 需要更强的体积优化，再拆成 workspace package，但保持公开 `<tada-ask>` API 不变。
 
 ## 3. 推荐目录结构
 
@@ -60,7 +60,7 @@ frontend/src/
 
   widget/
     entry.ts
-    TadaWidget.ce.vue
+    TadaAsk.ce.vue
     components/
       WidgetLauncher.vue
       WidgetPanel.vue
@@ -238,7 +238,7 @@ Widget 状态自包含：
 建议 localStorage key：
 
 ```txt
-tada-widget:{projectUid}:{widgetUid}:chat-session
+tada-ask:{projectUid}:{widgetUid}:chat-session
 ```
 
 即使同一个宿主页面出现多个 Widget 实例，也应该正常工作。每个实例通过 DOM attributes 获得自己的配置。
@@ -297,8 +297,8 @@ tada-widget:{projectUid}:{widgetUid}:chat-session
 部署片段示例：
 
 ```html
-<script src="https://your-domain/widget/tada-widget.iife.js"></script>
-<tada-widget project-uid="..." widget-uid="..." api-base-url="https://your-api"></tada-widget>
+<script src="https://your-domain/widget/tada-ask.iife.js"></script>
+<tada-ask project-uid="..." widget-uid="..." api-base-url="https://your-api"></tada-ask>
 ```
 
 ### 8.3 Project Settings

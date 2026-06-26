@@ -19,8 +19,8 @@ Final working command shape:
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
 $env:RERANK_MODEL_NAME='Xenova/ms-marco-MiniLM-L-6-v2'
-$env:SQLITE_DATABASE_PATH="$env:LOCALAPPDATA\Temp\tadawidget_sqlite_smoke.db"
-$env:CHROMADB_PATH="$env:LOCALAPPDATA\Temp\tadawidget_chromadb_smoke"
+$env:SQLITE_DATABASE_PATH="$env:LOCALAPPDATA\Temp\tadaask_sqlite_smoke.db"
+$env:CHROMADB_PATH="$env:LOCALAPPDATA\Temp\tadaask_chromadb_smoke"
 .\.venv\Scripts\fastapi.exe run app\main.py --host 127.0.0.1 --port 8765
 ```
 

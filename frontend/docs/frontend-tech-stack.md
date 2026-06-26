@@ -1,4 +1,4 @@
-# TadaWidget 前端技术栈说明
+# TadaAsk 前端技术栈说明
 
 ## 1. 前端范围
 
@@ -11,21 +11,21 @@ Widget 必须对宿主页面保持框架无关；Admin Console 可以沿用当�
 
 ## 2. 推荐技术栈
 
-| 领域 | 选择 | 说明 |
-|------|------|------|
-| 语言 | TypeScript | 前后端契约需要明确；后端 Pydantic schema 已经通过 alias 输出 camelCase，前端统一使用 camelCase。 |
-| 构建工具 | Vite | 当前已配置；同时支持 SPA 与 library/custom-element 构建。 |
-| Admin 框架 | Vue 3 SFC | 已在项目依赖中，适合后台表单、表格、路由和状态管理。 |
-| Widget 运行时 | Vue Custom Element (`defineCustomElement`) | 生成真正的 Web Component，并通过 Shadow DOM 隔离样式；MVP 阶段可复用 Vue/TS 能力。 |
-| 路由 | Vue Router | 仅用于 Admin Console；Widget 不依赖路由。 |
-| 状态管理 | Pinia + composables | Pinia 保存跨页面状态，如 auth、当前项目、活跃 stream；页面局部数据用 composables/API 调用维护。 |
-| HTTP JSON/FormData | axios | 已安装，适合 Admin 侧鉴权 CRUD 和文件上传。 |
-| POST SSE 流式响应 | `fetch` + stream parser | 当前后端以 POST 返回 `text/event-stream`；浏览器原生 `EventSource` 只支持 GET，因此聊天和 ingestion 需要 `fetch` 读取 `ReadableStream`。推荐增加轻量依赖 `eventsource-parser`。 |
-| API 契约 | OpenAPI 生成类型 + 手写轻量 client | 后端运行后从 FastAPI OpenAPI 生成 TS 类型；请求封装保持手写，便于理解和调试。 |
-| 样式 | Tailwind CSS v4 + CSS variables | 当前已配置；主题色、Widget token 等统一走 CSS 变量。 |
-| Admin UI 基础组件 | shadcn-vue / Reka UI + lucide-vue-next | `components.json` 已存在；适合表单、弹窗、tabs、菜单、表格、tooltip 和图标按钮。 |
-| Widget 样式 | Shadow DOM 内部 CSS + CSS variables | 不依赖宿主页面 Tailwind 或 reset，避免污染外部站点。 |
-| 图标 | lucide-vue-next | 当前已安装，与 shadcn-vue 风格一致。 |
+| 领域               | 选择                                       | 说明                                                                                                                                                                            |
+| ------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 语言               | TypeScript                                 | 前后端契约需要明确；后端 Pydantic schema 已经通过 alias 输出 camelCase，前端统一使用 camelCase。                                                                                |
+| 构建工具           | Vite                                       | 当前已配置；同时支持 SPA 与 library/custom-element 构建。                                                                                                                       |
+| Admin 框架         | Vue 3 SFC                                  | 已在项目依赖中，适合后台表单、表格、路由和状态管理。                                                                                                                            |
+| Widget 运行时      | Vue Custom Element (`defineCustomElement`) | 生成真正的 Web Component，并通过 Shadow DOM 隔离样式；MVP 阶段可复用 Vue/TS 能力。                                                                                              |
+| 路由               | Vue Router                                 | 仅用于 Admin Console；Widget 不依赖路由。                                                                                                                                       |
+| 状态管理           | Pinia + composables                        | Pinia 保存跨页面状态，如 auth、当前项目、活跃 stream；页面局部数据用 composables/API 调用维护。                                                                                 |
+| HTTP JSON/FormData | axios                                      | 已安装，适合 Admin 侧鉴权 CRUD 和文件上传。                                                                                                                                     |
+| POST SSE 流式响应  | `fetch` + stream parser                    | 当前后端以 POST 返回 `text/event-stream`；浏览器原生 `EventSource` 只支持 GET，因此聊天和 ingestion 需要 `fetch` 读取 `ReadableStream`。推荐增加轻量依赖 `eventsource-parser`。 |
+| API 契约           | OpenAPI 生成类型 + 手写轻量 client         | 后端运行后从 FastAPI OpenAPI 生成 TS 类型；请求封装保持手写，便于理解和调试。                                                                                                   |
+| 样式               | Tailwind CSS v4 + CSS variables            | 当前已配置；主题色、Widget token 等统一走 CSS 变量。                                                                                                                            |
+| Admin UI 基础组件  | shadcn-vue / Reka UI + lucide-vue-next     | `components.json` 已存在；适合表单、弹窗、tabs、菜单、表格、tooltip 和图标按钮。                                                                                                |
+| Widget 样式        | Shadow DOM 内部 CSS + CSS variables        | 不依赖宿主页面 Tailwind 或 reset，避免污染外部站点。                                                                                                                            |
+| 图标               | lucide-vue-next                            | 当前已安装，与 shadcn-vue 风格一致。                                                                                                                                            |
 
 ## 3. 关键技术决策
 
@@ -37,24 +37,24 @@ Widget 对外交付为 custom element：
 
 ```ts
 import { defineCustomElement } from 'vue'
-import TadaWidgetElement from './TadaWidget.ce.vue'
+import TadaAskElement from './TadaAsk.ce.vue'
 
-customElements.define('tada-widget', defineCustomElement(TadaWidgetElement))
+customElements.define('tada-ask', defineCustomElement(TadaAskElement))
 ```
 
 预期嵌入方式：
 
 ```html
-<script src="https://example.com/widget/tada-widget.iife.js"></script>
-<tada-widget
+<script src="https://example.com/widget/tada-ask.iife.js"></script>
+<tada-ask
   project-uid="project_xxx"
   widget-uid="widget_xxx"
   api-base-url="https://api.example.com"
   language="zh-CN"
-></tada-widget>
+></tada-ask>
 ```
 
-这能保证宿主站点不需要理解 Vue/React 等框架。后续如果 Widget bundle 体积成为核心问题，可以保持 `<tada-widget>` 对外 API 不变，内部再迁移到原生 Web Components 或 Lit。
+这能保证宿主站点不需要理解 Vue/React 等框架。后续如果 Widget bundle 体积成为核心问题，可以保持 `<tada-ask>` 对外 API 不变，内部再迁移到原生 Web Components 或 Lit。
 
 ### 3.2 流式客户端必须支持 POST SSE
 
@@ -170,7 +170,7 @@ Widget 是项目的核心产品入口，应优先实现。
 
 ### Phase 1：Visitor Widget
 
-- 渲染 `<tada-widget>` 为 launcher + chat panel。
+- 渲染 `<tada-ask>` 为 launcher + chat panel。
 - 支持 `projectUid`、`apiBaseUrl`、`language`、theme attributes。
 - 调用 visitor stream endpoint 并渲染流式 delta。
 - 按 project 持久化 `chatSessionUid`。

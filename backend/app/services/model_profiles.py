@@ -234,7 +234,7 @@ class ModelProfileService:
 
     async def _fetch_model_catalog(self, *, models_url: str) -> TargetCatalog:
         """拉取并解析目标模型目录。"""
-        headers = {"User-Agent": "TadaWidget/0.1"}
+        headers = {"User-Agent": "TadaAsk/0.1"}
         async with httpx.AsyncClient(timeout=20.0, headers=headers) as client:
             response = await client.get(models_url)
             response.raise_for_status()

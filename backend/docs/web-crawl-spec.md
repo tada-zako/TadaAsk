@@ -1,8 +1,8 @@
-# TadaWidget Web Crawl Development Spec
+# TadaAsk Web Crawl Development Spec
 
 ## 1. Context
 
-TadaWidget 的核心场景是个人部署、轻量级知识库问答，以及可嵌入静态站点的 RAG Widget。下一阶段的 web crawl 需要服务于这些目标：
+TadaAsk 的核心场景是个人部署、轻量级知识库问答，以及可嵌入静态站点的 RAG Widget。下一阶段的 web crawl 需要服务于这些目标：
 
 - 抓取个人静态博客、文档站、项目说明页、依赖库/框架文档等静态页面。
 - 将网页内容转为可检索、可引用的 Markdown 文本。
@@ -44,24 +44,24 @@ MVP 不实现：
 
 当前阶段不引入 Scrapy 这类完整爬虫框架作为主路径。推荐使用轻量组件组合。
 
-For TadaWidget's MVP, the primary HTML parsing path should be **BeautifulSoup4 + lxml + markdownify**. `trafilatura` and `parsel` can remain optional helpers, but they should not be the default content extraction path.
+For TadaAsk's MVP, the primary HTML parsing path should be **BeautifulSoup4 + lxml + markdownify**. `trafilatura` and `parsel` can remain optional helpers, but they should not be the default content extraction path.
 
-| Responsibility | Preferred Choice |
-|---|---|
-| HTTP requests | `httpx.AsyncClient` |
-| HTML parsing and cleanup | `beautifulsoup4` with the `lxml` parser |
-| HTML to Markdown | `markdownify` |
-| Link discovery | BeautifulSoup selectors; `parsel` optional later |
-| Sitemap discovery | lightweight XML parsing with `lxml`; `parsel` optional later |
-| Link normalization | standard URL utilities plus project rules |
-| Scheduling | lightweight service-level scheduler / manual sync endpoint |
-| Generic article extraction fallback | `trafilatura`, optional |
+| Responsibility                      | Preferred Choice                                             |
+| ----------------------------------- | ------------------------------------------------------------ |
+| HTTP requests                       | `httpx.AsyncClient`                                          |
+| HTML parsing and cleanup            | `beautifulsoup4` with the `lxml` parser                      |
+| HTML to Markdown                    | `markdownify`                                                |
+| Link discovery                      | BeautifulSoup selectors; `parsel` optional later             |
+| Sitemap discovery                   | lightweight XML parsing with `lxml`; `parsel` optional later |
+| Link normalization                  | standard URL utilities plus project rules                    |
+| Scheduling                          | lightweight service-level scheduler / manual sync endpoint   |
+| Generic article extraction fallback | `trafilatura`, optional                                      |
 
 ### Rationale
 
-TadaWidget 的目标不是大规模网页采集，而是为个人知识库和文档站建立可控的 RAG 数据源。完整爬虫框架会引入额外 runtime、pipeline、调度和 FastAPI 集成复杂度。MVP 更需要保留业务编排控制权：URL 如何归一化、如何映射到 `SourceItem`、如何判断变更、如何重建索引，都和本项目的 ORM/RAG pipeline 强绑定。
+TadaAsk 的目标不是大规模网页采集，而是为个人知识库和文档站建立可控的 RAG 数据源。完整爬虫框架会引入额外 runtime、pipeline、调度和 FastAPI 集成复杂度。MVP 更需要保留业务编排控制权：URL 如何归一化、如何映射到 `SourceItem`、如何判断变更、如何重建索引，都和本项目的 ORM/RAG pipeline 强绑定。
 
-For HTML parsing, TadaWidget should prefer DOM-level control over black-box article extraction:
+For HTML parsing, TadaAsk should prefer DOM-level control over black-box article extraction:
 
 - Most target pages are static blogs, project docs, and documentation sites.
 - The crawler needs to remove navigation, sidebars, footers, copy buttons, scripts, styles, and other repeated noise.
@@ -94,11 +94,11 @@ For web crawl, one `Source` represents one crawl scope, not necessarily one phys
 
 Web crawl 应支持三种入口。`single_url` should not be a separate MVP entry type; a single page is represented as `url_list` with one URL.
 
-| Entry Type | Purpose |
-|---|---|
-| `url_list` | 抓取用户显式提供的一个或多个页面；单页抓取是长度为 1 的 URL list |
-| `sitemap_url` | 根据 sitemap 发现文档页，优先推荐 |
-| `site_root` | 从指定根路径递归发现同范围链接 |
+| Entry Type    | Purpose                                                          |
+| ------------- | ---------------------------------------------------------------- |
+| `url_list`    | 抓取用户显式提供的一个或多个页面；单页抓取是长度为 1 的 URL list |
+| `sitemap_url` | 根据 sitemap 发现文档页，优先推荐                                |
+| `site_root`   | 从指定根路径递归发现同范围链接                                   |
 
 MVP should require exactly one `entry_type` per `Source.config_json` to avoid ambiguous discovery behavior. Recommended discovery preference for UI guidance:
 
@@ -185,12 +185,12 @@ item_key
 
 语义：
 
-| Source Type | item_key |
-|---|---|
-| `local_file` | storage key or source-local file key |
-| `web_crawl` | normalized URL without fragment |
-| `github_repo` | repo/ref/path |
-| `custom_content` | user-defined key |
+| Source Type      | item_key                             |
+| ---------------- | ------------------------------------ |
+| `local_file`     | storage key or source-local file key |
+| `web_crawl`      | normalized URL without fragment      |
+| `github_repo`    | repo/ref/path                        |
+| `custom_content` | user-defined key                     |
 
 唯一约束应倾向于：
 
@@ -311,7 +311,7 @@ For MVP, if a chunk spans multiple sections, assign the chunk to the section tha
 
 If no real anchor exists, MVP should still show the chunk card but should not pretend that an anchor jump is reliable.
 
-The parser should not generate synthetic anchors for external page jumps unless TadaWidget controls the rendered target page. Synthetic anchors are acceptable only for future admin-side parsed Markdown rendering.
+The parser should not generate synthetic anchors for external page jumps unless TadaAsk controls the rendered target page. Synthetic anchors are acceptable only for future admin-side parsed Markdown rendering.
 
 ### RAG Display
 
@@ -385,7 +385,7 @@ Keep `ChatMessage.rag_snapshot` as JSON for MVP. It is appropriate because:
 - reading chat history can load citations without extra joins;
 - snapshot is not the authoritative content store.
 
-Consider a separate citation table only when TadaWidget needs citation analytics, independent citation pagination, high-volume history, or cross-message citation queries.
+Consider a separate citation table only when TadaAsk needs citation analytics, independent citation pagination, high-volume history, or cross-message citation queries.
 
 ---
 
@@ -393,16 +393,16 @@ Consider a separate citation table only when TadaWidget needs citation analytics
 
 The implementation will likely touch these layers, but exact module boundaries can evolve during development:
 
-| Area | Expected Impact |
-|---|---|
-| `core.constants` / settings | source types, crawl defaults, allowed limits |
-| `db.models` / `db.schemas` | source config and source item identity |
-| `crud.source` | upsert source items by stable item key |
-| `services.rag` | sync orchestration and reindex decisions |
-| `parser` | HTML extraction result and heading metadata |
-| `storage` | local storage remains enough for MVP; future S3-compatible download can reuse protocol |
-| `api.admin` | manual sync endpoint, source configuration, future sync status |
-| `api.visitor` | citation card data and full action resolution |
+| Area                        | Expected Impact                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| `core.constants` / settings | source types, crawl defaults, allowed limits                                           |
+| `db.models` / `db.schemas`  | source config and source item identity                                                 |
+| `crud.source`               | upsert source items by stable item key                                                 |
+| `services.rag`              | sync orchestration and reindex decisions                                               |
+| `parser`                    | HTML extraction result and heading metadata                                            |
+| `storage`                   | local storage remains enough for MVP; future S3-compatible download can reuse protocol |
+| `api.admin`                 | manual sync endpoint, source configuration, future sync status                         |
+| `api.visitor`               | citation card data and full action resolution                                          |
 
 Layer boundaries should remain:
 
@@ -427,4 +427,4 @@ Recommended order:
 7. Add minimal citation metadata for HTML anchors.
 8. Add sync interval and lightweight manual/periodic trigger.
 
-This keeps TadaWidget focused: crawl enough static documentation to power grounded RAG answers, without becoming a general-purpose crawler or document rendering platform.
+This keeps TadaAsk focused: crawl enough static documentation to power grounded RAG answers, without becoming a general-purpose crawler or document rendering platform.
