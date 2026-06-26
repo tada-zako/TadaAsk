@@ -45,6 +45,10 @@ class GenerationRegistry:
         generation.cancel_event.set()
         return True
 
+    def get(self, generation_uid: str) -> ActiveGeneration | None:
+        """获取活跃 generation；不存在则返回 None"""
+        return self._registry.get(generation_uid)
+
     def is_cancelled(self, generation_uid: str) -> bool:
         """检查 cancel 信号是否被设置"""
         generation = self._registry.get(generation_uid)

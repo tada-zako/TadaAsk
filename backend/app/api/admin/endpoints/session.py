@@ -1,13 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Path, Depends, HTTPException
+from fastapi import APIRouter, Query, HTTPException
 
 from ...deps import (
     ValidProjectDeps,
     ChatSessionCRUDeps,
     ChatMessageCRUDeps,
+    ValidChatSessionDeps,
 )
-from app.db.models import ChatSession
 from app.db.schemas import ChatSessionRead, ChatMessageRead, ChatMessagesPage
 
 
@@ -55,33 +55,6 @@ async def list_global_chat_sessions(
         offset=offset,
     )
     return [ChatSessionRead.model_validate(session) for session in sessions]
-
-
-async def valid_admin_chat_session(
-    chat_session_crud: ChatSessionCRUDeps,
-    chat_session_uid: Annotated[
-        str,
-        Path(
-            description="前端传递的 chat_session_uid",
-        ),
-    ],
-) -> ChatSession:
-    """
-    Admin 端 ChatSession 依赖：
-    验证 chat_session_uid 是否有效，返回对应的 ChatSession 实例。
-    如果 chat_session_uid 为空或无效，报错
-    """
-    chat_session = await chat_session_crud.get_chat_session_by_uid(
-        chat_session_uid=chat_session_uid
-    )
-
-    if not chat_session:
-        raise HTTPException(status_code=404, detail="Chat session not found")
-
-    return chat_session
-
-
-ValidChatSessionDeps = Annotated[ChatSession, Depends(valid_admin_chat_session)]
 
 
 @router.get("/session/{chat_session_uid}/messages", response_model=ChatMessagesPage)

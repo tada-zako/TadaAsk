@@ -224,6 +224,30 @@ async def valid_project_with_settings(
     return project
 
 
+async def valid_chat_session(
+    chat_session_crud: "ChatSessionCRUDeps",
+    chat_session_uid: Annotated[
+        str,
+        Path(
+            description="前端传递的 chat_session_uid",
+        ),
+    ],
+) -> ChatSession:
+    """
+    ChatSession 依赖：
+    验证 chat_session_uid 是否有效，返回对应的 ChatSession 实例。
+    如果 chat_session_uid 为空或无效，报错
+    """
+    chat_session = await chat_session_crud.get_chat_session_by_uid(
+        chat_session_uid=chat_session_uid
+    )
+
+    if not chat_session:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    return chat_session
+
+
 # =========== Service 层依赖注入接口 ===========
 def get_source_creation_service(
     source_crud: "SourceCRUDeps",
@@ -344,6 +368,19 @@ def get_compaction_service(
     )
 
 
+def get_chat_session_ops_service(
+    chat_message_crud: "ChatMessageCRUDeps",
+    chat_session_crud: "ChatSessionCRUDeps",
+    generation_registry: "GenerationRegistryDeps",
+) -> ChatSessionOpsService:
+    """ChatSessionOpsService 依赖注入接口"""
+    return ChatSessionOpsService(
+        chat_message_crud=chat_message_crud,
+        chat_session_crud=chat_session_crud,
+        generation_registry=generation_registry,
+    )
+
+
 def get_chat_orchestrator_service(
     session: "SessionDeps",
     chat_message_crud: "ChatMessageCRUDeps",
@@ -402,6 +439,8 @@ ClientIPDeps = Annotated[str, Depends(get_client_ip)]
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
 ValidVisitorChatProjectDeps = Annotated[Project, Depends(valid_project_with_settings)]
+ValidChatSessionDeps = Annotated[ChatSession, Depends(valid_chat_session)]
+
 
 # Service 依赖
 SourceCreationServiceDeps = Annotated[
@@ -439,6 +478,10 @@ ContextBuilderDeps = Annotated[
 CompactionServiceDeps = Annotated[
     CompactionService,
     Depends(get_compaction_service),
+]
+ChatSessionOpsServiceDeps = Annotated[
+    ChatSessionOpsService,
+    Depends(get_chat_session_ops_service),
 ]
 ChatOrchestratorServiceDeps = Annotated[
     ChatOrchestratorService,

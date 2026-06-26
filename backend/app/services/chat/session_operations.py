@@ -1,8 +1,10 @@
 import re
 
+from .generation_registry import GenerationRegistry
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
-from app.db.models import ChatSession
+from app.db.models import ChatSession, ChatMessage
 from app.db.schemas import ChatMessageInternal, ChatSessionInternal, RAGSnapshot
+from app.core.exceptions import GenerationScopeError
 
 # fork session 后缀正则
 _FORK_SUFFIX_RE = re.compile(r"\(fork #(\d+)\)$")
@@ -16,9 +18,11 @@ class ChatSessionOpsService:
         *,
         chat_session_crud: ChatSessionCRUD,
         chat_message_crud: ChatMessageCRUD,
+        generation_registry: GenerationRegistry,
     ):
         self.chat_session_crud = chat_session_crud
         self.chat_message_crud = chat_message_crud
+        self.generation_registry = generation_registry
 
     @staticmethod
     def _generate_forked_session_title(original_title: str) -> str:
@@ -102,15 +106,32 @@ class ChatSessionOpsService:
         self,
         *,
         chat_session: ChatSession,
-        target_msg_sequence: int,
+        message: ChatMessage,
     ) -> int:
         """
         对话回退操作；
-        删除指定 sequence 之后的消息，并返回删除的消息数量
+        删除指定 sequence 及之后的消息，并返回删除的消息数量
         NOTE: 目前回退操作只是删除消息，有较大风险
         """
         deleted_count = await self.chat_message_crud.delete_messages_after_sequence(
             chat_session_id=chat_session.id,
-            target_sequence=target_msg_sequence,
+            target_sequence=message.sequence,
         )
         return deleted_count
+
+    def cancel_generation(
+        self,
+        *,
+        chat_session: ChatSession,
+        generation_uid: str,
+    ) -> bool:
+        """取消属于当前 session 的活跃 generation；不存在时幂等返回 False。"""
+        generation = self.generation_registry.get(generation_uid)
+        if not generation:
+            return False
+
+        if generation.session_uid != chat_session.uid:
+            # 确保请求的 generation 属于当前 session
+            raise GenerationScopeError("Generation not found")
+
+        return self.generation_registry.cancel(generation_uid)

@@ -262,6 +262,20 @@ class ChatMessageCRUD:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
+    async def get_message_by_uid_for_session(
+        self,
+        *,
+        chat_session_id: int,
+        message_uid: str,
+    ) -> ChatMessage | None:
+        """根据 session ID 和消息 UID 获取消息"""
+        stmt = select(ChatMessage).where(
+            ChatMessage.chat_session_id == chat_session_id,
+            ChatMessage.uid == message_uid,
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
     async def create_message(
         self,
         message_data: ChatMessageInternal,
@@ -343,7 +357,7 @@ class ChatMessageCRUD:
         chat_session_id: int,
         target_sequence: int,
     ) -> int:
-        """删除指定 sequence （包含）后的所有消息"""
+        """删除指定 sequence 及之后的所有消息"""
         stmt = delete(ChatMessage).where(
             ChatMessage.chat_session_id == chat_session_id,
             ChatMessage.sequence >= target_sequence,

@@ -40,6 +40,18 @@ class SourceCreateStorageError(SourceCreateError):
     pass
 
 
+class SourceItemDeleteConflictError(Exception):
+    """SourceItem 当前状态不允许删除"""
+
+    pass
+
+
+class GenerationScopeError(Exception):
+    """Generation 不属于当前会话 scope"""
+
+    pass
+
+
 class RateLimitExceededError(Exception):
     """请求被限流时抛出的异常，用于触发限流事件"""
 
