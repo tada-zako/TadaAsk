@@ -59,6 +59,40 @@ class VisitorChatRequest(BaseModel):
     )
 
 
+class AdminChatCancelResponse(BaseModel):
+    """Admin chat cancel 响应结构体"""
+
+    session_uid: str
+    generation_uid: str
+    cancelled: bool = Field(
+        default=False,
+        description="是否成功取消 LLM 生成",
+    )
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class VisitorChatCancelResponse(BaseModel):
+    """Visitor chat cancel 响应结构体"""
+
+    widget_uid: str
+    generation_uid: str
+    cancelled: bool = Field(
+        default=False,
+        description="是否成功取消 LLM 生成",
+    )
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 class ModelSelection(BaseModel):
     """模型选择请求结构体"""
 

@@ -13,8 +13,9 @@ from ...deps import (
     RAGSearchCRUDeps,
     ChatOrchestratorServiceDeps,
     RAGRetrievalServiceDeps,
+    GenerationRegistryDeps,
 )
-from ...schemas import VisitorChatRequest
+from ...schemas import VisitorChatRequest, VisitorChatCancelResponse
 from app.services.chat import ChatInput, RAGChatPlugin
 from app.providers import FullCompleter, completer_factory, ModelSettings
 from app.db.models import Provider, ModelProfile, ProjectWidget
@@ -186,14 +187,28 @@ async def get_rag_plugin(
     )
 
 
-async def enforce_visitor_rate_limit(
-    chat_request: Annotated[VisitorChatRequest, Depends(get_visitor_chat_request)],
+async def enforce_visitor_project_rate_limit(
     visitor_rate_limiter: VisitorRateLimiterDeps,
     client_ip: ClientIPDeps,
     project_uid: Annotated[str, Path(..., description="Project UID")],
 ) -> None:
+    """强制执行 Visitor 侧的通用 project 请求限流策略"""
+    try:
+        await visitor_rate_limiter.check_request(ip=client_ip, project_uid=project_uid)
+    except VisitorRateLimitError as exc:
+        # 直接上抛，交给全局异常处理器处理
+        raise exc
+
+
+async def enforce_visitor_chat_rate_limit(
+    chat_request: Annotated[VisitorChatRequest, Depends(get_visitor_chat_request)],
+    _rate_limit: Annotated[None, Depends(enforce_visitor_project_rate_limit)],
+) -> None:
     """
     强制执行 Visitor 侧的请求限流策略
+    NOTE: 这里单独将消息长度限制逻辑提取到依赖函数，
+    是因为 fastapi 进入 stream_chat() 中时，此时已经开始 SSE 流程；
+    如果将消息限制逻辑放到 API 函数体中，异常响应可能导致 SSE 不能正确结束
     """
     if len(chat_request.message) > settings.visitor_message_max_chars:
         # visitor 侧单条消息长度限制
@@ -201,12 +216,6 @@ async def enforce_visitor_rate_limit(
             status_code=413,
             detail="Visitor message is too large.",
         )
-
-    try:
-        await visitor_rate_limiter.check_request(ip=client_ip, project_uid=project_uid)
-    except VisitorRateLimitError as exc:
-        # 直接上抛，交给全局异常处理器处理
-        raise exc
 
 
 async def visitor_stream_lease(
@@ -237,7 +246,7 @@ async def visitor_stream_lease(
 )
 async def stream_chat(
     chat_request: Annotated[VisitorChatRequest, Depends(get_visitor_chat_request)],
-    _rate_limit: Annotated[None, Depends(enforce_visitor_rate_limit)],
+    _rate_limit: Annotated[None, Depends(enforce_visitor_chat_rate_limit)],
     _lease: Annotated[VisitorStreamLease, Depends(visitor_stream_lease)],
     project: ValidVisitorChatProjectDeps,
     _widget: Annotated[ProjectWidget, Depends(valid_visitor_widget)],
@@ -271,3 +280,22 @@ async def stream_chat(
                 by_alias=True,
             ),
         )
+
+
+@router.post(
+    "/project/{project_uid}/widget/{widget_uid}/generation/{generation_uid}/cancel",
+    response_model=VisitorChatCancelResponse,
+)
+async def cancel_visitor_generation(
+    _rate_limit: Annotated[None, Depends(enforce_visitor_project_rate_limit)],
+    generation_registry: GenerationRegistryDeps,
+    widget_uid: Annotated[str, Path(..., description="Widget UID")],
+    generation_uid: Annotated[str, Path(..., description="生成任务 UID")],
+):
+    """取消 visitor 侧活跃 LLM 生成；已结束时幂等 no-op"""
+    cancelled = generation_registry.cancel(generation_uid)
+    return VisitorChatCancelResponse(
+        widget_uid=widget_uid,
+        generation_uid=generation_uid,
+        cancelled=cancelled,
+    )
