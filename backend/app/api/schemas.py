@@ -93,6 +93,21 @@ class VisitorChatCancelResponse(BaseModel):
     )
 
 
+class AdminChatRevertResponse(BaseModel):
+    """Admin chat revert 响应结构体"""
+
+    session_uid: str
+    message_uid: str
+    target_sequence: int
+    deleted_count: int
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 class ModelSelection(BaseModel):
     """模型选择请求结构体"""
 
