@@ -93,17 +93,16 @@ Provider / RAG / CRUD（叶子模块）
 
 ### 4.4 文件存储
 
-- **内容寻址存储（CAS）**：物理路径 = `uploads/{hash[:2]}/{hash}{ext}`，路径由内容哈希决定，与 Source 无关。
-- `SourceItem.storage_key` 存储路径 key（非原始路径），与 `FileStorage` 实现解耦。
+- `SourceItem.storage_key` 存储文件对象 key（非原始路径），与 `FileStorage` 实现解耦。
 - `FileStorage` 是 Protocol；MVP 实现为 `LocalFileStorage`；未来可替换为 OSS/S3 兼容实现。
-- 文件去重：`storage_key` 已存在则跳过写入；通过 `SourceItem` 行数做引用计数，删除时 GC。
+- 上传文件按 `hash[:2]` 分目录，但每个 `SourceItem` 独占一个文件对象；即使内容相同也重复写入。
+- 删除 `SourceItem` 时同步删除对应文件对象，避免引入引用计数或后台磁盘 GC。
 
 ### 4.5 SourceItem 跨 Source 去重
 
-- 物理文件通过 CAS 去重（磁盘只存一份）。
-- SQL `SourceItem` 行 + `DocumentChunk` 行 + ChromaDB 向量**不跨 Source 共享**。
-- 理由：保持 `Source → SourceItem` 严格 1:N 关系，确保级联删除和 ChromaDB Collection 隔离的清晰性。
-- 未来优化：`item_hash` 命中已有 `SourceItem` 时，复制 Chunk 数据并向新 Collection 写入向量（跳过解析和向量化步骤）。
+- SQL `SourceItem` 行 + 原始文件对象 + `DocumentChunk` 行 + ChromaDB 向量**不跨 Source 共享**。
+- 理由：保持 `Source → SourceItem` 严格 1:N 关系，确保级联删除、文件删除和 ChromaDB Collection 隔离的清晰性。
+- 未来优化：`item_hash` 命中已有 `SourceItem` 时，可以复制 Chunk 数据并向新 Collection 写入向量（跳过解析和向量化步骤），但不复用原始文件对象。
 
 ### 4.6 Source 可见性控制
 
