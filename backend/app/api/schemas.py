@@ -108,6 +108,21 @@ class AdminChatRevertResponse(BaseModel):
     )
 
 
+class SourceItemDeleteResponse(BaseModel):
+    """Source item 删除响应结构体"""
+
+    source_uid: str
+    source_item_uid: str
+    deleted_vector_count: int
+    file_deleted: bool
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 class ModelSelection(BaseModel):
     """模型选择请求结构体"""
 

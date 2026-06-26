@@ -17,11 +17,12 @@ from loguru import logger
 from ...deps import (
     SourceCRUDeps,
     SourceCreationServiceDeps,
+    SourceItemServiceDeps,
     SourceItemUploadServiceDeps,
     WebCrawlSyncServiceDeps,
     SourceItemIndexingServiceDeps,
 )
-from ...schemas import IngestPausedResponse
+from ...schemas import IngestPausedResponse, SourceItemDeleteResponse
 from app.db.models import Source, SourceItem
 from app.db.schemas import (
     SourceCreate,
@@ -34,6 +35,7 @@ from app.core.exceptions import (
     SourceCreateStorageError,
     SourceCreateValidationError,
     SourceCreateConflictError,
+    SourceItemDeleteConflictError,
 )
 from app.core.config import settings
 
@@ -157,6 +159,31 @@ async def valid_source_item(
         )
 
     # TODO: 提前验证 source_item.status，确保已经完成的 item，不进入 ingest
+    return result
+
+
+async def valid_source_item_from_path(
+    source_crud: SourceCRUDeps,
+    source: "ValidSourceDeps",
+    source_item_uid: Annotated[
+        str,
+        FastAPIPath(..., description="数据项 UID"),
+    ],
+) -> SourceItem:
+    """验证 path 中的数据项 UID 是否属于当前 source"""
+    result = await source_crud.get_source_item_by_uid_for_source(
+        source_id=source.id, item_uid=source_item_uid
+    )
+
+    if not result:
+        logger.warning(
+            f"数据项 UID '{source_item_uid}' 在数据源 '{source.source_name}' 中未找到"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Source item not found",
+        )
+
     return result
 
 
@@ -322,6 +349,50 @@ async def upload_source_item(
     return await source_item_upload_service.upload_file(
         validated_files=validated_files,
         source=source,
+    )
+
+
+@router.get("/{source_uid}/items", response_model=list[SourceItemRead])
+async def list_source_items(
+    source: ValidSourceDeps,
+    source_crud: SourceCRUDeps,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+):
+    """获取 source 下的数据项列表"""
+    items = await source_crud.list_source_items_by_source_id(
+        source_id=source.id,
+        limit=limit,
+        offset=offset,
+    )
+    return [SourceItemRead.model_validate(item) for item in items]
+
+
+@router.delete(
+    "/{source_uid}/items/{source_item_uid}", response_model=SourceItemDeleteResponse
+)
+async def delete_source_item(
+    source: ValidSourceDeps,
+    source_item: Annotated[SourceItem, Depends(valid_source_item_from_path)],
+    source_item_service: SourceItemServiceDeps,
+):
+    """删除 source item，并清理对应的向量与文件对象"""
+    try:
+        result = await source_item_service.delete_source_item(
+            source=source,
+            source_item=source_item,
+        )
+    except SourceItemDeleteConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
+    return SourceItemDeleteResponse(
+        source_uid=source.uid,
+        source_item_uid=source_item.uid,
+        deleted_vector_count=result.deleted_vector_count,
+        file_deleted=result.file_deleted,
     )
 
 

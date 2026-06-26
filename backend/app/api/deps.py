@@ -4,7 +4,7 @@ from fastapi import Depends, Request, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db import get_db, get_session_factory
-from app.db.models import Project
+from app.db.models import Project, ChatSession
 from app.crud import (
     ProjectCRUD,
     AdminCRUD,
@@ -28,6 +28,7 @@ from app.rag import (
 from app.utils import TokenCounter
 from app.services.sources import (
     SourceItemUploadService,
+    SourceItemService,
     WebCrawlSyncService,
     SourceCreationService,
 )
@@ -35,6 +36,7 @@ from app.services.indexing import SourceItemIndexingService
 from app.services.search import HybridSearchService, RAGRetrievalService
 from app.services.model_profiles import ModelProfileService
 from app.services.chat import (
+    ChatSessionOpsService,
     ChatOrchestratorService,
     CompactionService,
     ContextBuilder,
@@ -278,6 +280,19 @@ def get_source_item_upload_service(
     )
 
 
+def get_source_item_service(
+    source_crud: "SourceCRUDeps",
+    file_storage: "FileStorageDeps",
+    vector_db: "VectorDBDeps",
+) -> SourceItemService:
+    """SourceItemService 依赖注入接口"""
+    return SourceItemService(
+        source_crud=source_crud,
+        file_storage=file_storage,
+        vector_db=vector_db,
+    )
+
+
 def get_web_crawl_sync_service(
     source_crud: "SourceCRUDeps",
     crawler: "WebCrawlerDeps",
@@ -454,6 +469,10 @@ ModelProfileServiceDeps = Annotated[
 SourceItemUploadServiceDeps = Annotated[
     SourceItemUploadService,
     Depends(get_source_item_upload_service),
+]
+SourceItemServiceDeps = Annotated[
+    SourceItemService,
+    Depends(get_source_item_service),
 ]
 WebCrawlSyncServiceDeps = Annotated[
     WebCrawlSyncService,
