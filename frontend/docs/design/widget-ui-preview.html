@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TadaAsk Visitor Widget UI Preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page-bg: #0b0b0c;
+        --page-surface: #101113;
+        --page-surface-strong: #17191c;
+        --page-text: #f5f5f4;
+        --page-muted: #a1a1aa;
+        --page-line: #24262b;
+        --widget-bg: #0b0b0c;
+        --widget-surface: #101113;
+        --widget-surface-strong: #17191c;
+        --widget-text: #f5f5f4;
+        --widget-muted: #a1a1aa;
+        --widget-faint: #71717a;
+        --widget-line: #24262b;
+        --widget-accent: #24d3c4;
+        --widget-accent-dark: #24d3c4;
+        --widget-accent-soft: rgba(36, 211, 196, 0.13);
+        --widget-radius: 8px;
+        --widget-font:
+          "Aptos", "Segoe UI", ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, sans-serif;
+        --mono:
+          "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono",
+          monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 70% -12%, rgba(36, 211, 196, 0.09), transparent 28rem),
+          var(--page-bg);
+        color: var(--page-text);
+        font-family: var(--widget-font);
+        letter-spacing: 0;
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .site-shell {
+        display: grid;
+        grid-template-columns: 272px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .site-sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        border-right: 1px solid var(--page-line);
+        background: #050505;
+        padding: 24px 20px;
+      }
+
+      .site-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 30px;
+        font-size: 18px;
+        font-weight: 760;
+      }
+
+      .site-mark,
+      .widget-mark {
+        display: grid;
+        place-items: center;
+        border-radius: 7px;
+        background: var(--widget-accent);
+        color: #031110;
+        font-weight: 800;
+      }
+
+      .site-mark {
+        width: 30px;
+        height: 30px;
+      }
+
+      .site-nav {
+        display: grid;
+        gap: 8px;
+      }
+
+      .site-nav a {
+        border-radius: 7px;
+        color: var(--page-muted);
+        padding: 9px 10px;
+        text-decoration: none;
+        font-size: 14px;
+      }
+
+      .site-nav a.active {
+        border: 1px solid rgba(36, 211, 196, 0.28);
+        background: var(--widget-accent-soft);
+        color: var(--widget-accent);
+        font-weight: 680;
+      }
+
+      .site-main {
+        min-width: 0;
+        padding: 50px clamp(28px, 7vw, 92px) 120px;
+      }
+
+      .doc {
+        max-width: 820px;
+      }
+
+      .doc-eyebrow {
+        color: var(--widget-accent-dark);
+        font-size: 13px;
+        font-weight: 760;
+        text-transform: uppercase;
+      }
+
+      .doc h1 {
+        margin: 10px 0 18px;
+        max-width: 720px;
+        font-size: clamp(34px, 6vw, 62px);
+        line-height: 1.02;
+        letter-spacing: 0;
+      }
+
+      .doc h2 {
+        margin: 44px 0 12px;
+        font-size: 24px;
+      }
+
+      .doc p,
+      .doc li {
+        color: var(--page-muted);
+        font-size: 16px;
+        line-height: 1.75;
+      }
+
+      .doc-card {
+        margin: 28px 0;
+        border: 1px solid var(--page-line);
+        border-radius: 8px;
+        background: var(--page-surface);
+        padding: 18px;
+      }
+
+      .doc-code {
+        overflow-x: auto;
+        border-radius: 7px;
+        background: #050505;
+        color: #dce8ea;
+        padding: 16px;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .widget-launcher {
+        position: fixed;
+        right: 28px;
+        bottom: 24px;
+        z-index: 20;
+        display: grid;
+        width: 54px;
+        height: 54px;
+        place-items: center;
+        border: 1px solid rgba(36, 211, 196, 0.42);
+        border-radius: 16px;
+        background: var(--widget-accent);
+        color: #031110;
+        padding: 0;
+        box-shadow: 0 16px 44px rgba(0, 0, 0, 0.36);
+        font-weight: 720;
+      }
+
+      .widget-launcher .spark {
+        display: grid;
+        width: 100%;
+        height: 100%;
+        place-items: center;
+        border-radius: inherit;
+        background: transparent;
+        font-size: 24px;
+      }
+
+      .widget-shell {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        z-index: 30;
+        display: none;
+        width: min(1000px, calc(100vw - 56px));
+        height: min(700px, calc(100vh - 48px));
+        overflow: hidden;
+        border: 1px solid var(--widget-line);
+        border-radius: 8px;
+        background: var(--widget-bg);
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.54);
+        transform: translate(-50%, -50%);
+      }
+
+      .widget-shell.open {
+        display: grid;
+        grid-template-rows: 74px minmax(0, 1fr) auto 30px;
+      }
+
+      .widget-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--widget-line);
+        background: #050505;
+        color: var(--widget-text);
+        padding: 0 24px;
+      }
+
+      .widget-title {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 12px;
+      }
+
+      .widget-mark {
+        width: 34px;
+        height: 34px;
+        border: 1px solid rgba(36, 211, 196, 0.38);
+        background: var(--widget-accent);
+        color: #031110;
+      }
+
+      .widget-title strong {
+        overflow: hidden;
+        font-size: 24px;
+        font-weight: 780;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .widget-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .icon-button {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border: 1px solid transparent;
+        border-radius: 7px;
+        background: transparent;
+        color: inherit;
+        font-size: 20px;
+      }
+
+      .icon-button:hover {
+        background: var(--widget-surface-strong);
+      }
+
+      .widget-scroll {
+        overflow-y: auto;
+        padding: 24px 26px 18px;
+      }
+
+      .welcome {
+        display: grid;
+        gap: 18px;
+        max-width: 820px;
+        margin: 0 auto;
+      }
+
+      .notice {
+        border: 1px solid var(--widget-line);
+        border-left: 4px solid var(--widget-accent);
+        border-radius: var(--widget-radius);
+        background: var(--widget-surface);
+        padding: 15px 16px;
+        color: var(--widget-muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      .notice a {
+        color: var(--widget-accent-dark);
+        font-weight: 680;
+        text-decoration: none;
+      }
+
+      .examples {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      .example-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: min(100%, 300px);
+        min-height: 54px;
+        border: 1px solid var(--widget-line);
+        border-radius: var(--widget-radius);
+        background: var(--widget-surface);
+        color: var(--widget-text);
+        padding: 10px 13px;
+        text-align: center;
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      .example-button:hover {
+        border-color: rgba(0, 148, 133, 0.42);
+        background: var(--widget-accent-soft);
+      }
+
+      .conversation {
+        display: grid;
+        gap: 18px;
+        max-width: 900px;
+      }
+
+      .message {
+        display: grid;
+        gap: 9px;
+      }
+
+      .message.user {
+        justify-items: end;
+      }
+
+      .message-label {
+        color: var(--widget-faint);
+        font-size: 12px;
+        font-weight: 760;
+        text-transform: uppercase;
+      }
+
+      .user-bubble {
+        max-width: 680px;
+        border-radius: 8px;
+        background: var(--widget-surface-strong);
+        color: var(--widget-text);
+        padding: 13px 15px;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .answer {
+        color: var(--widget-text);
+        font-size: 15px;
+        line-height: 1.75;
+      }
+
+      .answer p,
+      .answer ul,
+      .answer ol,
+      .answer pre,
+      .answer blockquote,
+      .answer table {
+        margin: 0 0 14px;
+      }
+
+      .answer h3 {
+        margin: 18px 0 8px;
+        font-size: 17px;
+      }
+
+      .answer code {
+        border: 1px solid var(--widget-line);
+        border-radius: 5px;
+        background: #050505;
+        padding: 1px 5px;
+        font-family: var(--mono);
+        font-size: 0.92em;
+      }
+
+      .answer pre {
+        overflow-x: auto;
+        border-radius: 7px;
+        background: #050505;
+        color: #dce8ea;
+        padding: 14px;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .answer pre code {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        padding: 0;
+      }
+
+      .answer blockquote {
+        border-left: 3px solid var(--widget-line);
+        color: var(--widget-muted);
+        padding-left: 12px;
+      }
+
+      .answer table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      .answer th,
+      .answer td {
+        border: 1px solid var(--widget-line);
+        padding: 8px 10px;
+        text-align: left;
+      }
+
+      .answer th {
+        background: var(--widget-surface);
+        font-weight: 720;
+      }
+
+      .typing-cursor {
+        display: inline-block;
+        width: 8px;
+        height: 1.1em;
+        margin-left: 2px;
+        transform: translateY(2px);
+        background: var(--widget-accent);
+        animation: blink 0.9s steps(2, start) infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      .source-section {
+        display: none;
+        margin-top: 18px;
+      }
+
+      .source-section.visible {
+        display: block;
+      }
+
+      .source-heading {
+        margin: 0 0 8px;
+        color: var(--widget-text);
+        font-size: 14px;
+        font-weight: 740;
+      }
+
+      .source-list {
+        display: grid;
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid var(--widget-line);
+        border-radius: var(--widget-radius);
+        background: var(--widget-surface);
+        padding: 0;
+        list-style: none;
+      }
+
+      .source-item {
+        border-bottom: 1px solid var(--widget-line);
+      }
+
+      .source-item:last-child {
+        border-bottom: 0;
+      }
+
+      .source-row,
+      .source-toggle {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        padding: 10px 12px;
+        text-align: left;
+        text-decoration: none;
+      }
+
+      .source-toggle:hover,
+      .source-row:hover {
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .source-index {
+        display: grid;
+        width: 22px;
+        height: 22px;
+        place-items: center;
+        border: 1px solid var(--widget-line);
+        border-radius: 999px;
+        color: var(--widget-accent);
+        font-size: 11px;
+        font-weight: 760;
+      }
+
+      .source-main {
+        min-width: 0;
+      }
+
+      .source-title {
+        overflow: hidden;
+        color: var(--widget-text);
+        font-size: 13px;
+        font-weight: 720;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .source-meta {
+        display: block;
+        overflow: hidden;
+        margin-top: 2px;
+        color: var(--widget-muted);
+        font-size: 12px;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .source-meta a {
+        color: var(--widget-muted);
+        text-decoration: none;
+      }
+
+      .source-meta a:hover {
+        color: var(--widget-accent);
+      }
+
+      .source-action {
+        display: block;
+        color: var(--widget-faint);
+        font-size: 16px;
+        transition: transform 0.16s ease, color 0.16s ease;
+      }
+
+      .source-type {
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: #050505;
+        color: var(--widget-muted);
+        padding: 3px 8px;
+        font-size: 11px;
+        font-weight: 720;
+      }
+
+      .source-excerpt {
+        display: none;
+        border-top: 1px solid var(--widget-line);
+        background: #050505;
+        color: var(--widget-muted);
+        padding: 10px 12px 12px 50px;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .source-item.open .source-excerpt {
+        display: block;
+      }
+
+      .source-item.open .source-action {
+        color: var(--widget-accent);
+        transform: rotate(180deg);
+      }
+
+      .composer {
+        border-top: 1px solid var(--widget-line);
+        background: #050505;
+        padding: 14px 26px;
+      }
+
+      .composer-box {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: 12px;
+        min-height: 86px;
+        border: 1px solid var(--widget-line);
+        border-radius: var(--widget-radius);
+        background: var(--widget-surface);
+        padding: 13px;
+      }
+
+      .composer textarea {
+        width: 100%;
+        min-height: 54px;
+        max-height: 130px;
+        resize: none;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--widget-text);
+        font-size: 18px;
+        line-height: 1.4;
+      }
+
+      .composer textarea::placeholder {
+        color: #a9b2bd;
+      }
+
+      .send-button {
+        display: grid;
+        width: 48px;
+        height: 48px;
+        place-items: center;
+        border: 0;
+        border-radius: 7px;
+        background: var(--widget-accent);
+        color: #031110;
+        font-size: 22px;
+      }
+
+      .send-button:disabled {
+        cursor: not-allowed;
+        background: var(--widget-surface-strong);
+        color: var(--widget-faint);
+      }
+
+      .widget-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 26px;
+        color: var(--widget-faint);
+        font-size: 12px;
+      }
+
+      .widget-footer strong {
+        color: var(--widget-muted);
+      }
+
+      .mobile-note {
+        display: none;
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        left: 16px;
+        border: 1px solid var(--page-line);
+        border-radius: 8px;
+        background: var(--page-surface);
+        color: var(--page-muted);
+        padding: 14px;
+        font-size: 14px;
+        line-height: 1.55;
+        box-shadow: 0 16px 48px rgba(16, 24, 32, 0.18);
+      }
+
+      @media (max-width: 940px) {
+        .site-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .site-sidebar {
+          display: none;
+        }
+      }
+
+      @media (max-width: 760px), (pointer: coarse) {
+        .widget-launcher,
+        .widget-shell {
+          display: none !important;
+        }
+
+        .mobile-note {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="site-shell">
+      <aside class="site-sidebar">
+        <div class="site-brand">
+          <div class="site-mark">F</div>
+          FastAPI Docs
+        </div>
+        <nav class="site-nav" aria-label="Documentation sections">
+          <a class="active" href="#">Getting Started</a>
+          <a href="#">Path Operations</a>
+          <a href="#">Dependencies</a>
+          <a href="#">Security</a>
+          <a href="#">Deployment</a>
+        </nav>
+      </aside>
+
+      <main class="site-main">
+        <article class="doc">
+          <div class="doc-eyebrow">Preview host page</div>
+          <h1>FastAPI documentation sample page</h1>
+          <p>
+            This static page exists only to show how the TadaAsk visitor widget
+            feels when embedded into a documentation site. The widget in the
+            bottom-right corner uses local demo state and does not call a backend.
+          </p>
+
+          <div class="doc-card">
+            <div class="doc-code">&lt;script
+  src="https://example.com/tadaask-widget.js"
+  data-project="project_fastapi_docs"
+  data-widget="widget_fastapi"
+  data-title="FastAPI AI Assistant"&gt;
+&lt;/script&gt;</div>
+          </div>
+
+          <h2>Why this preview is useful</h2>
+          <p>
+            The widget is intentionally closer to a reading panel than a narrow
+            chat bubble. RAG answers often need more room for Markdown content,
+            code examples, tables, and visible source cards.
+          </p>
+          <ul>
+            <li>The header keeps title and logo visible at all times.</li>
+            <li>The answer area supports a Markdown-shaped layout.</li>
+            <li>Sources use a compact capped list with expandable local excerpts.</li>
+            <li>Mobile rendering is hidden for MVP.</li>
+          </ul>
+        </article>
+      </main>
+    </div>
+
+    <button class="widget-launcher" id="launcher" type="button" aria-label="Open FastAPI AI Assistant" style="display: none">
+      <span class="spark">?</span>
+    </button>
+
+    <section class="widget-shell open" id="widget" aria-label="FastAPI AI Assistant preview">
+      <header class="widget-header">
+        <div class="widget-title">
+          <div class="widget-mark">F</div>
+          <strong>FastAPI AI Assistant</strong>
+        </div>
+        <div class="widget-actions">
+          <button class="icon-button" id="newChat" type="button" aria-label="Start new chat">+</button>
+          <button class="icon-button" id="closeWidget" type="button" aria-label="Close widget">x</button>
+        </div>
+      </header>
+
+      <main class="widget-scroll" id="scrollArea">
+        <section class="welcome" id="welcome">
+          <div class="notice">
+            AI-generated answers based on FastAPI
+            <a href="https://fastapi.tiangolo.com/" target="_blank" rel="noreferrer">documentation</a>
+            and
+            <a href="https://github.com/fastapi/fastapi/discussions" target="_blank" rel="noreferrer">community discussions</a>.
+            Always verify important information.
+          </div>
+          <div class="examples" aria-label="Example questions">
+            <button class="example-button" type="button">How do I declare path parameters?</button>
+            <button class="example-button" type="button">How should I structure dependencies?</button>
+            <button class="example-button" type="button">How do I return custom response headers?</button>
+            <button class="example-button" type="button">What is the difference between sync and async endpoints?</button>
+          </div>
+        </section>
+
+        <section class="conversation" id="conversation" hidden></section>
+      </main>
+
+      <form class="composer" id="composer">
+        <div class="composer-box">
+          <textarea id="question" rows="2" placeholder="Ask a follow-up"></textarea>
+          <button class="send-button" id="send" type="submit" aria-label="Send question">↑</button>
+        </div>
+      </form>
+
+      <footer class="widget-footer">
+        <span>Powered by <strong>TadaAsk</strong></span>
+        <span>Demo preview</span>
+      </footer>
+    </section>
+
+    <div class="mobile-note">
+      TadaAsk visitor widget is hidden on mobile in the MVP preview. Desktop layout
+      is the current design target.
+    </div>
+
+    <script>
+      const launcher = document.querySelector("#launcher");
+      const widget = document.querySelector("#widget");
+      const closeWidget = document.querySelector("#closeWidget");
+      const newChat = document.querySelector("#newChat");
+      const composer = document.querySelector("#composer");
+      const question = document.querySelector("#question");
+      const send = document.querySelector("#send");
+      const welcome = document.querySelector("#welcome");
+      const conversation = document.querySelector("#conversation");
+      const scrollArea = document.querySelector("#scrollArea");
+      const examples = document.querySelectorAll(".example-button");
+
+      const answerText =
+        "Use FastAPI path parameters by placing a named segment in the route, then declaring a function parameter with the same name. FastAPI reads the value from the URL, converts it using the Python type annotation, and validates it before your endpoint runs.\n\nFor example, /items/{item_id} with item_id: int will parse the path value as an integer. If the value cannot be converted, FastAPI returns a validation error automatically.\n\nYou can combine path parameters with query parameters, dependencies, and response models. Keep path parameters for resource identity and use query parameters for filtering, pagination, or optional controls.";
+
+      const answerHtml = `
+        <p>Use FastAPI path parameters by placing a named segment in the route, then declaring a function parameter with the same name. FastAPI reads the value from the URL, converts it using the Python type annotation, and validates it before your endpoint runs.</p>
+        <pre><code>from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/items/{item_id}")
+async def read_item(item_id: int):
+    return {"item_id": item_id}</code></pre>
+        <h3>Practical rules</h3>
+        <ul>
+          <li>Use path parameters for required resource identity.</li>
+          <li>Use query parameters for optional filtering or pagination.</li>
+          <li>Rely on type annotations such as <code>int</code>, <code>str</code>, or <code>Enum</code> for validation.</li>
+        </ul>
+        <table>
+          <thead>
+            <tr><th>Input</th><th>Behavior</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>/items/42</code></td><td>Accepted as <code>item_id = 42</code>.</td></tr>
+            <tr><td><code>/items/foo</code></td><td>Rejected when <code>item_id</code> is typed as <code>int</code>.</td></tr>
+          </tbody>
+        </table>
+        <blockquote>Always verify generated answers against the linked source material before changing production code.</blockquote>
+      `;
+
+      const sourcesHtml = `
+        <section class="source-section visible">
+          <p class="source-heading">Answer based on the following sources</p>
+          <ul class="source-list">
+            <li class="source-item">
+              <a class="source-row" href="https://fastapi.tiangolo.com/tutorial/path-params/#data-conversion" target="_blank" rel="noreferrer">
+                <span class="source-index">1</span>
+                <span class="source-main">
+                  <span class="source-title">Path Parameters - FastAPI documentation</span>
+                  <span class="source-meta">fastapi.tiangolo.com/tutorial/path-params/#data-conversion</span>
+                </span>
+                <span class="source-type">Web</span>
+              </a>
+            </li>
+
+            <li class="source-item">
+              <button class="source-toggle" type="button" aria-expanded="false">
+                <span class="source-index">2</span>
+                <span class="source-main">
+                  <span class="source-title">FastAPI local notes.pdf</span>
+                  <span class="source-meta">Page 4 · Routing basics</span>
+                </span>
+                <span class="source-action">⌄</span>
+              </button>
+              <div class="source-excerpt">When the route contains a variable segment, the endpoint signature must expose the corresponding parameter. Validation happens before entering the handler.</div>
+            </li>
+
+            <li class="source-item">
+              <a class="source-row" href="https://github.com/fastapi/fastapi/discussions" target="_blank" rel="noreferrer">
+                <span class="source-index">3</span>
+                <span class="source-main">
+                  <span class="source-title">Community discussion: path and query design</span>
+                  <span class="source-meta">github.com/fastapi/fastapi/discussions</span>
+                </span>
+                <span class="source-type">Web</span>
+              </a>
+            </li>
+          </ul>
+        </section>
+      `;
+
+      let streamTimer = null;
+
+      function openWidget() {
+        widget.classList.add("open");
+        launcher.style.display = "none";
+        question.focus();
+      }
+
+      function closePanel() {
+        widget.classList.remove("open");
+        launcher.style.display = "grid";
+      }
+
+      function resetChat() {
+        clearInterval(streamTimer);
+        conversation.hidden = true;
+        conversation.innerHTML = "";
+        welcome.style.display = "grid";
+        question.value = "";
+        send.disabled = false;
+        question.focus();
+      }
+
+      function scrollToBottom() {
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+      }
+
+      function ask(value) {
+        const text = value.trim();
+        if (!text) return;
+
+        clearInterval(streamTimer);
+        welcome.style.display = "none";
+        conversation.hidden = false;
+        send.disabled = true;
+        question.value = "";
+
+        conversation.innerHTML = `
+          <article class="message user">
+            <div class="message-label">You</div>
+            <div class="user-bubble"></div>
+          </article>
+          <article class="message">
+            <div class="message-label">TadaAsk</div>
+            <div class="answer" id="answer"><span class="typing-cursor"></span></div>
+          </article>
+        `;
+
+        conversation.querySelector(".user-bubble").textContent = text;
+        const answer = conversation.querySelector("#answer");
+        let index = 0;
+
+        streamTimer = setInterval(() => {
+          index += 4;
+          answer.textContent = answerText.slice(0, index);
+          const cursor = document.createElement("span");
+          cursor.className = "typing-cursor";
+          answer.appendChild(cursor);
+          scrollToBottom();
+
+          if (index >= answerText.length) {
+            clearInterval(streamTimer);
+            answer.innerHTML = answerHtml + sourcesHtml;
+            send.disabled = false;
+            scrollToBottom();
+          }
+        }, 22);
+      }
+
+      launcher.addEventListener("click", openWidget);
+      closeWidget.addEventListener("click", closePanel);
+      newChat.addEventListener("click", resetChat);
+
+      composer.addEventListener("submit", (event) => {
+        event.preventDefault();
+        ask(question.value);
+      });
+
+      examples.forEach((button) => {
+        button.addEventListener("click", () => ask(button.textContent));
+      });
+
+      conversation.addEventListener("click", (event) => {
+        const toggle = event.target.closest(".source-toggle");
+        if (!toggle) return;
+
+        const item = toggle.closest(".source-item");
+        item.classList.toggle("open");
+        toggle.setAttribute("aria-expanded", item.classList.contains("open"));
+      });
+
+      question.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          composer.requestSubmit();
+        }
+      });
+    </script>
+  </body>
+</html>
