@@ -1,4 +1,4 @@
-# TadaWidget 前端 AI / Vibe Coding 协作说明
+# TadaAsk 前端 AI / Vibe Coding 协作说明
 
 ## 1. 文档定位
 
