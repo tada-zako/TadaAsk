@@ -201,7 +201,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down the application...")
 
 
-app = FastAPI(lifespan=lifespan, title="LLM Technology Assignment API")
+app = FastAPI(lifespan=lifespan, title="Tada Ask API")
 
 origins = [
     "http://localhost",

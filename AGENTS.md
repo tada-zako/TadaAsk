@@ -1,94 +1,165 @@
-# TadaAsk — Agent Instructions
+# TadaAsk Agent Instructions
 
-Applies to all AI agents (GitHub Copilot, Claude, Cursor, etc.).
-Full requirements document: `docs/requirements.md`. RAG implementation details: `backend/docs/rag-pipeline.md`.
+Applies to all AI agents working in this repository.
 
----
-
-## Project Identity
-
-Open-source AI knowledge-base assistant with a widget-first integration model (reference: kapa.ai).
-Tech stack: FastAPI + SQLAlchemy async + SQLite backend; Vue 3 + TypeScript frontend.
-Personal learning project — no commercial scale constraints; prioritize architectural clarity over premature optimization.
+This file is a lightweight implementation guide for agents. It is not a full
+business specification, architecture document, API contract, or frontend design
+standard.
 
 ---
 
-## Backend Layer Boundaries
+## Project Context
 
+TadaAsk is an open-source AI knowledge-base assistant with a widget-first
+integration model.
+
+Current stack:
+
+- Backend: FastAPI, SQLAlchemy async, SQLite.
+- Frontend: Vue 3, TypeScript.
+
+This is a personal learning and MVP-stage project. Prefer clarity, fast
+iteration, and easy refactoring over heavy process or premature abstraction.
+
+The project name is **TadaAsk**. Do not introduce or restore old project names.
+
+---
+
+## Source Of Truth
+
+- Source code is the primary source of truth.
+- Backend API behavior should be checked against the FastAPI implementation and
+  generated OpenAPI output.
+- Lightweight backend integration notes live under `backend/docs/`.
+- `backend/docs/tutorial/openapi.json` is the generated API reference artifact.
+- `backend/docs/tutorial/source-map.md` is the preferred backend file-location
+  guide for frontend/backend integration work.
+
+Do not treat older design notes, generated specs, or large documentation files as
+binding if they disagree with the current implementation.
+
+This project does not use strict SDD. Do not create large specification sets
+unless the user explicitly asks for them.
+
+---
+
+## Working Principles
+
+- Read the relevant existing code before making changes.
+- Keep changes scoped to the user's request.
+- Do not perform broad refactors, rewrites, renames, formatting sweeps, or
+  documentation expansions unless they are directly requested.
+- Preserve existing patterns unless there is a clear reason to change them.
+- If a business boundary is unclear, discuss it with the user before encoding it
+  into code or documentation.
+- When implementation and documentation disagree, prefer implementation and note
+  the mismatch if it matters.
+- Avoid adding comments, types, error handling, abstractions, files, or
+  dependencies that are not needed for the current change.
+
+---
+
+## Backend Boundaries
+
+Use the current backend layering as a working habit, not as a frozen architecture
+spec:
+
+```text
+Router -> Service -> CRUD / Provider / Search / Indexing / Storage
 ```
-Router (HTTP, thin)  →  Service (orchestration)  →  Provider / RAG / CRUD (leaf modules)
-```
 
-- Handlers stay thin — all business logic belongs in the service layer.
-- Layer rule: `router → service → (crud | rag | provider | storage)`. No cross-layer shortcuts.
-- LLM/Provider abstractions must stay behind the `Model` Protocol; service and router layers must not import vendor SDKs directly.
-- Vector-store logic stays behind `VectorDatabase` Protocol; FTS logic stays behind `FTSProvider` Protocol.
-- All configuration via centralized `settings` (pydantic-settings). No hardcoded secrets, paths, or model names.
+- Keep HTTP handlers thin.
+- Put business orchestration in service modules.
+- Keep persistence details in CRUD/database-facing modules.
+- Keep LLM/provider-specific SDK usage behind provider abstractions.
+- Keep search, indexing, and storage details inside their existing modules.
+- Use centralized settings/configuration. Do not hardcode secrets, local paths,
+  provider names, or model names in feature code.
 
----
+Before changing RAG behavior, read the relevant source under:
 
-## Async Patterns
+- `backend/app/services/search/`
+- `backend/app/services/indexing/`
+- `backend/app/services/sources/`
+- `backend/app/db/`
 
-- Prefer async-first for all I/O-heavy flows (DB, file, network).
-- CPU-intensive sync operations (parse, embed, tokenize, AST scan) must run inside `asyncio.to_thread()`.
-- **Encapsulation rule**: the component that knows it is CPU-intensive is responsible for wrapping itself in `to_thread` — not the caller.
-- Use `asyncio.gather()` for concurrent multi-collection vector queries.
-- No Celery / task queue for MVP. `asyncio.to_thread()` is the sole async-sync bridge.
-- jieba tokenization does **not** release the GIL → must be wrapped in `asyncio.to_thread()`.
-- fastembed (ONNX) **does** release the GIL → safe inside `asyncio.to_thread()`.
-
----
-
-## RAG Architecture Constraints
-
-- SQL (`DocumentChunk.chunk_content`) is the **authoritative content store**. ChromaDB stores vectors only (`{source_item_id}` metadata).
-- `vector_id = uuid5(RAG_NAMESPACE, f"{source_item_id}_{chunk_index}")` — globally unique bridge key between SQL and ChromaDB.
-- FTS5 virtual table `documents_fts` is bound to `document_chunks.chunk_tokens` (chunk-level granularity).
-- One `Source` = one ChromaDB collection. Multi-source queries use `asyncio.gather()` + SQL-layer RRF merge.
-- Hybrid search order: `QueryExpander` → parallel FTS + vector search → RRF fusion (k=60) → `RerankProvider`.
-- `DocumentContent.document_content` stores **parser output (Markdown text)** — used to skip re-parsing during re-indexing.
+Do not restate detailed RAG, Source/SourceItem, citation, vector-store, FTS, or
+CAS behavior in this file. Those are current implementation details and should be
+verified from source code when needed.
 
 ---
 
-## File Storage
+## Async And I/O
 
-- **Content-addressable storage (CAS)**: `storage_key = f"{hash[:2]}/{hash}{ext}"` — path is derived from content hash, independent of which Source the file belongs to.
-- `FileStorage` is a Protocol (MVP impl: `LocalFileStorage`; future swap: S3-compatible impl).
-- `SourceItem.storage_key` holds the CAS key. Cross-source deduplication: same physical file on disk, but each Source has its own `SourceItem` + `DocumentChunk` rows.
-
----
-
-## Ingestion API Pattern
-
-- **Upload** (`POST /items/upload`) and **process** (`POST /document/ingest`) are **two separate endpoints**.
-- Upload: stores the file, creates `SourceItem` (`status=PENDING`), returns immediately.
-- Process: SSE-streamed via `AsyncGenerator` yielding `ProgressEvent` (stage, message, progress), served with sse-starlette's `EventSourceResponse`.
-- Never combine upload and processing logic in a single blocking HTTP request.
+- Prefer async-first code for database, file, network, LLM, crawl, and indexing
+  flows.
+- Keep sync/async bridging close to the component that owns the blocking or
+  CPU-heavy work.
+- Do not add a task queue or background worker system for MVP work unless the
+  user explicitly asks for that direction.
+- Use existing concurrency patterns in the touched module instead of inventing a
+  new local style.
 
 ---
 
-## Frontend Rules (Vue)
+## Code Style
 
-- Use Vue 3 + TypeScript; keep framework choices consistent within each feature area.
-- Keep UI modules reusable so the widget and admin console can evolve independently.
-- Keep client-server contracts explicit and consistent with backend payload conventions.
-- Frontend directory structure is expected to change for widget/admin adaptation; avoid coupling to fixed layouts.
+Follow Occam's Razor: the simplest sufficient solution is preferred.
+
+For Python backend code:
+
+- Prefer Pythonic, readable code over clever abstractions.
+- Use clear names, small functions, and direct control flow.
+- Avoid unnecessary base classes, managers, factories, registries, wrappers, and
+  configuration layers.
+- Reuse existing schemas, helpers, services, and provider interfaces before
+  introducing new entities.
+- Add abstraction only when it removes real duplication or protects an existing
+  boundary.
+
+For frontend code:
+
+- Use Vue 3 and TypeScript conventions already present in the project.
+- Non-essential entities should not be added: avoid unnecessary components,
+  stores, composables, types, wrappers, and configuration files.
+- Keep admin-console and visitor-widget code able to evolve independently.
+- Prefer explicit client-server contracts based on OpenAPI and backend source
+  over duplicated handwritten protocol documents.
 
 ---
 
-## Roadmap Alignment
+## Documentation Policy
 
-- Favor protocol-oriented abstractions supporting multiple LLMs (Gemini/OpenAI-compatible/Ollama) and vector DBs (Chroma → Qdrant/LanceDB).
-- Prefer additive changes that make crawler ingestion, GitHub repo ingestion, and owner-side MCP operations easier to add later.
-- SQLite is the metadata/config baseline. `Source.is_public` controls visitor-facing RAG access.
-- For MVP, prioritize grounded answers from known knowledge sources over broad web search.
+Documentation should help navigation and integration, not slow MVP development.
+
+- Keep backend docs lightweight.
+- Prefer entry documents, source maps, and generated OpenAPI over large manual
+  specs.
+- Do not create or expand business-contract documents unless requested.
+- When adding documentation, make it clear whether it is current behavior,
+  implementation guidance, or future design thinking.
+- Avoid strict promises about APIs, SSE events, citation rendering, storage, or
+  RAG internals unless they are enforced by current code.
 
 ---
 
-## Quality Expectations
+## Testing And Validation
 
-- Keep boundaries explicit: `router → service → provider/rag/core`.
-- Avoid shortcut coupling that bypasses existing layers; document the reason if it is truly necessary.
-- For architecture-impacting changes, include a brief note on extensibility impact.
-- Only make changes that are directly requested or clearly necessary; do not add comments, type annotations, or error handling to code that was not part of the change.
-- `backend/tests` is not a trusted correctness source. This project is not TDD, and tests are not kept up to date in real time; do not use tests for debug, review, or development validation unless the user explicitly asks for it.
+- `backend/tests` is not a trusted correctness source.
+- This project is not TDD, and tests are not kept up to date in real time.
+- Do not use tests for debugging, review, or development validation unless the
+  user explicitly asks for it.
+- For code changes, prefer targeted validation that matches the change: syntax
+  checks, type checks, focused smoke checks, or direct inspection.
+- For documentation-only changes, tests are usually unnecessary.
+
+---
+
+## Change Discipline
+
+- Respect the user's existing worktree changes. Do not revert files you did not
+  intentionally change.
+- Do not introduce large dependency changes without discussion.
+- Do not change project identity, naming, or product language unless requested.
+- If a change would turn a lightweight MVP decision into a long-term contract,
+  ask the user first.
