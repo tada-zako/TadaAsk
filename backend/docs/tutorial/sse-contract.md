@@ -145,7 +145,7 @@ TadaAsk 在**流式聊天问答 (Chat Streams)** 以及 **异步知识导入/抓
 知识源（Source）同步与 Ingestion（解析和向量化）接口均采用 SSE 方式报告复杂步骤进度。
 
 - 网页抓取同步：`POST /admin/source/{source_uid}/items/crawl/sync`
-- 向量化索引：`POST /admin/source/items/ingest`
+- 向量化索引：`POST /admin/source/{source_uid}/document/indexing`
 
 这些接口统一推送基于 `RAGSyncEvent` 结构的数据：
 
@@ -154,8 +154,8 @@ TadaAsk 在**流式聊天问答 (Chat Streams)** 以及 **异步知识导入/抓
 | 事件名称          | 描述说明                                                                                            |
 | :---------------- | :-------------------------------------------------------------------------------------------------- |
 | `sync_start`      | 全局同步/索引任务启动。                                                                             |
-| `item_discovered` | （仅 Crawl）发现了一个新的待抓取 URL，并创建了 pending 状态的 SourceItem。                          |
-| `item_upserted`   | 抓取过程中更新/覆盖了已有 URL 对应的 SourceItem 属性。                                              |
+| `item_discovered` | （仅 Crawl）发现了一个新的待抓取 URL（此时尚未 upsert 产生本地 SourceItem 记录）。                  |
+| `item_upserted`   | 抓取过程中对发现的页面进行加载解析并更新/保存对应 `pending` 或最新状态的 `SourceItem` 属性。        |  |
 | `item_progress`   | 具体的 SourceItem 正在经历解析（Parsing）、切片（Chunking）或向量化（Embedding）阶段。              |
 | `item_skipped`    | 该 SourceItem 重复或由于状态冲突，被跳过。                                                          |
 | `item_completed`  | 单个 SourceItem 已经完全成功写入向量索引并更新为 `completed` 状态。                                 |

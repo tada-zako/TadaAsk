@@ -52,7 +52,7 @@ Create Source ───► Local File Upload  ───► SourceItems (PENDING)
 
 ### 2.3 流程 C：向量化索引流程 (Ingestion/Indexing Flow)
 无论文件还是抓取的网页，新建立的 SourceItem 均处于 `pending`。必须通过 **Ingestion API** 触发深度解析与向量库索引：
-1. **启动 Ingestion**：发送 `POST /admin/source/items/ingest`，并在请求体中传入要处理的 `sourceItemUids: [string]` 数组。
+1. **启动 Ingestion**：发送 `POST /admin/source/{source_uid}/document/indexing`，并在请求体中传入要处理的 `sourceItemUids: [string]` 数组。
 2. **SSE 进度追踪**：此端点是一个 **SSE 事件流** (关于事件体详见 `03-sse-contract.md`)。后端会逐个对传入的 Item 进行：
    - 提取正文并转化为 Markdown
    - 保存 Markdown 全文到数据库中（用作后续 RAG 重新索引免解析缓存）
@@ -90,10 +90,10 @@ SourceItem 的 `status` 字段定义了其生命周期的中间状态和终端�
 
 ## 4. 删除 SourceItem 行为与安全约束
 
-在 Admin Console 界面中，管理员可以对 SourceItem 进行删除操作（调用 `DELETE /admin/source/items/{source_item_uid}`），后端具有如下安全边界：
+在 Admin Console 界面中，管理员可以对 SourceItem 进行删除操作（调用 `DELETE /admin/source/{source_uid}/items/{source_item_uid}`），后端具有如下安全边界：
 
 1. **状态安全校验**：
-   - 如果 SourceItem 处于 `processing` 或 `pause_requested`，**不允许进行删除**。后端会直接返回 `409 Conflict` 错误（提示：`Item is busy, deletion not allowed`）。
+   - 如果 SourceItem 处于 `processing` 或 `pause_requested`，**不允许进行删除**。后端会直接返回 `409 Conflict` 错误（提示：`Source item is busy, pause it or wait until processing finishes`）。
 2. **级联清理范畴**：
    - 删除成功后，后端会级联删除：
      - 数据库中的 `SourceItem` 实体记录
