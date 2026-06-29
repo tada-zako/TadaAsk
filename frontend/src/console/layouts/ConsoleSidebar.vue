@@ -26,12 +26,12 @@ import {
 <template>
   <!-- 控制台侧边栏 -->
   <aside
-    class="console-scrollbar sticky top-0 h-screen overflow-y-auto border-r border-[var(--line-soft)] bg-[var(--surface-shell)]/95 px-3.5 py-4 backdrop-blur-xl max-[760px]:hidden"
+    class="console-scrollbar sticky top-0 h-screen overflow-y-auto border-r border-(--line-soft) bg-(--surface-shell)/95 px-3.5 py-4 backdrop-blur-xl max-[760px]:hidden"
   >
     <!-- Logo 区域 -->
     <div class="mb-5 flex h-10 items-center gap-2 px-2">
       <div
-        class="grid size-7 place-items-center rounded-[var(--console-radius-md)] border border-[var(--line-soft)] bg-[var(--surface-panel)] text-sm font-bold text-primary"
+        class="grid size-7 place-items-center rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-panel) text-sm font-bold text-primary"
       >
         T
       </div>
@@ -45,19 +45,19 @@ import {
           type="button"
           aria-label="Switch project"
           variant="outline"
-          class="mb-5 h-[52px] w-full justify-start gap-2 rounded-[var(--console-radius-lg)] border-[var(--line-soft)] bg-[var(--surface-panel)] px-2.5 text-left hover:bg-[var(--surface-hover)] max-[1180px]:h-11 max-[1180px]:justify-center"
+          class="mb-5 h-[52px] w-full justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-(--surface-panel) px-2.5 text-left hover:bg-(--surface-hover) max-[1180px]:h-11 max-[1180px]:justify-center"
         >
           <span
-            class="grid size-8 shrink-0 place-items-center rounded-[var(--console-radius-md)] bg-primary/15 text-sm font-bold text-primary"
+            class="grid size-8 shrink-0 place-items-center rounded-(--console-radius-md) bg-primary/15 text-sm font-bold text-primary"
           >
             D
           </span>
           <span class="min-w-0 flex-1 max-[1180px]:hidden">
-            <span class="block text-[11px] font-normal text-[var(--text-faint)]"
+            <span class="block text-[11px] font-normal text-(--text-faint)"
               >Current project</span
             >
             <span
-              class="block truncate text-[13px] font-semibold text-[var(--text-strong)]"
+              class="block truncate text-[13px] font-semibold text-(--text-strong)"
               >Docs Assistant</span
             >
           </span>
@@ -94,16 +94,16 @@ import {
         </a>
         <!-- 子导航 -->
         <div
-          class="ml-7 grid gap-1 border-l border-[var(--line-soft)] pl-2 max-[1180px]:hidden"
+          class="ml-7 grid gap-1 border-l border-(--line-soft) pl-2 max-[1180px]:hidden"
         >
           <a
-            class="flex min-h-8 items-center rounded-[var(--console-radius-sm)] px-2 text-[13px] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-strong)]"
+            class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
             href="#"
           >
             Ask
           </a>
           <a
-            class="flex min-h-8 items-center rounded-[var(--console-radius-sm)] px-2 text-[13px] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-strong)]"
+            class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
             href="#"
           >
             Settings
@@ -171,10 +171,10 @@ import {
       </section>
 
       <section
-        class="mt-3 rounded-[var(--console-radius-lg)] border border-[var(--line-soft)] bg-[var(--surface-panel-soft)] p-3 max-[1180px]:hidden"
+        class="mt-3 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) p-3 max-[1180px]:hidden"
       >
         <div
-          class="mb-2 flex items-center gap-2 text-xs font-semibold text-[var(--text-body)]"
+          class="mb-2 flex items-center gap-2 text-xs font-semibold text-(--text-body)"
         >
           <Bot class="size-4 text-primary" />
           MVP analytics

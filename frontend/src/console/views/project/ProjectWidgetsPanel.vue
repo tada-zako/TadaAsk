@@ -36,9 +36,9 @@ import {
   <section class="console-table-panel">
     <!-- 面板头部操作栏 -->
     <div
-      class="flex min-h-12 items-center justify-between gap-4 border-b border-[var(--line-soft)] px-4 max-[760px]:items-start max-[760px]:py-3"
+      class="flex min-h-12 items-center justify-between gap-4 border-b border-(--line-soft) px-4 max-[760px]:items-start max-[760px]:py-3"
     >
-      <p class="text-xs text-[var(--text-faint)]">2 deployments</p>
+      <p class="text-xs text-(--text-faint)">2 deployments</p>
       <!-- 创建 Widget 对话框 -->
       <Dialog>
         <DialogTrigger as-child>

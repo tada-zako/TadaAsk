@@ -84,14 +84,14 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
       <div class="grid">
         <!-- 健康检查项 1 -->
         <div
-          class="grid min-h-16 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[var(--line-soft)] px-4 max-[680px]:grid-cols-[24px_minmax(0,1fr)]"
+          class="grid min-h-16 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-4 max-[680px]:grid-cols-[24px_minmax(0,1fr)]"
         >
           <span class="size-2 rounded-full bg-emerald-400"></span>
           <div>
-            <strong class="block text-sm text-[var(--text-strong)]"
+            <strong class="block text-sm text-(--text-strong)"
               >Project scoped Ask is available</strong
             >
-            <span class="mt-1 block text-xs text-[var(--text-faint)]">
+            <span class="mt-1 block text-xs text-(--text-faint)">
               It uses this project's linked sources by default.
             </span>
           </div>
@@ -103,14 +103,14 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
         </div>
         <!-- 健康检查项 2 -->
         <div
-          class="grid min-h-16 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[var(--line-soft)] px-4 max-[680px]:grid-cols-[24px_minmax(0,1fr)]"
+          class="grid min-h-16 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-4 max-[680px]:grid-cols-[24px_minmax(0,1fr)]"
         >
           <span class="size-2 rounded-full bg-emerald-400"></span>
           <div>
-            <strong class="block text-sm text-[var(--text-strong)]"
+            <strong class="block text-sm text-(--text-strong)"
               >Widget origin is explicitly bound</strong
             >
-            <span class="mt-1 block text-xs text-[var(--text-faint)]">
+            <span class="mt-1 block text-xs text-(--text-faint)">
               https://docs.example.com is enabled for this widget deployment.
             </span>
           </div>
@@ -126,10 +126,10 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
         >
           <CircleAlert class="size-4 text-yellow-300" />
           <div>
-            <strong class="block text-sm text-[var(--text-strong)]"
+            <strong class="block text-sm text-(--text-strong)"
               >One linked source is private</strong
             >
-            <span class="mt-1 block text-xs text-[var(--text-faint)]">
+            <span class="mt-1 block text-xs text-(--text-faint)">
               Private sources are still visible to Admin testing but not visitor
               RAG.
             </span>

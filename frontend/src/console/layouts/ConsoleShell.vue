@@ -5,9 +5,7 @@ import ConsoleSidebar from "./ConsoleSidebar.vue";
 
 <template>
   <!-- 控制台外壳容器 -->
-  <div
-    class="dark min-h-screen bg-background text-foreground [color-scheme:dark]"
-  >
+  <div class="dark min-h-screen bg-background text-foreground scheme-dark">
     <!-- 渐变背景容器 -->
     <div
       class="min-h-screen bg-[radial-gradient(circle_at_74%_-12%,rgba(36,211,196,0.14),transparent_30rem),linear-gradient(180deg,#09090a_0%,#050505_48rem)]"
@@ -21,7 +19,7 @@ import ConsoleSidebar from "./ConsoleSidebar.vue";
           <ConsoleHeader />
           <!-- 页面内容插槽容器 -->
           <div
-            class="mx-auto grid max-w-[1360px] gap-8 px-[var(--console-content-x)] py-[var(--console-content-y)] max-[760px]:px-4 max-[760px]:py-5"
+            class="mx-auto grid max-w-[1360px] gap-8 px-(--console-content-x) py-(--console-content-y) max-[760px]:px-4 max-[760px]:py-5"
           >
             <slot />
           </div>
