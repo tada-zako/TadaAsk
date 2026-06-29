@@ -31,7 +31,7 @@ import {
     <!-- Logo 区域 -->
     <div class="mb-5 flex h-10 items-center gap-2 px-2">
       <div
-        class="grid size-7 place-items-center rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-panel) text-sm font-bold text-primary"
+        class="text-primary grid size-7 place-items-center rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-panel) text-sm font-bold"
       >
         T
       </div>
@@ -45,10 +45,10 @@ import {
           type="button"
           aria-label="Switch project"
           variant="outline"
-          class="mb-5 h-[52px] w-full justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-(--surface-panel) px-2.5 text-left hover:bg-(--surface-hover) max-[1180px]:h-11 max-[1180px]:justify-center"
+          class="mb-5 h-13 w-full justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-(--surface-panel) px-2.5 text-left hover:bg-(--surface-hover) max-[1180px]:h-11 max-[1180px]:justify-center"
         >
           <span
-            class="grid size-8 shrink-0 place-items-center rounded-(--console-radius-md) bg-primary/15 text-sm font-bold text-primary"
+            class="bg-primary/15 text-primary grid size-8 shrink-0 place-items-center rounded-(--console-radius-md) text-sm font-bold"
           >
             D
           </span>
@@ -62,7 +62,7 @@ import {
             >
           </span>
           <ChevronDown
-            class="size-4 text-muted-foreground max-[1180px]:hidden"
+            class="text-muted-foreground size-4 max-[1180px]:hidden"
           />
         </Button>
       </DropdownMenuTrigger>
@@ -79,17 +79,17 @@ import {
     <nav class="grid gap-5">
       <!-- 项目管理模块 -->
       <section class="grid gap-1">
-        <p class="mx-2 h-2 select-none text-[10px] uppercase text-transparent">
+        <p class="mx-2 h-2 text-[10px] text-transparent uppercase select-none">
           Project
         </p>
         <a
           class="console-nav-link console-nav-link-active max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
         >
-          <LayoutDashboard class="size-4 text-primary" />
+          <LayoutDashboard class="text-primary size-4" />
           <span class="min-w-0 flex-1 max-[1180px]:hidden">Project</span>
           <ChevronDown
-            class="size-4 text-muted-foreground max-[1180px]:hidden"
+            class="text-muted-foreground size-4 max-[1180px]:hidden"
           />
         </a>
         <!-- 子导航 -->
@@ -176,7 +176,7 @@ import {
         <div
           class="mb-2 flex items-center gap-2 text-xs font-semibold text-(--text-body)"
         >
-          <Bot class="size-4 text-primary" />
+          <Bot class="text-primary size-4" />
           MVP analytics
         </div>
         <div class="grid gap-2">

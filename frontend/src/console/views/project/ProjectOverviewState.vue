@@ -60,7 +60,7 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
         <p class="console-metric-label">RAG status</p>
         <strong class="console-metric-value text-[1.55rem]">Enabled</strong>
         <span class="console-metric-foot mt-auto flex items-center gap-2">
-          <span class="size-2 rounded-full bg-primary"></span>
+          <span class="bg-primary size-2 rounded-full"></span>
           Project sources are used by Ask
         </span>
       </article>

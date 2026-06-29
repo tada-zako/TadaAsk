@@ -67,7 +67,7 @@ import {
                 id="site-origin"
                 default-value="https://docs.example.com"
               />
-              <p class="text-xs leading-5 text-muted-foreground">
+              <p class="text-muted-foreground text-xs leading-5">
                 Normalized origin used by project/widget scoped CORS checks.
               </p>
             </div>
@@ -79,7 +79,7 @@ import {
               />
               <div class="grid gap-1">
                 <strong class="text-sm">Enabled</strong>
-                <span class="text-xs text-muted-foreground">
+                <span class="text-muted-foreground text-xs">
                   Visitor widget requests are allowed from this origin.
                 </span>
               </div>

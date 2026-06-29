@@ -14,10 +14,10 @@ import { Textarea } from "@/shared/components/ui/textarea";
   >
     <!-- 左侧引导卡片 -->
     <article
-      class="grid min-h-[520px] content-center gap-5 rounded-(--console-radius-lg) border border-dashed border-(--line) bg-(--surface-panel-soft) p-9"
+      class="grid min-h-130 content-center gap-5 rounded-(--console-radius-lg) border border-dashed border-(--line) bg-(--surface-panel-soft) p-9"
     >
       <div
-        class="grid size-12 place-items-center rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel) text-primary"
+        class="text-primary grid size-12 place-items-center rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel)"
       >
         <Plus class="size-5" />
       </div>
@@ -70,9 +70,9 @@ import { Textarea } from "@/shared/components/ui/textarea";
       </div>
       <!-- 提示信息 -->
       <div
-        class="grid grid-cols-[24px_minmax(0,1fr)] gap-3 rounded-(--console-radius-lg) border border-primary/30 bg-primary/10 p-3"
+        class="border-primary/30 bg-primary/10 grid grid-cols-[24px_minmax(0,1fr)] gap-3 rounded-(--console-radius-lg) border p-3"
       >
-        <span class="mt-1 size-2 rounded-full bg-primary"></span>
+        <span class="bg-primary mt-1 size-2 rounded-full"></span>
         <div>
           <strong class="text-sm text-(--text-strong)"
             >Provider and sources can be configured later</strong

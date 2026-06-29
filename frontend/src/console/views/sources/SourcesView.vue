@@ -28,7 +28,7 @@ import {
         <h1 class="text-4xl font-bold tracking-normal max-[760px]:text-3xl">
           Sources
         </h1>
-        <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
+        <p class="text-muted-foreground max-w-3xl text-sm leading-6">
           Global source library for creation, indexing, item review, and project
           binding.
         </p>
@@ -40,7 +40,7 @@ import {
     </header>
 
     <!-- 数据源列表表格 -->
-    <section class="overflow-hidden rounded-lg border border-border bg-card/80">
+    <section class="border-border bg-card/80 overflow-hidden rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -56,7 +56,7 @@ import {
           <!-- 数据源：PDF 文档 -->
           <TableRow>
             <TableCell>
-              <strong class="font-semibold text-foreground"
+              <strong class="text-foreground font-semibold"
                 >Product docs PDF</strong
               >
             </TableCell>
@@ -96,7 +96,7 @@ import {
           <!-- 数据源：网页爬取 -->
           <TableRow>
             <TableCell>
-              <strong class="font-semibold text-foreground"
+              <strong class="text-foreground font-semibold"
                 >Main website pages</strong
               >
             </TableCell>

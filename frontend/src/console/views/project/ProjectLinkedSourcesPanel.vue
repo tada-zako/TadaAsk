@@ -73,18 +73,18 @@ import {
                   id="source-pick"
                   default-value="Select from global source library"
                 />
-                <p class="text-xs leading-5 text-muted-foreground">
+                <p class="text-muted-foreground text-xs leading-5">
                   No source creation here. Create and index source items from
                   global Sources.
                 </p>
               </div>
               <div
-                class="grid grid-cols-[24px_minmax(0,1fr)] gap-3 rounded-lg border border-primary/30 bg-primary/10 p-3"
+                class="border-primary/30 bg-primary/10 grid grid-cols-[24px_minmax(0,1fr)] gap-3 rounded-lg border p-3"
               >
-                <span class="mt-1 size-2 rounded-full bg-primary"></span>
+                <span class="bg-primary mt-1 size-2 rounded-full"></span>
                 <div>
                   <strong class="text-sm">Binding only</strong>
-                  <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                  <p class="text-muted-foreground mt-1 text-xs leading-5">
                     Import calls the project-source binding API and does not
                     change source content.
                   </p>
