@@ -122,6 +122,12 @@ For frontend code:
 - Use Vue 3 and TypeScript conventions already present in the project.
 - Non-essential entities should not be added: avoid unnecessary components,
   stores, composables, types, wrappers, and configuration files.
+- Avoid premature abstraction in MVP work. Keep code direct at first; split files,
+  helpers, or layers only after code becomes heavy, duplicated, or has a clear
+  boundary.
+- Write comments mainly in Chinese. Prefer comments that explain intent,
+  tradeoffs, protocol boundaries, or non-obvious behavior; avoid restating
+  obvious code.
 - Keep admin-console and visitor-widget code able to evolve independently.
 - Prefer explicit client-server contracts based on OpenAPI and backend source
   over duplicated handwritten protocol documents.

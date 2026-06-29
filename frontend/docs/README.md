@@ -18,8 +18,9 @@
 1. `../../docs/requirements.md`：理解项目定位、用户角色、Widget-first 方向和 MVP 功能背景。
 2. `./tutorial/frontend-ui-scope-constraints.md`：理解当前已确认的前端产品范围、Admin Console 页面组织和 Widget UI 边界。
 3. `./tutorial/frontend-ai-collaboration.md`：理解 MVP 阶段 AI / vibe coding 的参与边界和最低验收要求。
-4. `../../backend/docs/tutorial/sse-contract.md`：实现聊天、ingestion、web crawl 等流式交互前阅读。
-5. `../../backend/docs/tutorial/source-source-item-flow.md`：实现 Source、SourceItem、文件上传、索引流程相关 UI 前阅读。
+4. `./tutorial/frontend-ts-code-style.md`：理解前端 TypeScript 代码风格倾向。
+5. `../../backend/docs/tutorial/sse-contract.md`：实现聊天、ingestion、web crawl 等流式交互前阅读。
+6. `../../backend/docs/tutorial/source-source-item-flow.md`：实现 Source、SourceItem、文件上传、索引流程相关 UI 前阅读。
 
 ## 3. 按开发任务阅读
 
@@ -142,6 +143,7 @@
 - `README.md`：本文档，前端文档入口。
 - `./tutorial/frontend-ui-scope-constraints.md`：前端 UI 产品范围与约束草案。
 - `./tutorial/frontend-ai-collaboration.md`：前端 AI / vibe coding 协作说明。
+- `./tutorial/frontend-ts-code-style.md`：前端 TypeScript 代码风格说明。
 - `kapa-sources.png`：Admin Console 信息组织参考图，不作为复刻目标。
 
 后端侧与前端开发强相关的文档：
