@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+
+.env*
+
+src/shared/api/generated
+
+docs/design/*.html
+docs/**/*.png
+docs/**/*.jpg
+docs/**/*.jpeg
