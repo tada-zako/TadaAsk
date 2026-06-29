@@ -19,8 +19,9 @@
 2. `./tutorial/frontend-ui-scope-constraints.md`：理解当前已确认的前端产品范围、Admin Console 页面组织和 Widget UI 边界。
 3. `./tutorial/frontend-ai-collaboration.md`：理解 MVP 阶段 AI / vibe coding 的参与边界和最低验收要求。
 4. `./tutorial/frontend-ts-code-style.md`：理解前端 TypeScript 代码风格倾向。
-5. `../../backend/docs/tutorial/sse-contract.md`：实现聊天、ingestion、web crawl 等流式交互前阅读。
-6. `../../backend/docs/tutorial/source-source-item-flow.md`：实现 Source、SourceItem、文件上传、索引流程相关 UI 前阅读。
+5. `./console-ui-code-guidelines.md`: 了解前端 UI 组件、样式和布局的设计倾向。
+6. `../../backend/docs/tutorial/sse-contract.md`：实现聊天、ingestion、web crawl 等流式交互前阅读。
+7. `../../backend/docs/tutorial/source-source-item-flow.md`：实现 Source、SourceItem、文件上传、索引流程相关 UI 前阅读。
 
 ## 3. 按开发任务阅读
 

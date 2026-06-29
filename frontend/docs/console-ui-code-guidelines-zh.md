@@ -66,7 +66,7 @@
 
 避免混用随机的 `rounded-xl`、`rounded-[13px]` 或 `rounded-full`，除非有明确的组件设计原因。请优先使用基于 Token 的实用类。
 
-## 文本与宽度 (Text And Width)
+## 重点示例：文本与宽度 (Text And Width)
 
 文本的宽度通常应由其父容器控制，而不是由每个文本节点单独控制。
 

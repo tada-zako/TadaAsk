@@ -246,6 +246,7 @@
 
   .console-page-subtitle {
     color: var(--text-muted);
+    max-width: 46rem;
     font-size: 0.875rem;
     line-height: 1.7;
   }

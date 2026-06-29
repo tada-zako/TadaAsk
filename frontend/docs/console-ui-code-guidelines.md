@@ -73,7 +73,7 @@ Radius:
 Avoid mixing random `rounded-xl`, `rounded-[13px]`, or `rounded-full` unless
 there is a clear component reason. Prefer the token-backed utilities.
 
-## Text And Width
+## Key Example: Text And Width
 
 Text width should usually be controlled by the parent container, not each text
 node.
