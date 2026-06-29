@@ -57,6 +57,8 @@ node_modules/
 # IDE / Editor
 # =========================
 .vscode/
+!frontend/.vscode/
+!frontend/.vscode/settings.json
 .idea/
 *.swp
 *.swo
