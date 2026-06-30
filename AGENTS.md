@@ -54,7 +54,7 @@ unless the user explicitly asks for them.
   into code or documentation.
 - When implementation and documentation disagree, prefer implementation and note
   the mismatch if it matters.
-- Avoid adding comments, types, error handling, abstractions, files, or
+- Avoid adding types, error handling, abstractions, files, or
   dependencies that are not needed for the current change.
 
 ---
@@ -105,6 +105,10 @@ verified from source code when needed.
 ## Code Style
 
 Follow Occam's Razor: the simplest sufficient solution is preferred.
+
+- For vibe coding and generated code, always add appropriate, concise code
+  comments where they help future readers. Prefer Chinese comments, while
+  allowing English when it fits surrounding code, APIs, or domain terms better.
 
 For Python backend code:
 
