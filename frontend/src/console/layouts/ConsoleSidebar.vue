@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { storeToRefs } from "pinia";
 import {
   BarChart3,
   Bot,
@@ -23,102 +24,85 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
-import {
-  listProjectOptions,
-  resolveProjectUid,
-  type ProjectOption,
-} from "@/console/services/project-workspace";
+import { useProjectStore } from "@/console/stores/project";
 
+// 解包响应式对象
 const route = useRoute();
 const router = useRouter();
+const projectStore = useProjectStore();
+const { projects, selectedProject } = storeToRefs(projectStore);
 
-// Sidebar 暂不引入全局 store，只做 project selector 的轻量同步。
-const projects = ref<ProjectOption[]>([]);
-const selectedProjectUid = ref<string | null>(null);
-
-// 当前选中 project
-const currentProject = computed(
-  () =>
-    projects.value.find(
-      (project) => project.uid === selectedProjectUid.value,
-    ) ?? null,
-);
-
-// 项目首字作为 logo 显示
+// 项目首字作为 selector 标识显示。
 const projectInitial = computed(
-  () => currentProject.value?.name.charAt(0) ?? "T",
+  () => selectedProject.value?.name.charAt(0) ?? "T",
 );
 
 onMounted(async () => {
-  await loadProjectsForSidebar();
-  // 创建 project 后刷新 selector，避免为 MVP 过早引入 project store。
-  window.addEventListener("tadaask:projects-updated", handleProjectsUpdated);
-});
-
-onUnmounted(() => {
-  window.removeEventListener("tadaask:projects-updated", handleProjectsUpdated);
+  if (!getProjectUidFromRoute()) {
+    // 当前路由没有指定选中的 project，加载 projects 列表
+    await projectStore.loadProjects();
+  }
 });
 
 watch(
-  () => route.query.projectUid,
+  () => route.params.projectUid,
   async () => {
-    // 以路由 query 为准，保证刷新页面和侧栏选中状态一致。
-    const routeProjectUid = getProjectUidFromRoute();
+    // 以 path param 为准，保证刷新页面和侧栏选中状态一致。
+    const projectUid = getProjectUidFromRoute();
 
-    if (
-      routeProjectUid &&
-      !projects.value.some((project) => project.uid === routeProjectUid)
-    ) {
-      // 当前 projects 列表中不存在 projectUid，
-      // 重新请求刷新 projects 列表
-      await loadProjectsForSidebar();
+    if (!projectUid) {
+      // projectUid 不存在或被清空，清楚 Project 选中状态
+      projectStore.clearSelection();
       return;
     }
 
-    selectedProjectUid.value = resolveProjectUid(
-      projects.value,
-      routeProjectUid,
-    );
+    await projectStore.selectProject(projectUid);
   },
+  { immediate: true },
 );
-
-async function handleProjectsUpdated() {
-  await loadProjectsForSidebar();
-}
-
-/**
- * 加载 projects 列表，并基于当前路由 query 设置选中 project
- */
-async function loadProjectsForSidebar() {
-  try {
-    projects.value = await listProjectOptions();
-    selectedProjectUid.value = resolveProjectUid(
-      projects.value,
-      getProjectUidFromRoute(),
-    );
-  } catch (error) {
-    console.error("[ConsoleSidebar] Failed to load projects:", error);
-  }
-}
 
 // 选择 project
 async function selectProject(projectUid: string) {
-  selectedProjectUid.value = projectUid;
+  await projectStore.selectProject(projectUid);
   await router.push({
-    path: "/project",
-    query: { ...route.query, projectUid },
+    name: "project-overview",
+    params: { projectUid },
   });
 }
 
-async function openProjectPage() {
-  await router.push({ path: "/project" });
+async function openProjectHome() {
+  await router.push({ name: "project-landing" });
 }
 
 /**
- * 从路由 query 中获取 projectUid
+ * 打开当前选中项目的根路由（overview）
+ */
+async function openProjectRoot() {
+  if (!selectedProject.value) {
+    await openProjectHome();
+    return;
+  }
+
+  await selectProject(selectedProject.value.uid);
+}
+
+async function openProjectChild(child: "ask" | "settings") {
+  if (!selectedProject.value) {
+    await openProjectHome();
+    return;
+  }
+
+  await router.push({
+    name: child === "ask" ? "project-ask" : "project-settings",
+    params: { projectUid: selectedProject.value.uid },
+  });
+}
+
+/**
+ * 从路由 params 中获取 projectUid
  */
 function getProjectUidFromRoute(): string | null {
-  const value = route.query.projectUid;
+  const value = route.params.projectUid;
 
   if (Array.isArray(value)) {
     return typeof value[0] === "string" ? value[0] : null;
@@ -163,7 +147,7 @@ function getProjectUidFromRoute(): string | null {
             >
             <span
               class="block truncate text-[13px] font-semibold text-(--text-strong)"
-              >{{ currentProject?.name ?? "No project" }}</span
+              >{{ selectedProject?.name ?? "Project home" }}</span
             >
           </span>
           <ChevronDown
@@ -172,6 +156,10 @@ function getProjectUidFromRoute(): string | null {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" class="w-60">
+        <DropdownMenuItem @select="openProjectHome">
+          Project home
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuLabel>Projects</DropdownMenuLabel>
         <DropdownMenuItem
           v-for="project in projects"
@@ -184,8 +172,8 @@ function getProjectUidFromRoute(): string | null {
           No project yet
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem @select="openProjectPage">
-          Create project
+        <DropdownMenuItem @select="openProjectHome">
+          New project
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -200,6 +188,7 @@ function getProjectUidFromRoute(): string | null {
         <a
           class="console-nav-link console-nav-link-active max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
+          @click.prevent="openProjectRoot"
         >
           <LayoutDashboard class="text-primary size-4" />
           <span class="min-w-0 flex-1 max-[1180px]:hidden">Project</span>
@@ -214,12 +203,14 @@ function getProjectUidFromRoute(): string | null {
           <a
             class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
             href="#"
+            @click.prevent="openProjectChild('ask')"
           >
             Ask
           </a>
           <a
             class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
             href="#"
+            @click.prevent="openProjectChild('settings')"
           >
             Settings
           </a>
