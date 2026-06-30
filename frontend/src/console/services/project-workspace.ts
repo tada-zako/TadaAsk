@@ -131,32 +131,6 @@ function toProjectOption(project: ProjectRead): ProjectOption {
   };
 }
 
-/**
- * 根据当前可用 projects 列表和首选 projectUid，
- * 解析最终选中 projectUid
- * @param projects
- * @param preferredUid
- * @returns
- */
-export function resolveProjectUid(
-  projects: ProjectOption[],
-  preferredUid?: string | null,
-): string | null {
-  if (!projects.length) {
-    return null;
-  }
-
-  if (
-    preferredUid &&
-    projects.some((project) => project.uid === preferredUid)
-  ) {
-    return preferredUid;
-  }
-
-  // query 中的 projectUid 失效时，回退到列表中的第一个 project。
-  return projects[0].uid;
-}
-
 export async function listProjectOptions(): Promise<ProjectOption[]> {
   const { data, error } = await projectApi.list({ limit: 100, offset: 0 });
   const projects = unwrapApiData(data, error, "Unable to load projects.");
