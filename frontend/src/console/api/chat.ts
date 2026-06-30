@@ -1,4 +1,4 @@
-import { client } from "../client";
+import { client } from "../../shared/api/create-client";
 import type { AdminRagChatRequest } from "@/shared/types/chat-stream";
 
 /** Admin Console 中的聊天流接口。 */

@@ -1,4 +1,4 @@
-import { client } from "../client";
+import { client } from "../../shared/api/create-client";
 
 /** Project 管理接口 */
 export const projectApi = {
