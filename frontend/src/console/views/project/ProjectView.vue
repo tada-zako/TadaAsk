@@ -1,121 +1,105 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { storeToRefs } from "pinia";
 
 import {
-  createProject,
   createProjectWidget,
   deleteProjectWidget,
   importProjectSources,
-  listProjectOptions,
   loadProjectWorkspace,
-  resolveProjectUid,
   unbindProjectSource,
   updateProjectWidget,
   type CreateProjectInput,
-  type ProjectOption,
   type ProjectWidgetCreate,
   type ProjectWidgetUpdate,
   type ProjectWorkspaceViewModel,
 } from "@/console/services/project-workspace";
+import { useProjectStore } from "@/console/stores/project";
 
-import ProjectCreateState from "./ProjectCreateState.vue";
+import ProjectLandingState from "./ProjectLandingState.vue";
 import ProjectOverviewState from "./ProjectOverviewState.vue";
 
 const route = useRoute();
 const router = useRouter();
+const projectStore = useProjectStore();
+const {
+  errorMessage: storeErrorMessage,
+  isLoading,
+  projects,
+} = storeToRefs(projectStore);
 
-// 页面容器只持有响应式状态；API 聚合和展示清洗放在 service 层。
-const projects = ref<ProjectOption[]>([]);
-const selectedProjectUid = ref<string | null>(null);
+// 页面容器只持有 workspace 状态；project 选择态由 Pinia 共享。
 const workspace = ref<ProjectWorkspaceViewModel | null>(null);
 const isInitialLoading = ref(true);
 const isWorkspaceLoading = ref(false);
 const isMutating = ref(false);
-const errorMessage = ref<string | null>(null);
+const pageErrorMessage = ref<string | null>(null);
 const actionMessage = ref<string | null>(null);
 
-const hasProjects = computed(() => projects.value.length > 0);
+const routeProjectUid = computed(() => getProjectUidFromRoute());
+const routeErrorMessage = computed(() =>
+  route.query.error === "project-not-found" ? "Project not found." : null,
+);
 
 onMounted(async () => {
-  // 页面挂在时初始化页面数据
-  await initializeProjectPage(getProjectUidFromRoute());
+  await handleProjectRoute(routeProjectUid.value);
 });
 
 watch(
-  () => route.query.projectUid,
-  async (projectUid) => {
-    // URL query 是当前 project 的可刷新入口。
-    const nextProjectUid = getProjectUidFromQuery(projectUid);
-
-    if (!nextProjectUid || nextProjectUid === selectedProjectUid.value) {
-      return;
-    }
-
-    await selectProject(nextProjectUid);
+  () => route.params.projectUid,
+  async () => {
+    await handleProjectRoute(routeProjectUid.value);
   },
 );
 
 /**
- * 基于当前选中的 projectUid 初始化页面数据。
- * @param preferredProjectUid
+ * 根据 path param 决定渲染 landing 或 overview。
  */
-async function initializeProjectPage(preferredProjectUid: string | null) {
+async function handleProjectRoute(projectUid: string | null) {
   isInitialLoading.value = true;
-  errorMessage.value = null;
+  pageErrorMessage.value = null;
+  actionMessage.value = null;
 
   try {
-    projects.value = await listProjectOptions();
-    const nextProjectUid = resolveProjectUid(
-      projects.value,
-      preferredProjectUid,
-    );
+    await projectStore.loadProjects();
 
-    if (!nextProjectUid) {
-      // 无 project 时保留空状态，交给 create state 渲染。
-      selectedProjectUid.value = null;
+    if (!projectUid) {
+      projectStore.clearSelection();
       workspace.value = null;
-      await replaceProjectQuery(null);
       return;
     }
 
-    selectedProjectUid.value = nextProjectUid;
-    await replaceProjectQuery(nextProjectUid);
-    await refreshWorkspace(nextProjectUid);
+    const exists = await projectStore.selectProject(projectUid);
+    if (!exists) {
+      await redirectToProjectLanding();
+      return;
+    }
+
+    await refreshWorkspace(projectUid);
   } catch (error) {
-    errorMessage.value = getErrorMessage(error, "Unable to load project page.");
+    pageErrorMessage.value = getErrorMessage(
+      error,
+      "Unable to load project page.",
+    );
   } finally {
     isInitialLoading.value = false;
   }
 }
 
-// 选择 project 行为内部逻辑
-async function selectProject(projectUid: string) {
-  const nextProjectUid = resolveProjectUid(projects.value, projectUid);
-
-  if (!nextProjectUid) {
-    await initializeProjectPage(projectUid);
-    return;
-  }
-
-  selectedProjectUid.value = nextProjectUid;
-  await replaceProjectQuery(nextProjectUid);
-  await refreshWorkspace(nextProjectUid);
-}
-
 // 刷新当前 project workspace 数据
-async function refreshWorkspace(projectUid = selectedProjectUid.value) {
+async function refreshWorkspace(projectUid = routeProjectUid.value) {
   if (!projectUid) {
     return;
   }
 
   isWorkspaceLoading.value = true;
-  errorMessage.value = null;
+  pageErrorMessage.value = null;
 
   try {
     workspace.value = await loadProjectWorkspace(projectUid);
   } catch (error) {
-    errorMessage.value = getErrorMessage(error, "Unable to refresh project.");
+    await redirectToProjectLanding();
   } finally {
     isWorkspaceLoading.value = false;
   }
@@ -132,13 +116,7 @@ async function handleCreateProject(input: CreateProjectInput) {
   actionMessage.value = null;
 
   try {
-    const project = await createProject(input);
-    projects.value = await listProjectOptions();
-    selectedProjectUid.value = project.uid;
-    // 通知外层 sidebar 刷新 projects 列表
-    window.dispatchEvent(new Event("tadaask:projects-updated"));
-    await replaceProjectQuery(project.uid);
-    await refreshWorkspace(project.uid);
+    await projectStore.createProject(input);
   } catch (error) {
     actionMessage.value = getErrorMessage(error, "Unable to create project.");
   } finally {
@@ -147,32 +125,32 @@ async function handleCreateProject(input: CreateProjectInput) {
 }
 
 async function handleImportSources(sourceUids: string[]) {
-  if (!selectedProjectUid.value || sourceUids.length === 0) {
+  if (!routeProjectUid.value || sourceUids.length === 0) {
     return;
   }
 
   await runProjectMutation(async () => {
-    await importProjectSources(selectedProjectUid.value as string, sourceUids);
+    await importProjectSources(routeProjectUid.value as string, sourceUids);
   });
 }
 
 async function handleUnbindSource(sourceUid: string) {
-  if (!selectedProjectUid.value) {
+  if (!routeProjectUid.value) {
     return;
   }
 
   await runProjectMutation(async () => {
-    await unbindProjectSource(selectedProjectUid.value as string, sourceUid);
+    await unbindProjectSource(routeProjectUid.value as string, sourceUid);
   });
 }
 
 async function handleCreateWidget(input: ProjectWidgetCreate) {
-  if (!selectedProjectUid.value) {
+  if (!routeProjectUid.value) {
     return;
   }
 
   await runProjectMutation(async () => {
-    await createProjectWidget(selectedProjectUid.value as string, input);
+    await createProjectWidget(routeProjectUid.value as string, input);
   });
 }
 
@@ -180,13 +158,13 @@ async function handleUpdateWidget(input: {
   widgetUid: string;
   payload: ProjectWidgetUpdate;
 }) {
-  if (!selectedProjectUid.value) {
+  if (!routeProjectUid.value) {
     return;
   }
 
   await runProjectMutation(async () => {
     await updateProjectWidget(
-      selectedProjectUid.value as string,
+      routeProjectUid.value as string,
       input.widgetUid,
       input.payload,
     );
@@ -194,7 +172,7 @@ async function handleUpdateWidget(input: {
 }
 
 async function handleDeleteWidget(widgetUid: string) {
-  if (!selectedProjectUid.value) {
+  if (!routeProjectUid.value) {
     return;
   }
 
@@ -204,7 +182,7 @@ async function handleDeleteWidget(widgetUid: string) {
   }
 
   await runProjectMutation(async () => {
-    await deleteProjectWidget(selectedProjectUid.value as string, widgetUid);
+    await deleteProjectWidget(routeProjectUid.value as string, widgetUid);
   });
 }
 
@@ -217,6 +195,13 @@ async function handleOpenSource(sourceUid: string) {
 
 async function handleOpenGlobalSources() {
   await router.push({ path: "/sources" });
+}
+
+async function handleSelectProject(projectUid: string) {
+  await router.push({
+    name: "project-overview",
+    params: { projectUid },
+  });
 }
 
 // project 相关操作入口函数
@@ -235,23 +220,17 @@ async function runProjectMutation(action: () => Promise<void>) {
   }
 }
 
-async function replaceProjectQuery(projectUid: string | null) {
-  const nextQuery = { ...route.query };
-
-  if (projectUid) {
-    nextQuery.projectUid = projectUid;
-  } else {
-    delete nextQuery.projectUid;
-  }
-
-  await router.replace({ query: nextQuery });
+async function redirectToProjectLanding() {
+  projectStore.clearSelection("Project not found.");
+  workspace.value = null;
+  await router.replace({
+    name: "project-landing",
+    query: { error: "project-not-found" },
+  });
 }
 
 function getProjectUidFromRoute(): string | null {
-  return getProjectUidFromQuery(route.query.projectUid);
-}
-
-function getProjectUidFromQuery(value: unknown): string | null {
+  const value = route.params.projectUid;
   if (Array.isArray(value)) {
     return typeof value[0] === "string" ? value[0] : null;
   }
@@ -280,20 +259,28 @@ function getErrorMessage(error: unknown, fallback: string): string {
     </div>
   </section>
 
-  <!-- Project 创建 view -->
-  <ProjectCreateState
-    v-else-if="!hasProjects"
-    :error-message="actionMessage ?? errorMessage"
-    :is-submitting="isMutating"
+  <ProjectLandingState
+    v-else-if="!routeProjectUid"
+    :error-message="
+      actionMessage ??
+      routeErrorMessage ??
+      pageErrorMessage ??
+      storeErrorMessage
+    "
+    :is-loading="isLoading"
+    :is-submitting="isMutating || isLoading"
+    :projects="projects"
     @create="handleCreateProject"
+    @open-global-sources="handleOpenGlobalSources"
+    @select-project="handleSelectProject"
   />
 
   <section v-else-if="workspace" class="grid gap-4">
     <div
-      v-if="errorMessage || actionMessage"
+      v-if="pageErrorMessage || actionMessage"
       class="rounded-(--console-radius-md) border border-yellow-300/25 bg-yellow-300/10 px-4 py-3 text-sm text-yellow-100"
     >
-      {{ actionMessage ?? errorMessage }}
+      {{ actionMessage ?? pageErrorMessage }}
     </div>
 
     <!-- Project 数据 overview view -->
