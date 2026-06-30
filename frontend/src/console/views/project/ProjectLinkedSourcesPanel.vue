@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, watch } from "vue";
 import { Ellipsis, ExternalLink, Link, Unlink } from "@lucide/vue";
 
 import { Badge } from "@/shared/components/ui/badge";
@@ -19,7 +20,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
-import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import {
   Table,
@@ -29,6 +29,59 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
+import type { ProjectSourceRow } from "@/console/services/project-workspace";
+
+const props = defineProps<{
+  availableSources: ProjectSourceRow[]; // 可导入的全局 Sources
+  isMutating?: boolean; // 是否在进行操作
+  sources: ProjectSourceRow[];
+}>();
+
+const emit = defineEmits<{
+  importSources: [sourceUids: string[]];
+  openGlobalSources: [];
+  openSource: [sourceUid: string];
+  unbindSource: [sourceUid: string];
+}>();
+
+const importDialogOpen = ref(false);
+const selectedSourceUid = ref("");
+
+watch(
+  () => props.availableSources,
+  (sources) => {
+    // 候选列表刷新后，保证 dialog 中的选择仍然有效。
+    if (!sources.some((source) => source.uid === selectedSourceUid.value)) {
+      selectedSourceUid.value = sources[0]?.uid ?? "";
+    }
+  },
+  { immediate: true },
+);
+
+// 触发 source 导入事件
+function submitImport() {
+  if (!selectedSourceUid.value) {
+    return;
+  }
+
+  emit("importSources", [selectedSourceUid.value]);
+  // 关闭导入对话框
+  importDialogOpen.value = false;
+}
+
+// 根据 source tone 返回对应的 badge 样式
+function badgeClass(
+  tone: ProjectSourceRow["statusTone"] | ProjectSourceRow["visibilityTone"],
+): string {
+  const classes = {
+    danger: "border-red-400/25 bg-red-400/10 text-red-100",
+    muted: "border-(--line-soft) bg-(--surface-panel-soft) text-(--text-muted)",
+    success: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+    warning: "border-yellow-300/25 bg-yellow-300/10 text-yellow-100",
+  };
+
+  return classes[tone];
+}
 </script>
 
 <template>
@@ -38,7 +91,7 @@ import {
     <div
       class="flex min-h-12 items-center justify-between gap-4 border-b border-(--line-soft) px-4 max-[760px]:items-start max-[760px]:py-3"
     >
-      <p class="text-xs text-(--text-faint)">4 linked</p>
+      <p class="text-xs text-(--text-faint)">{{ sources.length }} linked</p>
       <div
         class="flex shrink-0 flex-wrap justify-end gap-2 max-[760px]:justify-start"
       >
@@ -47,14 +100,20 @@ import {
           aria-label="Open global sources"
           variant="outline"
           size="sm"
+          @click="emit('openGlobalSources')"
         >
           <ExternalLink class="size-4" />
           Global sources
         </Button>
         <!-- 导入数据源对话框 -->
-        <Dialog>
+        <Dialog v-model:open="importDialogOpen">
           <DialogTrigger as-child>
-            <Button type="button" aria-label="Import source" size="sm">
+            <Button
+              type="button"
+              aria-label="Import source"
+              size="sm"
+              :disabled="isMutating || availableSources.length === 0"
+            >
               <Link class="size-4" />
               Import
             </Button>
@@ -69,10 +128,19 @@ import {
             <div class="grid gap-4">
               <div class="grid gap-2">
                 <Label for="source-pick">Source</Label>
-                <Input
+                <select
                   id="source-pick"
-                  default-value="Select from global source library"
-                />
+                  v-model="selectedSourceUid"
+                  class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-(--console-radius-md) border px-3 py-1 text-sm text-(--text-body) shadow-xs transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option
+                    v-for="source in availableSources"
+                    :key="source.uid"
+                    :value="source.uid"
+                  >
+                    {{ source.name }} · {{ source.typeLabel }}
+                  </option>
+                </select>
                 <p class="text-muted-foreground text-xs leading-5">
                   No source creation here. Create and index source items from
                   global Sources.
@@ -96,10 +164,16 @@ import {
                 type="button"
                 aria-label="Cancel import source"
                 variant="outline"
+                @click="importDialogOpen = false"
               >
                 Cancel
               </Button>
-              <Button type="button" aria-label="Confirm import source">
+              <Button
+                type="button"
+                aria-label="Confirm import source"
+                :disabled="isMutating || !selectedSourceUid"
+                @click="submitImport"
+              >
                 Import
               </Button>
             </DialogFooter>
@@ -121,45 +195,44 @@ import {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <!-- 数据源行：PDF 文档 -->
-        <TableRow>
+        <TableRow v-for="source in sources" :key="source.uid">
           <TableCell>
-            <strong>Product docs PDF</strong>
+            <strong>{{ source.name }}</strong>
           </TableCell>
-          <TableCell>Local file</TableCell>
+          <TableCell>{{ source.typeLabel }}</TableCell>
           <TableCell>
-            <Badge
-              class="border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-              >Public</Badge
-            >
+            <Badge :class="badgeClass(source.visibilityTone)">
+              {{ source.visibilityLabel }}
+            </Badge>
           </TableCell>
           <TableCell>
-            <Badge
-              class="border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-              >Indexed</Badge
-            >
+            <Badge :class="badgeClass(source.statusTone)">
+              {{ source.statusLabel }}
+            </Badge>
           </TableCell>
-          <TableCell>12 minutes ago</TableCell>
+          <TableCell>{{ source.lastSyncedLabel }}</TableCell>
           <TableCell class="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <Button
                   type="button"
-                  aria-label="Product docs source actions"
+                  :aria-label="`${source.name} source actions`"
                   variant="outline"
                   size="icon-sm"
+                  :disabled="isMutating"
                 >
                   <Ellipsis class="size-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
+                <DropdownMenuItem @select="emit('openSource', source.uid)">
                   <ExternalLink class="size-4" />
                   Open source
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   class="text-destructive focus:text-destructive"
+                  @select="emit('unbindSource', source.uid)"
                 >
                   <Unlink class="size-4" />
                   Unbind
@@ -168,93 +241,9 @@ import {
             </DropdownMenu>
           </TableCell>
         </TableRow>
-        <!-- 数据源行：网页爬取 -->
-        <TableRow>
-          <TableCell>
-            <strong>Main website pages</strong>
-          </TableCell>
-          <TableCell>Web crawl</TableCell>
-          <TableCell>
-            <Badge
-              class="border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-              >Public</Badge
-            >
-          </TableCell>
-          <TableCell>
-            <Badge class="border-yellow-300/25 bg-yellow-300/10 text-yellow-100"
-              >Processing</Badge
-            >
-          </TableCell>
-          <TableCell>about 1 hour ago</TableCell>
-          <TableCell class="text-right">
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
-                <Button
-                  type="button"
-                  aria-label="Main website source actions"
-                  variant="outline"
-                  size="icon-sm"
-                >
-                  <Ellipsis class="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <ExternalLink class="size-4" />
-                  Open source
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  class="text-destructive focus:text-destructive"
-                >
-                  <Unlink class="size-4" />
-                  Unbind
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>
-            <strong>Release notes</strong>
-          </TableCell>
-          <TableCell>Markdown</TableCell>
-          <TableCell>
-            <Badge variant="outline">Private</Badge>
-          </TableCell>
-          <TableCell>
-            <Badge
-              class="border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-              >Indexed</Badge
-            >
-          </TableCell>
-          <TableCell>yesterday</TableCell>
-          <TableCell class="text-right">
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
-                <Button
-                  type="button"
-                  aria-label="Release notes source actions"
-                  variant="outline"
-                  size="icon-sm"
-                >
-                  <Ellipsis class="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <ExternalLink class="size-4" />
-                  Open source
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  class="text-destructive focus:text-destructive"
-                >
-                  <Unlink class="size-4" />
-                  Unbind
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        <TableRow v-if="sources.length === 0">
+          <TableCell colspan="6" class="h-28 text-center text-(--text-faint)">
+            No linked sources yet.
           </TableCell>
         </TableRow>
       </TableBody>

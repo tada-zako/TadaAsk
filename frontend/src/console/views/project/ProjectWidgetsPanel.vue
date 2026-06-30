@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive, ref } from "vue";
 import { Ellipsis, Pencil, Plus, Trash2 } from "@lucide/vue";
 
 import { Button } from "@/shared/components/ui/button";
@@ -29,6 +30,79 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
+import type {
+  ProjectWidgetCreate,
+  ProjectWidgetRow,
+  ProjectWidgetUpdate,
+} from "@/console/services/project-workspace";
+
+defineProps<{
+  isMutating?: boolean;
+  widgets: ProjectWidgetRow[];
+}>();
+
+const emit = defineEmits<{
+  createWidget: [input: ProjectWidgetCreate];
+  deleteWidget: [widgetUid: string];
+  updateWidget: [input: { widgetUid: string; payload: ProjectWidgetUpdate }];
+}>();
+
+const createDialogOpen = ref(false);
+const editDialogOpen = ref(false);
+const editingWidgetUid = ref<string | null>(null);
+
+// Dialog 表单只维护本地输入，提交时交给页面容器执行 API。
+const createForm = reactive<ProjectWidgetCreate>({
+  isEnabled: true,
+  name: "Docs production",
+  siteOrigin: "https://docs.example.com",
+});
+
+const editForm = reactive<ProjectWidgetCreate>({
+  isEnabled: true,
+  name: "",
+  siteOrigin: "",
+});
+
+function submitCreate() {
+  if (!createForm.name.trim() || !createForm.siteOrigin.trim()) {
+    return;
+  }
+
+  emit("createWidget", { ...createForm });
+  createDialogOpen.value = false;
+}
+
+function openEdit(widget: ProjectWidgetRow) {
+  editingWidgetUid.value = widget.uid;
+  editForm.name = widget.name;
+  editForm.siteOrigin = widget.siteOrigin;
+  editForm.isEnabled = widget.isEnabled;
+  editDialogOpen.value = true;
+}
+
+function submitEdit() {
+  if (
+    !editingWidgetUid.value ||
+    !editForm.name.trim() ||
+    !editForm.siteOrigin.trim()
+  ) {
+    return;
+  }
+
+  emit("updateWidget", {
+    payload: { ...editForm },
+    widgetUid: editingWidgetUid.value,
+  });
+  editDialogOpen.value = false;
+}
+
+function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
+  emit("updateWidget", {
+    payload: { isEnabled },
+    widgetUid: widget.uid,
+  });
+}
 </script>
 
 <template>
@@ -38,11 +112,18 @@ import {
     <div
       class="flex min-h-12 items-center justify-between gap-4 border-b border-(--line-soft) px-4 max-[760px]:items-start max-[760px]:py-3"
     >
-      <p class="text-xs text-(--text-faint)">2 deployments</p>
+      <p class="text-xs text-(--text-faint)">
+        {{ widgets.length }} deployments
+      </p>
       <!-- 创建 Widget 对话框 -->
-      <Dialog>
+      <Dialog v-model:open="createDialogOpen">
         <DialogTrigger as-child>
-          <Button type="button" aria-label="Create widget" size="sm">
+          <Button
+            type="button"
+            aria-label="Create widget"
+            size="sm"
+            :disabled="isMutating"
+          >
             <Plus class="size-4" />
             Create
           </Button>
@@ -58,15 +139,12 @@ import {
             <!-- Widget 名称 -->
             <div class="grid gap-2">
               <Label for="widget-name">Widget name</Label>
-              <Input id="widget-name" default-value="Docs production" />
+              <Input id="widget-name" v-model="createForm.name" />
             </div>
             <!-- 部署站点域名 -->
             <div class="grid gap-2">
               <Label for="site-origin">Site origin</Label>
-              <Input
-                id="site-origin"
-                default-value="https://docs.example.com"
-              />
+              <Input id="site-origin" v-model="createForm.siteOrigin" />
               <p class="text-muted-foreground text-xs leading-5">
                 Normalized origin used by project/widget scoped CORS checks.
               </p>
@@ -74,8 +152,9 @@ import {
             <!-- 启用状态开关 -->
             <div class="flex items-start gap-3">
               <Switch
-                :default-value="true"
+                :model-value="createForm.isEnabled"
                 aria-label="Enable widget after creation"
+                @update:model-value="createForm.isEnabled = Boolean($event)"
               />
               <div class="grid gap-1">
                 <strong class="text-sm">Enabled</strong>
@@ -90,10 +169,16 @@ import {
               type="button"
               aria-label="Cancel widget creation"
               variant="outline"
+              @click="createDialogOpen = false"
             >
               Cancel
             </Button>
-            <Button type="button" aria-label="Confirm create widget">
+            <Button
+              type="button"
+              aria-label="Confirm create widget"
+              :disabled="isMutating"
+              @click="submitCreate"
+            >
               Create
             </Button>
           </DialogFooter>
@@ -114,41 +199,48 @@ import {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <!-- 部署项：生产环境 -->
-        <TableRow>
+        <TableRow v-for="widget in widgets" :key="widget.uid">
           <TableCell>
-            <strong>Docs production</strong>
+            <strong>{{ widget.name }}</strong>
           </TableCell>
-          <TableCell>https://docs.example.com</TableCell>
+          <TableCell>{{ widget.siteOrigin }}</TableCell>
           <TableCell>
             <Switch
-              :default-value="true"
-              aria-label="Docs production widget enabled"
+              :model-value="widget.isEnabled"
+              :aria-label="`${widget.name} widget enabled`"
+              :disabled="isMutating"
+              @update:model-value="toggleWidget(widget, Boolean($event))"
             />
           </TableCell>
-          <TableCell>2026-06-02</TableCell>
-          <TableCell>2026-06-27</TableCell>
+          <TableCell>{{ widget.createdLabel }}</TableCell>
+          <TableCell>{{ widget.updatedLabel }}</TableCell>
           <TableCell class="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <Button
                   type="button"
-                  aria-label="Docs production widget actions"
+                  :aria-label="`${widget.name} widget actions`"
                   variant="outline"
                   size="icon-sm"
+                  :disabled="isMutating"
                 >
                   <Ellipsis class="size-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
+                <DropdownMenuItem @select="openEdit(widget)">
                   <Pencil class="size-4" />
                   Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem>Disable</DropdownMenuItem>
+                <DropdownMenuItem
+                  @select="toggleWidget(widget, !widget.isEnabled)"
+                >
+                  {{ widget.enabledActionLabel }}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   class="text-destructive focus:text-destructive"
+                  @select="emit('deleteWidget', widget.uid)"
                 >
                   <Trash2 class="size-4" />
                   Delete
@@ -157,50 +249,65 @@ import {
             </DropdownMenu>
           </TableCell>
         </TableRow>
-        <!-- 部署项：本地预览 -->
-        <TableRow>
-          <TableCell>
-            <strong>Local preview</strong>
-          </TableCell>
-          <TableCell>http://localhost:4321</TableCell>
-          <TableCell>
-            <Switch
-              :default-value="false"
-              aria-label="Local preview widget disabled"
-            />
-          </TableCell>
-          <TableCell>2026-06-14</TableCell>
-          <TableCell>2026-06-22</TableCell>
-          <TableCell class="text-right">
-            <DropdownMenu>
-              <DropdownMenuTrigger as-child>
-                <Button
-                  type="button"
-                  aria-label="Local preview widget actions"
-                  variant="outline"
-                  size="icon-sm"
-                >
-                  <Ellipsis class="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>
-                  <Pencil class="size-4" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem>Enable</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  class="text-destructive focus:text-destructive"
-                >
-                  <Trash2 class="size-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+        <TableRow v-if="widgets.length === 0">
+          <TableCell colspan="6" class="h-28 text-center text-(--text-faint)">
+            No widget deployments yet.
           </TableCell>
         </TableRow>
       </TableBody>
     </Table>
+
+    <!-- 编辑 Widget 对话框 -->
+    <Dialog v-model:open="editDialogOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit widget</DialogTitle>
+          <DialogDescription>
+            Updates the widget deployment used by visitor CORS checks.
+          </DialogDescription>
+        </DialogHeader>
+        <div class="grid gap-4">
+          <div class="grid gap-2">
+            <Label for="edit-widget-name">Widget name</Label>
+            <Input id="edit-widget-name" v-model="editForm.name" />
+          </div>
+          <div class="grid gap-2">
+            <Label for="edit-site-origin">Site origin</Label>
+            <Input id="edit-site-origin" v-model="editForm.siteOrigin" />
+          </div>
+          <div class="flex items-start gap-3">
+            <Switch
+              :model-value="editForm.isEnabled"
+              aria-label="Edit widget enabled"
+              @update:model-value="editForm.isEnabled = Boolean($event)"
+            />
+            <div class="grid gap-1">
+              <strong class="text-sm">Enabled</strong>
+              <span class="text-muted-foreground text-xs">
+                Visitor widget requests are allowed from this origin.
+              </span>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            aria-label="Cancel widget edit"
+            variant="outline"
+            @click="editDialogOpen = false"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            aria-label="Confirm edit widget"
+            :disabled="isMutating"
+            @click="submitEdit"
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </section>
 </template>

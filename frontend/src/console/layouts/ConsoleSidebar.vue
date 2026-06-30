@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import {
   BarChart3,
   Bot,
@@ -21,6 +23,109 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import {
+  listProjectOptions,
+  resolveProjectUid,
+  type ProjectOption,
+} from "@/console/services/project-workspace";
+
+const route = useRoute();
+const router = useRouter();
+
+// Sidebar 暂不引入全局 store，只做 project selector 的轻量同步。
+const projects = ref<ProjectOption[]>([]);
+const selectedProjectUid = ref<string | null>(null);
+
+// 当前选中 project
+const currentProject = computed(
+  () =>
+    projects.value.find(
+      (project) => project.uid === selectedProjectUid.value,
+    ) ?? null,
+);
+
+// 项目首字作为 logo 显示
+const projectInitial = computed(
+  () => currentProject.value?.name.charAt(0) ?? "T",
+);
+
+onMounted(async () => {
+  await loadProjectsForSidebar();
+  // 创建 project 后刷新 selector，避免为 MVP 过早引入 project store。
+  window.addEventListener("tadaask:projects-updated", handleProjectsUpdated);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("tadaask:projects-updated", handleProjectsUpdated);
+});
+
+watch(
+  () => route.query.projectUid,
+  async () => {
+    // 以路由 query 为准，保证刷新页面和侧栏选中状态一致。
+    const routeProjectUid = getProjectUidFromRoute();
+
+    if (
+      routeProjectUid &&
+      !projects.value.some((project) => project.uid === routeProjectUid)
+    ) {
+      // 当前 projects 列表中不存在 projectUid，
+      // 重新请求刷新 projects 列表
+      await loadProjectsForSidebar();
+      return;
+    }
+
+    selectedProjectUid.value = resolveProjectUid(
+      projects.value,
+      routeProjectUid,
+    );
+  },
+);
+
+async function handleProjectsUpdated() {
+  await loadProjectsForSidebar();
+}
+
+/**
+ * 加载 projects 列表，并基于当前路由 query 设置选中 project
+ */
+async function loadProjectsForSidebar() {
+  try {
+    projects.value = await listProjectOptions();
+    selectedProjectUid.value = resolveProjectUid(
+      projects.value,
+      getProjectUidFromRoute(),
+    );
+  } catch (error) {
+    console.error("[ConsoleSidebar] Failed to load projects:", error);
+  }
+}
+
+// 选择 project
+async function selectProject(projectUid: string) {
+  selectedProjectUid.value = projectUid;
+  await router.push({
+    path: "/project",
+    query: { ...route.query, projectUid },
+  });
+}
+
+async function openProjectPage() {
+  await router.push({ path: "/project" });
+}
+
+/**
+ * 从路由 query 中获取 projectUid
+ */
+function getProjectUidFromRoute(): string | null {
+  const value = route.query.projectUid;
+
+  if (Array.isArray(value)) {
+    return typeof value[0] === "string" ? value[0] : null;
+  }
+
+  return typeof value === "string" && value ? value : null;
+}
 </script>
 
 <template>
@@ -50,7 +155,7 @@ import {
           <span
             class="bg-primary/15 text-primary grid size-8 shrink-0 place-items-center rounded-(--console-radius-md) text-sm font-bold"
           >
-            D
+            {{ projectInitial }}
           </span>
           <span class="min-w-0 flex-1 max-[1180px]:hidden">
             <span class="block text-[11px] font-normal text-(--text-faint)"
@@ -58,7 +163,7 @@ import {
             >
             <span
               class="block truncate text-[13px] font-semibold text-(--text-strong)"
-              >Docs Assistant</span
+              >{{ currentProject?.name ?? "No project" }}</span
             >
           </span>
           <ChevronDown
@@ -68,10 +173,20 @@ import {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" class="w-60">
         <DropdownMenuLabel>Projects</DropdownMenuLabel>
-        <DropdownMenuItem>Docs Assistant</DropdownMenuItem>
-        <DropdownMenuItem>Support Sandbox</DropdownMenuItem>
+        <DropdownMenuItem
+          v-for="project in projects"
+          :key="project.uid"
+          @select="selectProject(project.uid)"
+        >
+          {{ project.name }}
+        </DropdownMenuItem>
+        <DropdownMenuItem v-if="projects.length === 0" disabled>
+          No project yet
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>Create project</DropdownMenuItem>
+        <DropdownMenuItem @select="openProjectPage">
+          Create project
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
 

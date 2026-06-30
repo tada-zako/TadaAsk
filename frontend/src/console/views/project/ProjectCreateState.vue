@@ -1,10 +1,36 @@
 <script setup lang="ts">
+import { reactive } from "vue";
 import { Plus } from "@lucide/vue";
 
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import { Textarea } from "@/shared/components/ui/textarea";
+
+import type { CreateProjectInput } from "@/console/services/project-workspace";
+
+defineProps<{
+  errorMessage?: string | null;
+  isSubmitting?: boolean;
+}>();
+
+const emit = defineEmits<{
+  create: [input: CreateProjectInput];
+}>();
+
+// Project 创建表单数据
+const form = reactive({
+  description:
+    "Answers questions from product documentation and release notes.",
+  name: "Docs Assistant",
+});
+
+function submitCreate() {
+  emit("create", {
+    description: form.description,
+    name: form.name,
+  });
+}
 </script>
 
 <template>
@@ -29,7 +55,12 @@ import { Textarea } from "@/shared/components/ui/textarea";
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
-        <Button type="button" aria-label="Create project">
+        <Button
+          type="button"
+          aria-label="Create project"
+          :disabled="isSubmitting"
+          @click="submitCreate"
+        >
           Create project
         </Button>
         <Button
@@ -51,7 +82,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
       <!-- 项目名称输入 -->
       <div class="grid gap-2">
         <Label for="project-name">Project name</Label>
-        <Input id="project-name" default-value="Docs Assistant" />
+        <Input id="project-name" v-model="form.name" />
         <p class="text-xs leading-5 text-(--text-faint)">
           Must be unique. It appears in the sidebar project selector.
         </p>
@@ -61,7 +92,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
         <Label for="project-description">Description</Label>
         <Textarea
           id="project-description"
-          default-value="Answers questions from product documentation and release notes."
+          v-model="form.description"
           class="min-h-28"
         />
         <p class="text-xs leading-5 text-(--text-faint)">
@@ -83,6 +114,12 @@ import { Textarea } from "@/shared/components/ui/textarea";
           </p>
         </div>
       </div>
+      <p
+        v-if="errorMessage"
+        class="rounded-(--console-radius-md) border border-yellow-300/25 bg-yellow-300/10 px-3 py-2 text-xs leading-5 text-yellow-100"
+      >
+        {{ errorMessage }}
+      </p>
       <!-- 操作按钮 -->
       <div class="flex justify-end gap-2">
         <Button
@@ -92,8 +129,13 @@ import { Textarea } from "@/shared/components/ui/textarea";
         >
           Cancel
         </Button>
-        <Button type="button" aria-label="Create project from details">
-          Create
+        <Button
+          type="button"
+          aria-label="Create project from details"
+          :disabled="isSubmitting"
+          @click="submitCreate"
+        >
+          {{ isSubmitting ? "Creating" : "Create" }}
         </Button>
       </div>
     </aside>

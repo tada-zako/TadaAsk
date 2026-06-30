@@ -1,11 +1,78 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { BadgeCheck, CircleAlert } from "@lucide/vue";
 
 import { Badge } from "@/shared/components/ui/badge";
 import { Separator } from "@/shared/components/ui/separator";
+import type {
+  ProjectHealthItem,
+  ProjectMetric,
+  ProjectWidgetCreate,
+  ProjectWidgetUpdate,
+  ProjectWorkspaceViewModel,
+} from "@/console/services/project-workspace";
 
 import ProjectLinkedSourcesPanel from "./ProjectLinkedSourcesPanel.vue";
 import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
+
+const props = defineProps<{
+  isMutating?: boolean;
+  workspace: ProjectWorkspaceViewModel;
+}>();
+
+defineEmits<{
+  createWidget: [input: ProjectWidgetCreate];
+  deleteWidget: [widgetUid: string];
+  importSources: [sourceUids: string[]];
+  openGlobalSources: [];
+  openSource: [sourceUid: string];
+  unbindSource: [sourceUid: string];
+  updateWidget: [input: { widgetUid: string; payload: ProjectWidgetUpdate }];
+}>();
+
+const healthBadge = computed(() => {
+  const hasWarning = props.workspace.healthItems.some(
+    (item) => item.tone === "warning",
+  );
+
+  return hasWarning
+    ? { label: "Review", tone: "warning" as const }
+    : { label: "Ready", tone: "success" as const };
+});
+
+// metric 提示 dot 样式定义
+function metricDotClass(metric: ProjectMetric): string {
+  const classes: Record<ProjectMetric["tone"], string> = {
+    muted: "bg-(--text-faint)",
+    primary: "bg-primary",
+    success: "bg-emerald-400",
+    warning: "bg-yellow-300/80",
+  };
+
+  return classes[metric.tone];
+}
+
+// project health 提示 dot 样式定义
+function healthDotClass(item: ProjectHealthItem): string {
+  const classes: Record<ProjectHealthItem["tone"], string> = {
+    muted: "bg-(--text-faint)",
+    success: "bg-emerald-400",
+    warning: "bg-yellow-300/80",
+  };
+
+  return classes[item.tone];
+}
+
+// 提示 badge 样式定义
+function badgeToneClass(tone: ProjectHealthItem["tone"]): string {
+  const classes: Record<ProjectHealthItem["tone"], string> = {
+    muted: "border-(--line-soft) bg-(--surface-panel-soft) text-(--text-muted)",
+    success: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+    warning: "border-yellow-300/25 bg-yellow-300/10 text-yellow-100",
+  };
+
+  return classes[tone];
+}
 </script>
 
 <template>
@@ -13,12 +80,13 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
   <section class="console-page">
     <!-- 页面头部 -->
     <header class="console-page-head">
-      <p class="console-kicker">Docs Assistant</p>
+      <p class="console-kicker">{{ workspace.project.name }}</p>
       <h1 class="console-page-title">Project</h1>
       <p class="console-page-subtitle">
-        Project workspace for deployed widgets, linked sources, and
-        visitor-facing RAG configuration. Source creation and item indexing stay
-        in the global Sources area.
+        {{
+          workspace.project.description ??
+          "Project workspace for deployed widgets, linked sources, and visitor-facing RAG configuration."
+        }}
       </p>
     </header>
 
@@ -26,42 +94,21 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
     <section
       class="grid grid-cols-4 gap-4 max-[1180px]:grid-cols-2 max-[680px]:grid-cols-1"
     >
-      <!-- 关联数据源指标 -->
-      <article class="console-metric-card grid gap-3">
-        <p class="console-metric-label">Linked sources</p>
-        <strong class="console-metric-value">4</strong>
+      <article
+        v-for="metric in workspace.metrics"
+        :key="metric.key"
+        class="console-metric-card grid gap-3"
+      >
+        <p class="console-metric-label">{{ metric.label }}</p>
+        <strong class="console-metric-value truncate text-[1.55rem]">
+          {{ metric.value }}
+        </strong>
         <span class="console-metric-foot mt-auto flex items-center gap-2">
-          <span class="size-2 rounded-full bg-emerald-400"></span>
-          3 public for visitor RAG
-        </span>
-      </article>
-      <!-- Widget 部署指标 -->
-      <article class="console-metric-card grid gap-3">
-        <p class="console-metric-label">Widget deployments</p>
-        <strong class="console-metric-value">2</strong>
-        <span class="console-metric-foot mt-auto flex items-center gap-2">
-          <span class="size-2 rounded-full bg-emerald-400"></span>
-          1 enabled origin
-        </span>
-      </article>
-      <!-- 模型提供商指标 -->
-      <article class="console-metric-card grid gap-3">
-        <p class="console-metric-label">Provider / model</p>
-        <strong class="console-metric-value truncate text-[1.55rem]"
-          >Gemini 2.5</strong
-        >
-        <span class="console-metric-foot mt-auto flex items-center gap-2">
-          <span class="size-2 rounded-full bg-emerald-400"></span>
-          Visitor default is set
-        </span>
-      </article>
-      <!-- RAG 状态指标 -->
-      <article class="console-metric-card grid gap-3">
-        <p class="console-metric-label">RAG status</p>
-        <strong class="console-metric-value text-[1.55rem]">Enabled</strong>
-        <span class="console-metric-foot mt-auto flex items-center gap-2">
-          <span class="bg-primary size-2 rounded-full"></span>
-          Project sources are used by Ask
+          <span
+            class="size-2 rounded-full"
+            :class="metricDotClass(metric)"
+          ></span>
+          {{ metric.foot }}
         </span>
       </article>
     </section>
@@ -75,69 +122,42 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
             Current setup signals from available backend resources
           </p>
         </div>
-        <Badge class="border-emerald-400/25 bg-emerald-400/10 text-emerald-200">
-          <BadgeCheck class="size-3" />
-          Ready
+        <Badge :class="badgeToneClass(healthBadge.tone)">
+          <BadgeCheck v-if="healthBadge.tone === 'success'" class="size-3" />
+          <CircleAlert v-else class="size-3" />
+          {{ healthBadge.label }}
         </Badge>
       </div>
       <Separator />
       <div class="grid">
-        <!-- 健康检查项 1 -->
         <div
+          v-for="(item, index) in workspace.healthItems"
+          :key="item.key"
           class="grid min-h-16 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-4 max-[680px]:grid-cols-[24px_minmax(0,1fr)]"
+          :class="{ 'border-b-0': index === workspace.healthItems.length - 1 }"
         >
-          <span class="size-2 rounded-full bg-emerald-400"></span>
+          <!-- <CircleAlert
+            v-if="item.tone === 'warning'"
+            class="size-4 rounded-full"
+            :class="healthDotClass(item)"
+          /> -->
+          <span
+            class="size-2 rounded-full"
+            :class="healthDotClass(item)"
+          ></span>
           <div>
-            <strong class="block text-sm text-(--text-strong)"
-              >Project scoped Ask is available</strong
-            >
+            <strong class="block text-sm text-(--text-strong)">
+              {{ item.title }}
+            </strong>
             <span class="mt-1 block text-xs text-(--text-faint)">
-              It uses this project's linked sources by default.
+              {{ item.detail }}
             </span>
           </div>
           <Badge
-            class="border-emerald-400/25 bg-emerald-400/10 text-emerald-200 max-[680px]:col-start-2"
+            class="max-[680px]:col-start-2"
+            :class="badgeToneClass(item.tone)"
           >
-            Configured
-          </Badge>
-        </div>
-        <!-- 健康检查项 2 -->
-        <div
-          class="grid min-h-16 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-4 max-[680px]:grid-cols-[24px_minmax(0,1fr)]"
-        >
-          <span class="size-2 rounded-full bg-emerald-400"></span>
-          <div>
-            <strong class="block text-sm text-(--text-strong)"
-              >Widget origin is explicitly bound</strong
-            >
-            <span class="mt-1 block text-xs text-(--text-faint)">
-              https://docs.example.com is enabled for this widget deployment.
-            </span>
-          </div>
-          <Badge
-            class="border-emerald-400/25 bg-emerald-400/10 text-emerald-200 max-[680px]:col-start-2"
-          >
-            CORS ready
-          </Badge>
-        </div>
-        <!-- 健康检查项 3 -->
-        <div
-          class="grid min-h-16 grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3 px-4 max-[680px]:grid-cols-[24px_minmax(0,1fr)]"
-        >
-          <CircleAlert class="size-4 text-yellow-300" />
-          <div>
-            <strong class="block text-sm text-(--text-strong)"
-              >One linked source is private</strong
-            >
-            <span class="mt-1 block text-xs text-(--text-faint)">
-              Private sources are still visible to Admin testing but not visitor
-              RAG.
-            </span>
-          </div>
-          <Badge
-            class="border-yellow-300/25 bg-yellow-300/10 text-yellow-100 max-[680px]:col-start-2"
-          >
-            Review
+            {{ item.status }}
           </Badge>
         </div>
       </div>
@@ -153,7 +173,15 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
           </p>
         </div>
       </div>
-      <ProjectLinkedSourcesPanel />
+      <ProjectLinkedSourcesPanel
+        :available-sources="workspace.availableSources"
+        :is-mutating="isMutating"
+        :sources="workspace.sourceRows"
+        @import-sources="$emit('importSources', $event)"
+        @open-global-sources="$emit('openGlobalSources')"
+        @open-source="$emit('openSource', $event)"
+        @unbind-source="$emit('unbindSource', $event)"
+      />
     </section>
 
     <!-- Widget 部署子面板 -->
@@ -166,7 +194,13 @@ import ProjectWidgetsPanel from "./ProjectWidgetsPanel.vue";
           </p>
         </div>
       </div>
-      <ProjectWidgetsPanel />
+      <ProjectWidgetsPanel
+        :is-mutating="isMutating"
+        :widgets="workspace.widgetRows"
+        @create-widget="$emit('createWidget', $event)"
+        @delete-widget="$emit('deleteWidget', $event)"
+        @update-widget="$emit('updateWidget', $event)"
+      />
     </section>
   </section>
 </template>
