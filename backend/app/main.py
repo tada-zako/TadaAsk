@@ -208,6 +208,7 @@ origins = [
     "http://localhost:3000",
     "http://localhost:8000",
     "http://localhost:8080",
+    "http://localhost:5173",
 ]
 
 # 跨域中间件执行顺序：widget 跨域中间件 -> 全局跨域中间件
@@ -263,4 +264,5 @@ app.include_router(visitor.router, prefix="/visitor", tags=["Visitor"])
 
 @app.get("/")
 async def root():
+    logger.info("访问根路径 /")
     return {"message": "Hello World"}
