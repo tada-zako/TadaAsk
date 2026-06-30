@@ -4,17 +4,21 @@ import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import {
   BarChart3,
-  Bot,
   Check,
   ChevronDown,
   Database,
   KeyRound,
+  Languages,
   LayoutDashboard,
+  LogOut,
   MessageSquare,
+  Monitor,
+  Moon,
   Plus,
   Settings,
   Sparkles,
   SquareDashed,
+  Sun,
 } from "@lucide/vue";
 
 import { Button } from "@/shared/components/ui/button";
@@ -26,11 +30,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { useAuthStore } from "@/console/stores/auth";
 import { useProjectStore } from "@/console/stores/project";
 
 // 解包响应式对象
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 const projectStore = useProjectStore();
 const { projects, selectedProject } = storeToRefs(projectStore);
 
@@ -46,6 +52,7 @@ onMounted(async () => {
   }
 });
 
+// 监听路由参数中的项目 UID 变化，保持侧栏选中状态与路由一致
 watch(
   () => route.params.projectUid,
   async () => {
@@ -63,7 +70,7 @@ watch(
   { immediate: true },
 );
 
-// 选择 project
+// 选择并切换当前项目
 async function selectProject(projectUid: string) {
   await projectStore.selectProject(projectUid);
   await router.push({
@@ -72,10 +79,12 @@ async function selectProject(projectUid: string) {
   });
 }
 
+// 判断项目是否处于激活状态
 function isProjectActive(projectUid: string): boolean {
   return selectedProject.value?.uid === projectUid;
 }
 
+// 打开项目 Landing 页面
 async function openProjectHome() {
   await router.push({ name: "project-landing" });
 }
@@ -92,6 +101,7 @@ async function openProjectRoot() {
   await selectProject(selectedProject.value.uid);
 }
 
+// 打开项目的子功能页面（如 Ask 或 Settings）
 async function openProjectChild(child: "ask" | "settings") {
   if (!selectedProject.value) {
     await openProjectHome();
@@ -102,6 +112,12 @@ async function openProjectChild(child: "ask" | "settings") {
     name: child === "ask" ? "project-ask" : "project-settings",
     params: { projectUid: selectedProject.value.uid },
   });
+}
+
+// 退出登录
+async function signOut() {
+  authStore.logout();
+  await router.replace({ name: "login" });
 }
 
 /**
@@ -121,7 +137,7 @@ function getProjectUidFromRoute(): string | null {
 <template>
   <!-- 控制台侧边栏 -->
   <aside
-    class="console-scrollbar sticky top-0 h-screen overflow-y-auto border-r border-(--line-soft) bg-(--surface-shell)/95 px-3.5 py-4 backdrop-blur-xl max-[760px]:hidden"
+    class="sticky top-0 flex h-screen flex-col overflow-hidden border-r border-(--line-soft) bg-(--surface-shell)/95 px-3.5 pt-4 backdrop-blur-xl max-[760px]:hidden"
   >
     <!-- Logo 区域 -->
     <div class="mb-5 flex h-10 items-center gap-2 px-2">
@@ -212,7 +228,9 @@ function getProjectUidFromRoute(): string | null {
     </DropdownMenu>
 
     <!-- 导航菜单 -->
-    <nav class="grid gap-5">
+    <nav
+      class="console-scrollbar grid min-h-0 flex-1 content-start gap-5 overflow-y-auto pb-4"
+    >
       <!-- 项目管理模块 -->
       <section class="grid gap-1">
         <p class="mx-2 h-2 text-[10px] text-transparent uppercase select-none">
@@ -308,21 +326,101 @@ function getProjectUidFromRoute(): string | null {
           <span class="max-[1180px]:hidden">Global Settings</span>
         </a>
       </section>
-
-      <section
-        class="mt-3 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) p-3 max-[1180px]:hidden"
-      >
-        <div
-          class="mb-2 flex items-center gap-2 text-xs font-semibold text-(--text-body)"
-        >
-          <Bot class="text-primary size-4" />
-          MVP analytics
-        </div>
-        <div class="grid gap-2">
-          <div class="tadaask-skeleton h-2.5 w-11/12 rounded-md"></div>
-          <div class="tadaask-skeleton h-2.5 w-7/12 rounded-md"></div>
-        </div>
-      </section>
     </nav>
+
+    <!-- 侧边栏底部操作区 -->
+    <section
+      class="sticky bottom-0 -mx-3.5 border-t border-(--line-soft) bg-(--surface-shell)/95 px-3.5 py-3 backdrop-blur-xl"
+    >
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <Button
+            type="button"
+            aria-label="Open admin menu"
+            title="Admin settings"
+            variant="outline"
+            class="h-11 w-full justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-(--surface-panel-soft) px-2.5 text-left hover:border-(--line) hover:bg-(--surface-hover) max-[1180px]:justify-center max-[1180px]:px-0"
+          >
+            <span
+              class="grid size-7 shrink-0 place-items-center rounded-full border border-(--line-soft) bg-(--surface-panel) text-xs font-semibold text-(--text-body)"
+            >
+              A
+            </span>
+            <span class="min-w-0 flex-1 max-[1180px]:hidden">
+              <span
+                class="block truncate text-[13px] font-semibold text-(--text-body)"
+              >
+                Admin
+              </span>
+              <span class="block text-[10px] font-normal text-(--text-faint)">
+                Console settings
+              </span>
+            </span>
+            <ChevronDown
+              class="size-4 text-(--text-faint) max-[1180px]:hidden"
+            />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          side="top"
+          class="w-72 rounded-(--console-radius-lg) border-(--line) bg-(--surface-shell) p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
+        >
+          <DropdownMenuLabel
+            class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
+          >
+            Theme
+          </DropdownMenuLabel>
+          <DropdownMenuItem
+            class="text-primary focus:bg-primary/15 focus:text-primary min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium"
+          >
+            <Moon class="text-primary size-4" />
+            <span class="min-w-0 flex-1">Dark</span>
+            <Check class="text-primary size-3.5" />
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
+          >
+            <Monitor class="size-4" />
+            System
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
+          >
+            <Sun class="size-4" />
+            Light
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator class="my-1 bg-(--line-soft)" />
+          <DropdownMenuLabel
+            class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
+          >
+            Language
+          </DropdownMenuLabel>
+          <DropdownMenuItem
+            class="text-primary focus:bg-primary/15 focus:text-primary min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium"
+          >
+            <Languages class="text-primary size-4" />
+            <span class="min-w-0 flex-1">English</span>
+            <Check class="text-primary size-3.5" />
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
+          >
+            <Languages class="size-4" />
+            中文
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator class="my-1 bg-(--line-soft)" />
+          <DropdownMenuItem
+            class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-red-200 focus:bg-red-400/10 focus:text-red-100"
+            @select="signOut"
+          >
+            <LogOut class="size-4 text-red-200" />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </section>
   </aside>
 </template>
