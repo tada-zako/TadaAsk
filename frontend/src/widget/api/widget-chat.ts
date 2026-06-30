@@ -1,4 +1,4 @@
-import { client } from "../../shared/api/create-client";
+import { client } from "./client";
 import type { VisitorChatRequest } from "@/shared/types/chat-stream";
 
 /** Visitor Widget 侧的公开聊天接口 */

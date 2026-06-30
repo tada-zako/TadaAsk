@@ -1,27 +1,24 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "@/shared/api/generated/schema";
 
-/**
- * 前端统一的 OpenAPI client
- */
-export const client = createClient<paths>({
-  baseUrl: import.meta.env.VITE_API_BASE_URL ?? "",
-});
+interface CreateApiClientOptions {
+  middlewares?: Middleware[];
+}
 
 /**
- * Admin 鉴权请求的预留挂载点。
+ * 创建 OpenAPI client 实例。
+ *
+ * shared 层只负责提供基础工厂，不承载 console/widget 业务策略。
  */
-const authMiddleware: Middleware = {
-  onRequest({ request, schemaPath }) {
-    if (
-      schemaPath.startsWith("/admin/") &&
-      schemaPath !== "/admin/auth/login"
-    ) {
-      // TODO: 后续挂载 Admin 鉴权的 token
-    }
+export function createApiClient(options: CreateApiClientOptions = {}) {
+  const client = createClient<paths>({
+    baseUrl: import.meta.env.VITE_API_BASE_URL ?? "",
+  });
 
-    return request;
-  },
-};
+  // 挂载 middleware
+  for (const middleware of options.middlewares ?? []) {
+    client.use(middleware);
+  }
 
-client.use(authMiddleware);
+  return client;
+}

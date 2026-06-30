@@ -1,4 +1,4 @@
-import { client } from "../../shared/api/create-client";
+import { client } from "./client";
 
 /**
  * Admin 登录请求 payload
