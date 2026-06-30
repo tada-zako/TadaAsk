@@ -29,9 +29,8 @@ const emit = defineEmits<{
 
 // Project 创建表单数据
 const form = reactive({
-  description:
-    "Answers questions from product documentation and release notes.",
-  name: "Docs Assistant",
+  description: "", // 默认描述为空，由 placeholder 提示
+  name: "", // 默认名称为空，由 placeholder 提示
 });
 
 // 提交创建项目
@@ -98,7 +97,7 @@ function submitCreate() {
         </div>
 
         <!-- 项目列表滚动区域 -->
-        <div class="console-scrollbar grid max-h-[28rem] gap-2 overflow-y-auto">
+        <div class="console-scrollbar grid max-h-112 gap-2 overflow-y-auto">
           <button
             v-for="project in projects"
             :key="project.uid"
@@ -128,7 +127,12 @@ function submitCreate() {
       <!-- 项目名称输入 -->
       <div class="grid gap-2">
         <Label for="project-name">Project name</Label>
-        <Input id="project-name" v-model="form.name" />
+        <Input
+          id="project-name"
+          v-model="form.name"
+          class="placeholder:text-(--text-faint)"
+          placeholder="Docs Assistant"
+        />
         <p class="text-xs leading-5 text-(--text-faint)">
           Must be unique. It appears in the sidebar project selector.
         </p>
@@ -139,7 +143,8 @@ function submitCreate() {
         <Textarea
           id="project-description"
           v-model="form.description"
-          class="min-h-28"
+          class="min-h-28 resize-none placeholder:text-(--text-faint)"
+          placeholder="Answers questions from product documentation and release notes."
         />
         <p class="text-xs leading-5 text-(--text-faint)">
           Optional. Keep it short enough to scan in project overview.
