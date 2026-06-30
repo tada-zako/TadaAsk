@@ -122,7 +122,7 @@ function submitCreate() {
     <!-- 右侧项目详情配置面板 -->
     <aside class="console-panel grid gap-4 p-5">
       <div class="grid gap-1">
-        <h2 class="console-panel-title">Project details</h2>
+        <h2 class="console-panel-title">Project Create</h2>
         <p class="console-panel-note">Minimal fields for MVP creation</p>
       </div>
       <!-- 项目名称输入 -->

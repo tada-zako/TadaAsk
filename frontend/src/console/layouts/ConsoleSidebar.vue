@@ -5,11 +5,13 @@ import { storeToRefs } from "pinia";
 import {
   BarChart3,
   Bot,
+  Check,
   ChevronDown,
   Database,
   KeyRound,
   LayoutDashboard,
   MessageSquare,
+  Plus,
   Settings,
   Sparkles,
   SquareDashed,
@@ -68,6 +70,10 @@ async function selectProject(projectUid: string) {
     name: "project-overview",
     params: { projectUid },
   });
+}
+
+function isProjectActive(projectUid: string): boolean {
+  return selectedProject.value?.uid === projectUid;
 }
 
 async function openProjectHome() {
@@ -129,12 +135,13 @@ function getProjectUidFromRoute(): string | null {
 
     <!-- 项目切换下拉菜单 -->
     <DropdownMenu>
+      <!-- 项目切换菜单触发器 -->
       <DropdownMenuTrigger as-child>
         <Button
           type="button"
           aria-label="Switch project"
           variant="outline"
-          class="mb-5 h-13 w-full justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-(--surface-panel) px-2.5 text-left hover:bg-(--surface-hover) max-[1180px]:h-11 max-[1180px]:justify-center"
+          class="mb-5 h-13 w-full justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-(--surface-panel) px-2.5 text-left hover:border-(--line) hover:bg-(--surface-hover) max-[1180px]:h-11 max-[1180px]:justify-center"
         >
           <span
             class="bg-primary/15 text-primary grid size-8 shrink-0 place-items-center rounded-(--console-radius-md) text-sm font-bold"
@@ -142,7 +149,7 @@ function getProjectUidFromRoute(): string | null {
             {{ projectInitial }}
           </span>
           <span class="min-w-0 flex-1 max-[1180px]:hidden">
-            <span class="block text-[11px] font-normal text-(--text-faint)"
+            <span class="block text-[10px] font-normal text-(--text-faint)/75"
               >Current project</span
             >
             <span
@@ -155,25 +162,51 @@ function getProjectUidFromRoute(): string | null {
           />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" class="w-60">
-        <DropdownMenuItem @select="openProjectHome">
-          Project home
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Projects</DropdownMenuLabel>
+      <!-- 菜单内容 -->
+      <DropdownMenuContent
+        align="start"
+        class="w-72 rounded-(--console-radius-lg) border-(--line) bg-(--surface-shell) p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
+      >
+        <DropdownMenuLabel
+          class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
+          >Projects</DropdownMenuLabel
+        >
         <DropdownMenuItem
           v-for="project in projects"
           :key="project.uid"
+          class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
+          :class="
+            isProjectActive(project.uid)
+              ? 'bg-primary/10 text-primary focus:bg-primary/15 focus:text-primary'
+              : ''
+          "
           @select="selectProject(project.uid)"
         >
-          {{ project.name }}
+          <span class="min-w-0 flex-1 truncate">{{ project.name }}</span>
+          <Check
+            v-if="isProjectActive(project.uid)"
+            class="text-primary size-3.5"
+          />
         </DropdownMenuItem>
-        <DropdownMenuItem v-if="projects.length === 0" disabled>
+        <DropdownMenuItem
+          v-if="projects.length === 0"
+          disabled
+          class="px-2.5 py-2 text-[13px] font-normal text-(--text-faint)"
+        >
           No project yet
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem @select="openProjectHome">
-          New project
+        <DropdownMenuSeparator class="my-1 bg-(--line-soft)" />
+        <DropdownMenuItem
+          class="min-h-10 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-semibold text-(--text-body) focus:bg-(--surface-hover) focus:text-(--text-strong)"
+          @select="openProjectHome"
+        >
+          <Plus class="text-primary size-4" />
+          <span class="grid gap-0.5">
+            <span>New project</span>
+            <span class="text-[11px] font-normal text-(--text-faint)">
+              Return to project landing
+            </span>
+          </span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
