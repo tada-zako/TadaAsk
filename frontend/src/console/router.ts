@@ -24,8 +24,25 @@ const router = createRouter({
       children: [
         {
           path: "project",
-          name: "project",
+          name: "project-landing",
           component: () => import("./views/project/ProjectView.vue"),
+        },
+        {
+          path: "project/:projectUid",
+          name: "project-overview",
+          component: () => import("./views/project/ProjectView.vue"),
+        },
+        {
+          // 预留页面
+          path: "project/:projectUid/ask",
+          name: "project-ask",
+          component: () => import("./views/project/ProjectReservedView.vue"),
+        },
+        {
+          // 预留页面
+          path: "project/:projectUid/settings",
+          name: "project-settings",
+          component: () => import("./views/project/ProjectReservedView.vue"),
         },
         {
           path: "chat",
