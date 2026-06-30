@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import ConsoleShell from "./layouts/ConsoleShell.vue";
-import ProjectView from "./views/project/ProjectView.vue";
+import { RouterView } from "vue-router";
 </script>
 
 <template>
-  <ConsoleShell>
-    <ProjectView />
-  </ConsoleShell>
+  <RouterView />
 </template>

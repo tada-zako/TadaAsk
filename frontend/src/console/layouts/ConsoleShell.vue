@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { RouterView } from "vue-router";
+
 import ConsoleHeader from "./ConsoleHeader.vue";
 import ConsoleSidebar from "./ConsoleSidebar.vue";
 </script>
@@ -21,7 +23,7 @@ import ConsoleSidebar from "./ConsoleSidebar.vue";
           <div
             class="mx-auto grid max-w-340 gap-8 px-(--console-content-x) py-(--console-content-y) max-[760px]:px-4 max-[760px]:py-5"
           >
-            <slot />
+            <RouterView />
           </div>
         </main>
       </div>
