@@ -54,8 +54,8 @@ const editingWidgetUid = ref<string | null>(null);
 // Dialog 表单只维护本地输入，提交时交给页面容器执行 API。
 const createForm = reactive<ProjectWidgetCreate>({
   isEnabled: true,
-  name: "Docs production",
-  siteOrigin: "https://docs.example.com",
+  name: "",
+  siteOrigin: "",
 });
 
 const editForm = reactive<ProjectWidgetCreate>({
@@ -139,12 +139,20 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
             <!-- Widget 名称 -->
             <div class="grid gap-2">
               <Label for="widget-name">Widget name</Label>
-              <Input id="widget-name" v-model="createForm.name" />
+              <Input
+                id="widget-name"
+                v-model="createForm.name"
+                placeholder="Docs production"
+              />
             </div>
             <!-- 部署站点域名 -->
             <div class="grid gap-2">
               <Label for="site-origin">Site origin</Label>
-              <Input id="site-origin" v-model="createForm.siteOrigin" />
+              <Input
+                id="site-origin"
+                v-model="createForm.siteOrigin"
+                placeholder="https://docs.example.com"
+              />
               <p class="text-muted-foreground text-xs leading-5">
                 Normalized origin used by project/widget scoped CORS checks.
               </p>

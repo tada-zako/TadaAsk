@@ -130,7 +130,6 @@ function submitCreate() {
         <Input
           id="project-name"
           v-model="form.name"
-          class="placeholder:text-(--text-faint)"
           placeholder="Docs Assistant"
         />
         <p class="text-xs leading-5 text-(--text-faint)">
@@ -143,7 +142,7 @@ function submitCreate() {
         <Textarea
           id="project-description"
           v-model="form.description"
-          class="min-h-28 resize-none placeholder:text-(--text-faint)"
+          class="min-h-28"
           placeholder="Answers questions from product documentation and release notes."
         />
         <p class="text-xs leading-5 text-(--text-faint)">
