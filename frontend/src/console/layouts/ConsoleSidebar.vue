@@ -45,7 +45,7 @@ const { projects, selectedProject } = storeToRefs(projectStore);
 
 // 项目首字作为 selector 标识显示。
 const projectInitial = computed(
-  () => selectedProject.value?.name.charAt(0) ?? "T",
+  () => selectedProject.value?.name.charAt(0) ?? "+",
 );
 
 onMounted(async () => {
