@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { Send } from "@lucide/vue";
 
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Textarea } from "@/shared/components/ui/textarea";
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -15,9 +18,11 @@ import { Textarea } from "@/shared/components/ui/textarea";
     <div class="border-border bg-card/80 grid rounded-lg border">
       <!-- 面板头部 -->
       <div class="border-border/70 border-b px-4 py-4">
-        <h1 class="text-2xl font-bold tracking-normal">Global chat</h1>
+        <h1 class="text-2xl font-bold tracking-normal">
+          {{ t("chat.globalTitle") }}
+        </h1>
         <p class="text-muted-foreground mt-1 text-sm">
-          Admin scoped RAG conversation across global sources.
+          {{ t("chat.globalDescription") }}
         </p>
       </div>
       <!-- 聊天消息历史区域 -->
@@ -26,27 +31,23 @@ import { Textarea } from "@/shared/components/ui/textarea";
         <div
           class="border-border bg-accent/60 justify-self-end rounded-lg border p-4 text-sm leading-6"
         >
-          How should I embed the widget on a static documentation site?
+          {{ t("chat.sampleUser") }}
         </div>
         <!-- AI 消息 -->
         <div
           class="border-border bg-card text-muted-foreground max-w-3xl rounded-lg border p-4 text-sm leading-6"
         >
-          Add the widget script to the host page and pass the project identifier
-          through the public widget API.
+          {{ t("chat.sampleAssistant") }}
         </div>
       </div>
       <!-- 消息输入区域 -->
       <div class="border-border/70 border-t p-4">
         <div class="grid gap-2">
-          <Textarea
-            class="min-h-24"
-            placeholder="Ask across global sources..."
-          />
+          <Textarea class="min-h-24" :placeholder="t('chat.placeholder')" />
           <div class="flex justify-end">
-            <Button type="button" aria-label="Send global chat message">
+            <Button type="button" :aria-label="t('chat.sendAria')">
               <Send class="size-4" />
-              Send
+              {{ t("chat.send") }}
             </Button>
           </div>
         </div>
@@ -55,8 +56,8 @@ import { Textarea } from "@/shared/components/ui/textarea";
     <!-- 右侧引用来源面板 -->
     <aside class="border-border bg-card/80 rounded-lg border p-4">
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-sm font-semibold">Citations</h2>
-        <Badge variant="outline">Admin detail</Badge>
+        <h2 class="text-sm font-semibold">{{ t("chat.citations") }}</h2>
+        <Badge variant="outline">{{ t("chat.adminDetail") }}</Badge>
       </div>
       <!-- 引用卡片 -->
       <div class="border-border bg-background/50 rounded-lg border p-3">
@@ -65,8 +66,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
           <span class="text-primary text-xs font-semibold">0.92</span>
         </div>
         <p class="text-muted-foreground mt-3 text-xs leading-5">
-          Widget public API is not finalized. MVP style customization is limited
-          to CSS tokens.
+          {{ t("chat.sampleCitation") }}
         </p>
       </div>
     </aside>

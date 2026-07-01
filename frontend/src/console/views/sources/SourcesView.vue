@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { Ellipsis, Plus } from "@lucide/vue";
 
 import { Badge } from "@/shared/components/ui/badge";
@@ -17,6 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -26,16 +29,15 @@ import {
     <header class="flex items-start justify-between gap-4">
       <div class="grid gap-2">
         <h1 class="text-4xl font-bold tracking-normal max-[760px]:text-3xl">
-          Sources
+          {{ t("sources.title") }}
         </h1>
         <p class="text-muted-foreground max-w-3xl text-sm leading-6">
-          Global source library for creation, indexing, item review, and project
-          binding.
+          {{ t("sources.description") }}
         </p>
       </div>
-      <Button type="button" aria-label="Create source">
+      <Button type="button" :aria-label="t('sources.createSource')">
         <Plus class="size-4" />
-        Create source
+        {{ t("sources.createSource") }}
       </Button>
     </header>
 
