@@ -144,7 +144,7 @@ TadaAsk 在**流式聊天问答 (Chat Streams)** 以及 **异步知识导入/抓
 
 知识源（Source）同步与 Ingestion（解析和向量化）接口均采用 SSE 方式报告复杂步骤进度。
 
-- 网页抓取同步：`POST /admin/source/{source_uid}/items/crawl/sync`
+- 网页抓取同步：`POST /admin/source/{source_uid}/crawl/sync`
 - 向量化索引：`POST /admin/source/{source_uid}/document/indexing`
 
 这些接口统一推送基于 `RAGSyncEvent` 结构的数据：

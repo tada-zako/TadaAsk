@@ -45,14 +45,14 @@ Create Source ───► Local File Upload  ───► SourceItems (PENDING)
 
 ### 2.2 流程 B：网页抓取流程 (Web Crawl Flow)
 1. **创建 Source**：发送 `POST /admin/source/new`，设置 `sourceType="web_crawl"`，并填充 `webCrawlConfig`（包括抓取入口 `entryType`：`url_list` / `sitemap` / `site_root`，以及爬取域名规则和 content/exclude DOM 选择器）。
-2. **触发同步 (Discover & Crawl)**：发送 `POST /admin/source/{source_uid}/items/crawl/sync`。
+2. **触发同步 (Discover & Crawl)**：发送 `POST /admin/source/{source_uid}/crawl/sync`。
    - *后端工作*：爬虫组件开始按配置规则下载页面、解析出页面中的所有有效链接，并在数据库中为每个发现的有效网页页面记录一条 `SourceItem`，其初始状态同样为 `pending`。
    - *获取实时反馈*：该接口会返回一个 SSE 事件流，展示抓取进度。
 3. **启动 Ingestion (解析/索引)**：执行 Flow C。
 
 ### 2.3 流程 C：向量化索引流程 (Ingestion/Indexing Flow)
 无论文件还是抓取的网页，新建立的 SourceItem 均处于 `pending`。必须通过 **Ingestion API** 触发深度解析与向量库索引：
-1. **启动 Ingestion**：发送 `POST /admin/source/{source_uid}/document/indexing`，并在请求体中传入要处理的 `sourceItemUids: [string]` 数组。
+1. **启动 Ingestion**：发送 `POST /admin/source/{source_uid}/document/indexing`，并在请求体中传入要处理的 `itemUids: [string]` 数组。
 2. **SSE 进度追踪**：此端点是一个 **SSE 事件流** (关于事件体详见 `03-sse-contract.md`)。后端会逐个对传入的 Item 进行：
    - 提取正文并转化为 Markdown
    - 保存 Markdown 全文到数据库中（用作后续 RAG 重新索引免解析缓存）
