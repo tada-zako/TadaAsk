@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import { ChevronRight } from "@lucide/vue";
 
@@ -10,13 +11,14 @@ import { useProjectStore } from "@/console/stores/project";
 interface BreadcrumbItem {
   key: string;
   label: string;
-  active?: boolean;
+  active?: boolean; // 当前所在的导航选项
   loading?: boolean;
   navigate?: () => Promise<void>;
 }
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const projectStore = useProjectStore();
 const { selectedProject } = storeToRefs(projectStore);
 
@@ -32,26 +34,38 @@ const routeProjectName = computed(() =>
 // 动态计算面包屑导航项
 const breadcrumbs = computed<BreadcrumbItem[]>(() => {
   const items: BreadcrumbItem[] = [
+    // 首页
     {
       key: "console",
-      label: "Console",
+      label: t("shell.breadcrumb.console"),
       navigate: goProjectLanding,
     },
   ];
 
+  // 全局聊天页面
   if (route.name === "chat") {
-    items.push({ active: true, key: "chat", label: "Chat" });
+    items.push({
+      active: true,
+      key: "chat",
+      label: t("shell.breadcrumb.chat"),
+    });
     return items;
   }
 
+  // 全局 Sources 页面
   if (route.name === "sources") {
-    items.push({ active: true, key: "sources", label: "Sources" });
+    items.push({
+      active: true,
+      key: "sources",
+      label: t("shell.breadcrumb.sources"),
+    });
     return items;
   }
 
+  // project 相关页面配置
   items.push({
     key: "project",
-    label: "Project",
+    label: t("shell.breadcrumb.project"),
     navigate: goProjectLanding,
   });
 
@@ -69,11 +83,15 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
   });
 
   if (route.name === "project-ask") {
-    items.push({ active: true, key: "ask", label: "Ask" });
+    items.push({ active: true, key: "ask", label: t("shell.breadcrumb.ask") });
   }
 
   if (route.name === "project-settings") {
-    items.push({ active: true, key: "settings", label: "Settings" });
+    items.push({
+      active: true,
+      key: "settings",
+      label: t("shell.breadcrumb.settings"),
+    });
   }
 
   return items;
@@ -136,7 +154,7 @@ function getProjectUidFromRoute(): string | null {
           <button
             v-else-if="item.navigate && !item.active"
             type="button"
-            :aria-label="`Open ${item.label}`"
+            :aria-label="t('shell.breadcrumb.open', { label: item.label })"
             class="min-w-0 truncate rounded-(--console-radius-xs) px-1 py-0.5 text-(--text-muted) transition hover:bg-(--surface-hover) hover:text-(--text-body)"
             @click="item.navigate"
           >

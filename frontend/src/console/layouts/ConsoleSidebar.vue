@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import {
   BarChart3,
@@ -30,12 +31,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { setConsoleLocale, type ConsoleLocale } from "@/console/i18n";
 import { useAuthStore } from "@/console/stores/auth";
 import { useProjectStore } from "@/console/stores/project";
 
 // 解包响应式对象
 const route = useRoute();
 const router = useRouter();
+const { locale, t } = useI18n();
 const authStore = useAuthStore();
 const projectStore = useProjectStore();
 const { projects, selectedProject } = storeToRefs(projectStore);
@@ -120,6 +123,11 @@ async function signOut() {
   await router.replace({ name: "login" });
 }
 
+// 切换控制台语言
+function selectLocale(nextLocale: ConsoleLocale) {
+  setConsoleLocale(nextLocale);
+}
+
 /**
  * 从路由 params 中获取 projectUid
  */
@@ -146,7 +154,9 @@ function getProjectUidFromRoute(): string | null {
       >
         T
       </div>
-      <strong class="text-sm font-semibold max-[1180px]:hidden">TadaAsk</strong>
+      <strong class="text-sm font-semibold max-[1180px]:hidden">
+        {{ t("shell.appName") }}
+      </strong>
     </div>
 
     <!-- 项目切换下拉菜单 -->
@@ -155,7 +165,7 @@ function getProjectUidFromRoute(): string | null {
       <DropdownMenuTrigger as-child>
         <Button
           type="button"
-          aria-label="Switch project"
+          :aria-label="t('shell.sidebar.switchProject')"
           variant="outline"
           class="mb-5 h-13 w-full justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-(--surface-panel) px-2.5 text-left hover:border-(--line) hover:bg-(--surface-hover) max-[1180px]:h-11 max-[1180px]:justify-center"
         >
@@ -165,13 +175,14 @@ function getProjectUidFromRoute(): string | null {
             {{ projectInitial }}
           </span>
           <span class="min-w-0 flex-1 max-[1180px]:hidden">
-            <span class="block text-[10px] font-normal text-(--text-faint)/75"
-              >Current project</span
-            >
+            <span class="block text-[10px] font-normal text-(--text-faint)/75">
+              {{ t("shell.sidebar.currentProject") }}
+            </span>
             <span
               class="block truncate text-[13px] font-semibold text-(--text-strong)"
-              >{{ selectedProject?.name ?? "Project home" }}</span
             >
+              {{ selectedProject?.name ?? t("shell.sidebar.projectHome") }}
+            </span>
           </span>
           <ChevronDown
             class="text-muted-foreground size-4 max-[1180px]:hidden"
@@ -185,7 +196,7 @@ function getProjectUidFromRoute(): string | null {
       >
         <DropdownMenuLabel
           class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
-          >Projects</DropdownMenuLabel
+          >{{ t("shell.sidebar.projects") }}</DropdownMenuLabel
         >
         <DropdownMenuItem
           v-for="project in projects"
@@ -209,7 +220,7 @@ function getProjectUidFromRoute(): string | null {
           disabled
           class="px-2.5 py-2 text-[13px] font-normal text-(--text-faint)"
         >
-          No project yet
+          {{ t("shell.sidebar.noProject") }}
         </DropdownMenuItem>
         <DropdownMenuSeparator class="my-1 bg-(--line-soft)" />
         <DropdownMenuItem
@@ -218,9 +229,9 @@ function getProjectUidFromRoute(): string | null {
         >
           <Plus class="text-primary size-4" />
           <span class="grid gap-0.5">
-            <span>New project</span>
+            <span>{{ t("shell.sidebar.newProject") }}</span>
             <span class="text-[11px] font-normal text-(--text-faint)">
-              Return to project landing
+              {{ t("shell.sidebar.returnProjectLanding") }}
             </span>
           </span>
         </DropdownMenuItem>
@@ -234,7 +245,7 @@ function getProjectUidFromRoute(): string | null {
       <!-- 项目管理模块 -->
       <section class="grid gap-1">
         <p class="mx-2 h-2 text-[10px] text-transparent uppercase select-none">
-          Project
+          {{ t("shell.sidebar.project") }}
         </p>
         <a
           class="console-nav-link console-nav-link-active max-[1180px]:justify-center max-[1180px]:px-0"
@@ -242,7 +253,9 @@ function getProjectUidFromRoute(): string | null {
           @click.prevent="openProjectRoot"
         >
           <LayoutDashboard class="text-primary size-4" />
-          <span class="min-w-0 flex-1 max-[1180px]:hidden">Project</span>
+          <span class="min-w-0 flex-1 max-[1180px]:hidden">
+            {{ t("shell.sidebar.project") }}
+          </span>
           <ChevronDown
             class="text-muted-foreground size-4 max-[1180px]:hidden"
           />
@@ -256,14 +269,14 @@ function getProjectUidFromRoute(): string | null {
             href="#"
             @click.prevent="openProjectChild('ask')"
           >
-            Ask
+            {{ t("shell.sidebar.ask") }}
           </a>
           <a
             class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
             href="#"
             @click.prevent="openProjectChild('settings')"
           >
-            Settings
+            {{ t("shell.sidebar.settings") }}
           </a>
         </div>
         <a
@@ -271,59 +284,75 @@ function getProjectUidFromRoute(): string | null {
           href="#"
         >
           <MessageSquare class="size-4" />
-          <span class="max-[1180px]:hidden">Chat</span>
+          <span class="max-[1180px]:hidden">{{ t("shell.sidebar.chat") }}</span>
         </a>
       </section>
 
       <!-- 数据分析模块 -->
       <section class="grid gap-1">
-        <p class="console-nav-title max-[1180px]:hidden">Analytics</p>
+        <p class="console-nav-title max-[1180px]:hidden">
+          {{ t("shell.sidebar.analytics") }}
+        </p>
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
         >
           <BarChart3 class="size-4" />
-          <span class="max-[1180px]:hidden">Conversations</span>
+          <span class="max-[1180px]:hidden">
+            {{ t("shell.sidebar.conversations") }}
+          </span>
         </a>
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
         >
           <Sparkles class="size-4" />
-          <span class="max-[1180px]:hidden">Top Questions</span>
+          <span class="max-[1180px]:hidden">
+            {{ t("shell.sidebar.topQuestions") }}
+          </span>
         </a>
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
         >
           <SquareDashed class="size-4" />
-          <span class="max-[1180px]:hidden">Source Analytics</span>
+          <span class="max-[1180px]:hidden">
+            {{ t("shell.sidebar.sourceAnalytics") }}
+          </span>
         </a>
       </section>
 
       <!-- 系统配置模块 -->
       <section class="grid gap-1">
-        <p class="console-nav-title max-[1180px]:hidden">Configuration</p>
+        <p class="console-nav-title max-[1180px]:hidden">
+          {{ t("shell.sidebar.configuration") }}
+        </p>
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
         >
           <Database class="size-4" />
-          <span class="max-[1180px]:hidden">Sources</span>
+          <span class="max-[1180px]:hidden">
+            {{ t("shell.sidebar.sources") }}
+          </span>
         </a>
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
         >
           <KeyRound class="size-4" />
-          <span class="max-[1180px]:hidden">API Keys</span>
+          <span class="max-[1180px]:hidden">
+            {{ t("shell.sidebar.apiKeys") }}
+          </span>
         </a>
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
         >
           <Settings class="size-4" />
-          <span class="max-[1180px]:hidden">Global Settings</span>
+          <span class="max-[1180px]:hidden">
+            {{ t("shell.sidebar.globalSettings") }}
+          </span>
         </a>
       </section>
     </nav>
@@ -336,8 +365,8 @@ function getProjectUidFromRoute(): string | null {
         <DropdownMenuTrigger as-child>
           <Button
             type="button"
-            aria-label="Open admin menu"
-            title="Admin settings"
+            :aria-label="t('shell.admin.openMenu')"
+            :title="t('shell.admin.settings')"
             variant="outline"
             class="h-11 w-full justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-(--surface-panel-soft) px-2.5 text-left hover:border-(--line) hover:bg-(--surface-hover) max-[1180px]:justify-center max-[1180px]:px-0"
           >
@@ -350,10 +379,10 @@ function getProjectUidFromRoute(): string | null {
               <span
                 class="block truncate text-[13px] font-semibold text-(--text-body)"
               >
-                Admin
+                {{ t("shell.admin.name") }}
               </span>
               <span class="block text-[10px] font-normal text-(--text-faint)">
-                Console settings
+                {{ t("shell.admin.settings") }}
               </span>
             </span>
             <ChevronDown
@@ -369,46 +398,65 @@ function getProjectUidFromRoute(): string | null {
           <DropdownMenuLabel
             class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
           >
-            Theme
+            {{ t("shell.admin.theme") }}
           </DropdownMenuLabel>
           <DropdownMenuItem
             class="text-primary focus:bg-primary/15 focus:text-primary min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium"
           >
             <Moon class="text-primary size-4" />
-            <span class="min-w-0 flex-1">Dark</span>
+            <span class="min-w-0 flex-1">
+              {{ t("shell.admin.themes.dark") }}
+            </span>
             <Check class="text-primary size-3.5" />
           </DropdownMenuItem>
           <DropdownMenuItem
             class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
           >
             <Monitor class="size-4" />
-            System
+            {{ t("shell.admin.themes.system") }}
           </DropdownMenuItem>
           <DropdownMenuItem
             class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
           >
             <Sun class="size-4" />
-            Light
+            {{ t("shell.admin.themes.light") }}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator class="my-1 bg-(--line-soft)" />
           <DropdownMenuLabel
             class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
           >
-            Language
+            {{ t("shell.admin.language") }}
           </DropdownMenuLabel>
           <DropdownMenuItem
-            class="text-primary focus:bg-primary/15 focus:text-primary min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium"
+            class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
+            :class="
+              locale === 'en'
+                ? 'bg-primary/10 text-primary focus:bg-primary/15 focus:text-primary'
+                : ''
+            "
+            @select="selectLocale('en')"
           >
-            <Languages class="text-primary size-4" />
-            <span class="min-w-0 flex-1">English</span>
-            <Check class="text-primary size-3.5" />
+            <Languages class="size-4" />
+            <span class="min-w-0 flex-1">
+              {{ t("shell.admin.languages.en") }}
+            </span>
+            <Check v-if="locale === 'en'" class="text-primary size-3.5" />
           </DropdownMenuItem>
           <DropdownMenuItem
             class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
+            :class="
+              locale === 'zh-CN'
+                ? 'bg-primary/10 text-primary focus:bg-primary/15 focus:text-primary'
+                : ''
+            "
+            @select="selectLocale('zh-CN')"
           >
             <Languages class="size-4" />
-            中文
+            <span class="min-w-0 flex-1">
+              {{ t("shell.admin.languages.zhCN") }}
+            </span>
+            <Check v-if="locale === 'zh-CN'" class="text-primary size-3.5" />
           </DropdownMenuItem>
 
           <DropdownMenuSeparator class="my-1 bg-(--line-soft)" />
@@ -417,7 +465,7 @@ function getProjectUidFromRoute(): string | null {
             @select="signOut"
           >
             <LogOut class="size-4 text-red-200" />
-            Sign out
+            {{ t("shell.admin.signOut") }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
