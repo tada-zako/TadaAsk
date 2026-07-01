@@ -1,0 +1,1953 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TadaAsk Source Page UI Preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --background: #050505;
+        --foreground: #f5f5f4;
+        --primary: #24d3c4;
+        --primary-foreground: #031110;
+        --text-strong: #f5f5f4;
+        --text-body: #d4d4d8;
+        --text-muted: #a1a1aa;
+        --text-faint: #71717a;
+        --text-disabled: #52525b;
+        --surface-shell: #080809;
+        --surface-panel: rgba(16, 17, 19, 0.72);
+        --surface-panel-soft: rgba(15, 16, 18, 0.48);
+        --surface-raised: #14161a;
+        --surface-hover: #1b1e23;
+        --line-soft: rgba(255, 255, 255, 0.055);
+        --line: #24262b;
+        --line-strong: #343741;
+        --green: #34d399;
+        --yellow: #fde047;
+        --red: #ff6b6b;
+        --radius-sm: 6px;
+        --radius-md: 8px;
+        --radius-lg: 10px;
+        --radius-pill: 999px;
+        --header-height: 54px;
+        --sidebar-width: 260px;
+        --content-x: 32px;
+        --content-y: 32px;
+        --font:
+          "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+        background:
+          radial-gradient(
+            circle at 76% -12%,
+            rgba(36, 211, 196, 0.13),
+            transparent 30rem
+          ),
+          linear-gradient(180deg, #09090a 0%, #050505 48rem);
+        color: var(--foreground);
+        font-family: var(--font);
+        letter-spacing: 0;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: default;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .design-wrap {
+        display: grid;
+        gap: 34px;
+        padding: 24px;
+      }
+
+      .state-title {
+        display: flex;
+        width: min(1480px, 100%);
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 0 auto;
+      }
+
+      .state-title h1 {
+        color: var(--text-strong);
+        font-size: 20px;
+        font-weight: 720;
+      }
+
+      .state-title span {
+        color: var(--text-faint);
+        font-size: 13px;
+      }
+
+      .frame {
+        overflow: hidden;
+        width: min(1480px, 100%);
+        margin: 0 auto;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--background);
+        box-shadow: 0 24px 90px rgba(0, 0, 0, 0.26);
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+        min-height: 900px;
+      }
+
+      .sidebar {
+        display: flex;
+        height: 900px;
+        flex-direction: column;
+        overflow: hidden;
+        border-right: 1px solid var(--line-soft);
+        background: rgba(8, 8, 9, 0.95);
+        padding: 16px 14px 0;
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 40px;
+        margin-bottom: 20px;
+        padding: 0 8px;
+      }
+
+      .mark {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-md);
+        background: var(--surface-panel);
+        color: var(--primary);
+        font-size: 14px;
+        font-weight: 760;
+      }
+
+      .brand strong {
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .project-switcher,
+      .admin-menu {
+        display: grid;
+        width: 100%;
+        align-items: center;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-lg);
+        background: var(--surface-panel);
+        color: var(--text-body);
+        text-align: left;
+      }
+
+      .project-switcher {
+        grid-template-columns: 32px minmax(0, 1fr) 18px;
+        gap: 10px;
+        min-height: 52px;
+        margin-bottom: 20px;
+        padding: 8px 10px;
+      }
+
+      .project-avatar,
+      .admin-avatar,
+      .account-avatar {
+        display: grid;
+        place-items: center;
+        border-radius: var(--radius-md);
+        font-size: 12px;
+        font-weight: 720;
+      }
+
+      .project-avatar {
+        width: 32px;
+        height: 32px;
+        background: rgba(36, 211, 196, 0.15);
+        color: var(--primary);
+      }
+
+      .admin-avatar,
+      .account-avatar {
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-pill);
+        background: var(--surface-panel);
+        color: var(--text-body);
+      }
+
+      .project-switcher small,
+      .admin-menu small {
+        display: block;
+        color: rgba(113, 113, 122, 0.75);
+        font-size: 10px;
+      }
+
+      .project-switcher strong,
+      .admin-menu strong {
+        display: block;
+        overflow: hidden;
+        margin-top: 1px;
+        color: var(--text-strong);
+        font-size: 13px;
+        font-weight: 650;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chevron {
+        color: var(--text-faint);
+        font-size: 14px;
+      }
+
+      .nav {
+        display: grid;
+        min-height: 0;
+        flex: 1;
+        align-content: start;
+        gap: 20px;
+        overflow-y: auto;
+        padding-bottom: 16px;
+      }
+
+      .nav-group {
+        display: grid;
+        gap: 4px;
+      }
+
+      .nav-title {
+        margin: 0 8px 4px;
+        color: var(--text-disabled);
+        font-size: 10px;
+        font-weight: 760;
+        letter-spacing: 0.09em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .nav-title.ghost {
+        height: 8px;
+        color: transparent;
+        user-select: none;
+      }
+
+      .nav-item {
+        display: flex;
+        min-height: 35px;
+        align-items: center;
+        gap: 8px;
+        border-radius: var(--radius-md);
+        color: var(--text-muted);
+        padding: 0 10px;
+        font-size: 13px;
+      }
+
+      .nav-item.active {
+        border: 1px solid rgba(36, 211, 196, 0.26);
+        background: rgba(36, 211, 196, 0.115);
+        color: var(--text-strong);
+      }
+
+      .nav-icon {
+        display: grid;
+        width: 16px;
+        height: 16px;
+        place-items: center;
+        color: var(--primary);
+        font-size: 13px;
+      }
+
+      .admin-section {
+        position: sticky;
+        bottom: 0;
+        margin: 0 -14px;
+        border-top: 1px solid var(--line-soft);
+        background: rgba(8, 8, 9, 0.95);
+        padding: 12px 14px;
+        backdrop-filter: blur(18px);
+      }
+
+      .admin-menu {
+        grid-template-columns: 28px minmax(0, 1fr) 16px;
+        gap: 9px;
+        min-height: 44px;
+        padding: 0 10px;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center;
+        min-height: var(--header-height);
+        border-bottom: 1px solid var(--line-soft);
+        background: rgba(5, 5, 5, 0.8);
+        padding: 0 28px;
+        backdrop-filter: blur(18px);
+      }
+
+      .breadcrumb {
+        display: flex;
+        min-width: 0;
+        max-width: min(54vw, 42rem);
+        align-items: center;
+        justify-self: center;
+        gap: 6px;
+        overflow: hidden;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .breadcrumb strong {
+        color: var(--text-strong);
+        font-weight: 650;
+      }
+
+      .account {
+        display: flex;
+        align-items: center;
+        justify-self: end;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .content {
+        display: grid;
+        width: min(1360px, 100%);
+        gap: 32px;
+        margin: 0 auto;
+        padding: var(--content-y) var(--content-x);
+      }
+
+      .console-page {
+        display: grid;
+        gap: 32px;
+      }
+
+      .page-head {
+        display: grid;
+        max-width: 58rem;
+        gap: 7px;
+      }
+
+      .kicker {
+        color: var(--text-faint);
+        font-size: 12px;
+        font-weight: 680;
+        letter-spacing: 0.08em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .page-title {
+        color: var(--text-strong);
+        font-size: clamp(32px, 3vw, 44px);
+        font-weight: 720;
+        line-height: 1.08;
+      }
+
+      .subtitle {
+        max-width: 46rem;
+        color: var(--text-muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .page-head-row {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface-panel);
+        color: var(--text-body);
+        padding: 0 13px;
+        font-size: 13px;
+        font-weight: 620;
+      }
+
+      .button.primary {
+        border-color: rgba(36, 211, 196, 0.4);
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+
+      .button.ghost {
+        border-color: transparent;
+        background: transparent;
+        color: var(--text-muted);
+      }
+
+      .button.danger {
+        border-color: rgba(255, 107, 107, 0.28);
+        background: rgba(255, 107, 107, 0.1);
+        color: #ffc1c1;
+      }
+
+      .button.disabled {
+        color: var(--text-disabled);
+        opacity: 0.68;
+      }
+
+      .button.icon {
+        width: 36px;
+        padding: 0;
+      }
+
+      .panel,
+      .table-panel,
+      .detail-card {
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-lg);
+        background: var(--surface-panel);
+      }
+
+      .panel {
+        overflow: hidden;
+      }
+
+      .panel.pad {
+        display: grid;
+        gap: 16px;
+        padding: 20px;
+      }
+
+      .panel-header {
+        display: flex;
+        min-height: 56px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 0 16px;
+      }
+
+      .panel-title {
+        display: grid;
+        gap: 4px;
+      }
+
+      .panel-title h2,
+      .section-title {
+        color: var(--text-strong);
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 1.35;
+      }
+
+      .panel-title span,
+      .section-note {
+        color: var(--text-faint);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .toolbar {
+        display: flex;
+        min-height: 58px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 0 16px;
+      }
+
+      .toolbar-left,
+      .toolbar-right {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .input,
+      .select,
+      .textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--background);
+        color: var(--text-body);
+        font-size: 13px;
+        outline: none;
+      }
+
+      .input,
+      .select {
+        height: 38px;
+        padding: 0 12px;
+      }
+
+      .textarea {
+        min-height: 92px;
+        padding: 11px 12px;
+        resize: vertical;
+      }
+
+      .search {
+        width: 300px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        height: 56px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 0 16px;
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      th {
+        height: 38px;
+        color: var(--text-faint);
+        font-size: 11px;
+        font-weight: 720;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      td {
+        color: var(--text-body);
+        font-size: 13px;
+      }
+
+      td strong {
+        color: var(--text-strong);
+        font-weight: 620;
+      }
+
+      tr:hover td {
+        background: rgba(255, 255, 255, 0.012);
+      }
+
+      .table-panel {
+        overflow: hidden;
+      }
+
+      .table-scroll {
+        height: 420px;
+        overflow: auto;
+        scrollbar-color: var(--line-strong) transparent;
+        scrollbar-gutter: stable;
+        scrollbar-width: thin;
+      }
+
+      .badge {
+        display: inline-flex;
+        min-height: 24px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-pill);
+        background: var(--surface-panel-soft);
+        color: var(--text-muted);
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 620;
+        white-space: nowrap;
+      }
+
+      .badge.success {
+        border-color: rgba(52, 211, 153, 0.25);
+        background: rgba(52, 211, 153, 0.1);
+        color: #a7f3d0;
+      }
+
+      .badge.warning {
+        border-color: rgba(253, 224, 71, 0.25);
+        background: rgba(253, 224, 71, 0.1);
+        color: #fef3c7;
+      }
+
+      .badge.danger {
+        border-color: rgba(255, 107, 107, 0.28);
+        background: rgba(255, 107, 107, 0.1);
+        color: #ffc1c1;
+      }
+
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        flex: 0 0 auto;
+        border-radius: var(--radius-pill);
+        background: var(--primary);
+      }
+
+      .dot.green {
+        background: var(--green);
+      }
+
+      .dot.yellow {
+        background: rgba(253, 224, 71, 0.8);
+      }
+
+      .dot.red {
+        background: var(--red);
+      }
+
+      .source-name {
+        display: grid;
+        gap: 4px;
+      }
+
+      .source-name span,
+      .cell-note {
+        color: var(--text-faint);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .source-type {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-body);
+      }
+
+      .type-mark {
+        display: grid;
+        width: 26px;
+        height: 26px;
+        place-items: center;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-sm);
+        background: var(--surface-panel-soft);
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 720;
+      }
+
+      .menu-trigger {
+        display: inline-grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface-panel);
+        color: var(--text-muted);
+        font-size: 18px;
+      }
+
+      .sheet-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 420px;
+        min-height: 900px;
+      }
+
+      .sheet-preview {
+        border-left: 1px solid var(--line);
+        background: #0d0e10;
+        box-shadow: -24px 0 80px rgba(0, 0, 0, 0.28);
+      }
+
+      .sheet-head,
+      .sheet-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 18px;
+      }
+
+      .sheet-footer {
+        justify-content: flex-end;
+        border-top: 1px solid var(--line-soft);
+        border-bottom: 0;
+      }
+
+      .sheet-body {
+        display: grid;
+        gap: 20px;
+        padding: 18px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .field label {
+        color: var(--text-body);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .field-help {
+        color: var(--text-faint);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .segmented {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--background);
+        padding: 4px;
+      }
+
+      .segment {
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-muted);
+        padding: 8px 10px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .segment.active {
+        background: var(--surface-raised);
+        color: var(--text-strong);
+      }
+
+      .callout {
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 12px;
+        border: 1px solid rgba(36, 211, 196, 0.3);
+        border-radius: var(--radius-lg);
+        background: rgba(36, 211, 196, 0.1);
+        padding: 12px;
+      }
+
+      .callout.warning {
+        border-color: rgba(253, 224, 71, 0.25);
+        background: rgba(253, 224, 71, 0.1);
+      }
+
+      .callout strong {
+        display: block;
+        color: var(--text-strong);
+        font-size: 13px;
+      }
+
+      .callout span {
+        display: block;
+        margin-top: 4px;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 18px;
+      }
+
+      .detail-aside {
+        display: grid;
+        align-content: start;
+        gap: 14px;
+      }
+
+      .detail-card {
+        display: grid;
+        gap: 14px;
+        padding: 16px;
+      }
+
+      .spec-list {
+        display: grid;
+      }
+
+      .spec-row {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr);
+        gap: 14px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 11px 0;
+      }
+
+      .spec-row:first-child {
+        padding-top: 0;
+      }
+
+      .spec-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .spec-row strong {
+        color: var(--text-faint);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .spec-row span {
+        min-width: 0;
+        color: var(--text-body);
+        font-size: 13px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+
+      .dropzone {
+        display: grid;
+        min-height: 150px;
+        place-items: center;
+        border: 1px dashed var(--line-strong);
+        border-radius: var(--radius-lg);
+        background: var(--surface-panel-soft);
+        padding: 24px;
+        text-align: center;
+      }
+
+      .dropzone-inner {
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        max-width: 420px;
+      }
+
+      .dropzone-icon {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: var(--surface-panel);
+        color: var(--primary);
+        font-size: 20px;
+        font-weight: 720;
+      }
+
+      .event-log {
+        display: grid;
+        gap: 0;
+        overflow: hidden;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-lg);
+        background: #08090a;
+      }
+
+      .event-row {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr) 64px;
+        gap: 12px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 11px 12px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .event-row:last-child {
+        border-bottom: 0;
+      }
+
+      .event-row strong {
+        color: var(--text-strong);
+        font-weight: 650;
+      }
+
+      .progress-track {
+        overflow: hidden;
+        height: 7px;
+        border-radius: var(--radius-pill);
+        background: var(--surface-panel-soft);
+      }
+
+      .progress-fill {
+        width: 72%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--primary), #8bfff4);
+      }
+
+      .split-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      @media (max-width: 1180px) {
+        .shell {
+          grid-template-columns: 82px minmax(0, 1fr);
+        }
+
+        .brand strong,
+        .project-switcher div:not(.project-avatar),
+        .project-switcher .chevron,
+        .nav-title,
+        .nav-item span:not(.nav-icon),
+        .admin-menu div,
+        .admin-menu .chevron {
+          display: none;
+        }
+
+        .project-switcher,
+        .admin-menu {
+          grid-template-columns: 32px;
+          justify-content: center;
+        }
+
+        .nav-item {
+          justify-content: center;
+          padding: 0;
+        }
+
+        .detail-grid,
+        .sheet-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .sheet-preview {
+          border-top: 1px solid var(--line);
+          border-left: 0;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .design-wrap {
+          padding: 12px;
+        }
+
+        .shell {
+          display: block;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .topbar {
+          padding: 0 16px;
+        }
+
+        .content {
+          padding: 22px 14px;
+        }
+
+        .page-head-row,
+        .toolbar {
+          display: grid;
+        }
+
+        .button-row,
+        .toolbar-left,
+        .toolbar-right {
+          justify-content: flex-start;
+        }
+
+        .search {
+          width: 100%;
+        }
+
+        table {
+          min-width: 800px;
+        }
+
+        .table-scroll {
+          overflow-x: auto;
+        }
+
+        .split-fields {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="design-wrap">
+      <div class="state-title">
+        <h1>State A: Global source library</h1>
+        <span>/sources lists global sources only</span>
+      </div>
+
+      <section class="frame" aria-label="Global source library state">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+
+            <button class="project-switcher" type="button">
+              <div class="project-avatar">D</div>
+              <div>
+                <small>Current project</small>
+                <strong>Docs Assistant</strong>
+              </div>
+              <div class="chevron">v</div>
+            </button>
+
+            <nav class="nav">
+              <section class="nav-group">
+                <p class="nav-title ghost">Project</p>
+                <div class="nav-item">
+                  <span class="nav-icon">P</span>
+                  <span>Overview</span>
+                </div>
+                <div class="nav-item">
+                  <span class="nav-icon">Q</span>
+                  <span>Ask</span>
+                </div>
+                <div class="nav-item">
+                  <span class="nav-icon">C</span>
+                  <span>Chat</span>
+                </div>
+              </section>
+
+              <section class="nav-group">
+                <p class="nav-title">Analytics</p>
+                <div class="nav-item">
+                  <span class="nav-icon">A</span>
+                  <span>Conversations</span>
+                </div>
+                <div class="nav-item">
+                  <span class="nav-icon">#</span>
+                  <span>Top Questions</span>
+                </div>
+                <div class="nav-item">
+                  <span class="nav-icon">S</span>
+                  <span>Source Analytics</span>
+                </div>
+              </section>
+
+              <section class="nav-group">
+                <p class="nav-title">Configuration</p>
+                <div class="nav-item active">
+                  <span class="nav-icon">D</span>
+                  <span>Sources</span>
+                </div>
+                <div class="nav-item">
+                  <span class="nav-icon">K</span>
+                  <span>API Keys</span>
+                </div>
+                <div class="nav-item">
+                  <span class="nav-icon">G</span>
+                  <span>Global Settings</span>
+                </div>
+              </section>
+            </nav>
+
+            <section class="admin-section">
+              <button class="admin-menu" type="button">
+                <span class="admin-avatar">A</span>
+                <div>
+                  <strong>Admin</strong>
+                  <small>Console settings</small>
+                </div>
+                <span class="chevron">v</span>
+              </button>
+            </section>
+          </aside>
+
+          <main class="main">
+            <header class="topbar">
+              <div></div>
+              <nav class="breadcrumb" aria-label="Breadcrumb">
+                <span>Console</span>
+                <span>/</span>
+                <strong>Sources</strong>
+              </nav>
+              <div class="account">
+                <span>admin</span>
+                <div class="account-avatar">A</div>
+              </div>
+            </header>
+
+            <section class="content">
+              <section class="console-page">
+                <header class="page-head-row">
+                  <div class="page-head">
+                    <p class="kicker">Global library</p>
+                    <h1 class="page-title">Sources</h1>
+                    <p class="subtitle">
+                      Create global sources and open a source detail page to
+                      upload files, sync crawl targets, and index source items.
+                    </p>
+                  </div>
+                  <div class="button-row">
+                    <button class="button primary" type="button">
+                      <span>+</span>
+                      Create source
+                    </button>
+                  </div>
+                </header>
+
+                <section class="table-panel">
+                  <div class="toolbar">
+                    <div class="toolbar-left">
+                      <input
+                        class="input search"
+                        value="Search sources"
+                        aria-label="Search sources"
+                      />
+                      <select class="select" aria-label="Filter by source type">
+                        <option>Type: all</option>
+                        <option>Local file</option>
+                        <option>Web crawl</option>
+                      </select>
+                      <select class="select" aria-label="Filter by status">
+                        <option>Status: all</option>
+                        <option>Indexed</option>
+                        <option>Processing</option>
+                        <option>Pending</option>
+                        <option>Failed</option>
+                      </select>
+                    </div>
+                    <div class="toolbar-right">
+                      <button class="button" type="button">Refresh</button>
+                    </div>
+                  </div>
+
+                  <div class="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Source</th>
+                          <th>Type</th>
+                          <th>Visibility</th>
+                          <th>Status</th>
+                          <th>Last synced</th>
+                          <th style="text-align: right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <div class="source-name">
+                              <strong>Product docs PDF</strong>
+                              <span>Open detail to upload and index files</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span class="source-type">
+                              <span class="type-mark">F</span>
+                              Local file
+                            </span>
+                          </td>
+                          <td><span class="badge success">Public</span></td>
+                          <td><span class="badge success">Indexed</span></td>
+                          <td>12 minutes ago</td>
+                          <td style="text-align: right">
+                            <button class="menu-trigger" type="button">...</button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <div class="source-name">
+                              <strong>Main website pages</strong>
+                              <span>Configured with site root crawl rules</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span class="source-type">
+                              <span class="type-mark">W</span>
+                              Web crawl
+                            </span>
+                          </td>
+                          <td><span class="badge success">Public</span></td>
+                          <td><span class="badge warning">Processing</span></td>
+                          <td>about 1 hour ago</td>
+                          <td style="text-align: right">
+                            <button class="menu-trigger" type="button">...</button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <div class="source-name">
+                              <strong>Release notes archive</strong>
+                              <span>Private admin test material</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span class="source-type">
+                              <span class="type-mark">F</span>
+                              Local file
+                            </span>
+                          </td>
+                          <td><span class="badge">Private</span></td>
+                          <td><span class="badge">Pending</span></td>
+                          <td>Not synced</td>
+                          <td style="text-align: right">
+                            <button class="menu-trigger" type="button">...</button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <div class="source-name">
+                              <strong>Developer docs crawl</strong>
+                              <span>Sitemap source, waiting for first sync</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span class="source-type">
+                              <span class="type-mark">W</span>
+                              Web crawl
+                            </span>
+                          </td>
+                          <td><span class="badge">Private</span></td>
+                          <td><span class="badge danger">Failed</span></td>
+                          <td>yesterday</td>
+                          <td style="text-align: right">
+                            <button class="menu-trigger" type="button">...</button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </section>
+            </section>
+          </main>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State B: Create source sheet</h1>
+        <span>creation stays short for local file, expands for web crawl</span>
+      </div>
+
+      <section class="frame" aria-label="Create source sheet state">
+        <div class="sheet-layout">
+          <div class="shell" style="min-height: 900px">
+            <aside class="sidebar">
+              <div class="brand">
+                <div class="mark">T</div>
+                <strong>TadaAsk</strong>
+              </div>
+              <button class="project-switcher" type="button">
+                <div class="project-avatar">D</div>
+                <div>
+                  <small>Current project</small>
+                  <strong>Docs Assistant</strong>
+                </div>
+                <div class="chevron">v</div>
+              </button>
+              <nav class="nav">
+                <section class="nav-group">
+                  <p class="nav-title">Configuration</p>
+                  <div class="nav-item active">
+                    <span class="nav-icon">D</span>
+                    <span>Sources</span>
+                  </div>
+                  <div class="nav-item">
+                    <span class="nav-icon">K</span>
+                    <span>API Keys</span>
+                  </div>
+                </section>
+              </nav>
+            </aside>
+            <main class="main">
+              <header class="topbar">
+                <div></div>
+                <nav class="breadcrumb" aria-label="Breadcrumb">
+                  <span>Console</span>
+                  <span>/</span>
+                  <strong>Sources</strong>
+                </nav>
+                <div class="account">
+                  <span>admin</span>
+                  <div class="account-avatar">A</div>
+                </div>
+              </header>
+              <section class="content">
+                <div class="page-head">
+                  <p class="kicker">Global library</p>
+                  <h1 class="page-title">Sources</h1>
+                  <p class="subtitle">
+                    The source list remains visible behind the creation sheet.
+                  </p>
+                </div>
+                <section class="table-panel" style="opacity: 0.42">
+                  <div class="toolbar">
+                    <input
+                      class="input search"
+                      value="Search sources"
+                      aria-label="Search sources"
+                    />
+                    <button class="button primary" type="button">
+                      + Create source
+                    </button>
+                  </div>
+                  <div class="table-scroll">
+                    <table>
+                      <tbody>
+                        <tr>
+                          <td><strong>Product docs PDF</strong></td>
+                          <td>Local file</td>
+                          <td><span class="badge success">Public</span></td>
+                          <td><span class="badge success">Indexed</span></td>
+                        </tr>
+                        <tr>
+                          <td><strong>Main website pages</strong></td>
+                          <td>Web crawl</td>
+                          <td><span class="badge success">Public</span></td>
+                          <td><span class="badge warning">Processing</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </section>
+            </main>
+          </div>
+
+          <aside class="sheet-preview" aria-label="Create source sheet preview">
+            <div class="sheet-head">
+              <div class="panel-title">
+                <h2>Create source</h2>
+                <span>Choose a supported source type for MVP ingestion.</span>
+              </div>
+              <button class="button icon" type="button" aria-label="Close">
+                x
+              </button>
+            </div>
+
+            <div class="sheet-body">
+              <div class="field">
+                <label>Source type</label>
+                <div class="segmented" aria-label="Source type">
+                  <button class="segment active" type="button">Local file</button>
+                  <button class="segment" type="button">Web crawl</button>
+                </div>
+                <p class="field-help">
+                  GitHub and custom content remain reserved until backend
+                  support is added.
+                </p>
+              </div>
+
+              <div class="field">
+                <label for="source-name">Name</label>
+                <input
+                  class="input"
+                  id="source-name"
+                  value="Product docs PDF"
+                />
+              </div>
+
+              <div class="field">
+                <label>Visibility</label>
+                <select class="select">
+                  <option>Private until indexed</option>
+                  <option>Public for visitor RAG</option>
+                </select>
+                <p class="field-help">
+                  Visitor RAG still requires at least one completed source item.
+                </p>
+              </div>
+
+              <div class="callout">
+                <span class="dot" style="margin-top: 6px"></span>
+                <div>
+                  <strong>Local file creation is only the container</strong>
+                  <span>
+                    Upload files from the source detail page after the source
+                    record is created.
+                  </span>
+                </div>
+              </div>
+
+              <div class="panel pad">
+                <div class="panel-title">
+                  <h2>Web crawl fields when selected</h2>
+                  <span>
+                    The sheet expands instead of opening another page.
+                  </span>
+                </div>
+                <div class="field">
+                  <label>Entry type</label>
+                  <select class="select">
+                    <option>site_root</option>
+                    <option>url_list</option>
+                    <option>sitemap_url</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Seed URL</label>
+                  <input
+                    class="input"
+                    value="https://docs.example.com/"
+                  />
+                </div>
+                <div class="split-fields">
+                  <div class="field">
+                    <label>Max pages</label>
+                    <input class="input" value="20" />
+                  </div>
+                  <div class="field">
+                    <label>Max depth</label>
+                    <input class="input" value="3" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label>Content selectors</label>
+                  <input class="input" value="main, article, .docs-content" />
+                </div>
+                <div class="field">
+                  <label>Exclude selectors</label>
+                  <input class="input" value="nav, footer, .toc" />
+                </div>
+              </div>
+            </div>
+
+            <div class="sheet-footer">
+              <button class="button" type="button">Cancel</button>
+              <button class="button primary" type="button">Create</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State C: Local file source detail</h1>
+        <span>/sources/:sourceUid manages files and indexing</span>
+      </div>
+
+      <section class="frame" aria-label="Local file source detail state">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+            <button class="project-switcher" type="button">
+              <div class="project-avatar">D</div>
+              <div>
+                <small>Current project</small>
+                <strong>Docs Assistant</strong>
+              </div>
+              <div class="chevron">v</div>
+            </button>
+            <nav class="nav">
+              <section class="nav-group">
+                <p class="nav-title">Configuration</p>
+                <div class="nav-item active">
+                  <span class="nav-icon">D</span>
+                  <span>Sources</span>
+                </div>
+              </section>
+            </nav>
+          </aside>
+
+          <main class="main">
+            <header class="topbar">
+              <div></div>
+              <nav class="breadcrumb" aria-label="Breadcrumb">
+                <span>Console</span>
+                <span>/</span>
+                <span>Sources</span>
+                <span>/</span>
+                <strong>Product docs PDF</strong>
+              </nav>
+              <div class="account">
+                <span>admin</span>
+                <div class="account-avatar">A</div>
+              </div>
+            </header>
+
+            <section class="content">
+              <section class="console-page">
+                <header class="page-head-row">
+                  <div class="page-head">
+                    <p class="kicker">Local file source</p>
+                    <h1 class="page-title">Product docs PDF</h1>
+                    <p class="subtitle">
+                      Upload source files, review generated source items, and
+                      choose which items should enter document indexing.
+                    </p>
+                  </div>
+                  <div class="button-row">
+                    <button class="button" type="button">Back to sources</button>
+                    <button class="button disabled" type="button">
+                      Edit source
+                    </button>
+                    <button class="button danger disabled" type="button">
+                      Delete source
+                    </button>
+                  </div>
+                </header>
+
+                <div class="detail-grid">
+                  <main class="console-page">
+                    <section class="dropzone">
+                      <div class="dropzone-inner">
+                        <div class="dropzone-icon">+</div>
+                        <h2 class="section-title">Upload files</h2>
+                        <p class="section-note">
+                          Files become pending source items after upload. Run
+                          indexing when the items are ready.
+                        </p>
+                        <button class="button primary" type="button">
+                          Select files
+                        </button>
+                      </div>
+                    </section>
+
+                    <section class="table-panel">
+                      <div class="toolbar">
+                        <div class="toolbar-left">
+                          <input
+                            class="input search"
+                            value="Search 4 items"
+                            aria-label="Search source items"
+                          />
+                          <select class="select">
+                            <option>Status: all</option>
+                            <option>Pending</option>
+                            <option>Processing</option>
+                            <option>Completed</option>
+                            <option>Failed</option>
+                          </select>
+                        </div>
+                        <div class="toolbar-right">
+                          <button class="button" type="button">Pause</button>
+                          <button class="button primary" type="button">
+                            Index selected
+                          </button>
+                        </div>
+                      </div>
+                      <div class="table-scroll">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th style="width: 44px">Pick</th>
+                              <th>Item</th>
+                              <th>Status</th>
+                              <th>Updated</th>
+                              <th style="text-align: right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td><span class="badge">x</span></td>
+                              <td>
+                                <div class="source-name">
+                                  <strong>getting-started.pdf</strong>
+                                  <span>File item, waiting for indexing</span>
+                                </div>
+                              </td>
+                              <td><span class="badge">Pending</span></td>
+                              <td>8 minutes ago</td>
+                              <td style="text-align: right">
+                                <button class="menu-trigger" type="button">
+                                  ...
+                                </button>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td><span class="badge">x</span></td>
+                              <td>
+                                <div class="source-name">
+                                  <strong>api-reference.pdf</strong>
+                                  <span>24 chunks indexed</span>
+                                </div>
+                              </td>
+                              <td><span class="badge success">Completed</span></td>
+                              <td>12 minutes ago</td>
+                              <td style="text-align: right">
+                                <button class="menu-trigger" type="button">
+                                  ...
+                                </button>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td><span class="badge">x</span></td>
+                              <td>
+                                <div class="source-name">
+                                  <strong>release-notes.md</strong>
+                                  <span>Embedding stage is running</span>
+                                </div>
+                              </td>
+                              <td><span class="badge warning">Processing</span></td>
+                              <td>just now</td>
+                              <td style="text-align: right">
+                                <button class="menu-trigger" type="button">
+                                  ...
+                                </button>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  </main>
+
+                  <aside class="detail-aside">
+                    <section class="detail-card">
+                      <div class="panel-title">
+                        <h2>Source profile</h2>
+                        <span>Read-only until update API is connected.</span>
+                      </div>
+                      <div class="spec-list">
+                        <div class="spec-row">
+                          <strong>Type</strong>
+                          <span>Local file</span>
+                        </div>
+                        <div class="spec-row">
+                          <strong>Visibility</strong>
+                          <span><span class="badge success">Public</span></span>
+                        </div>
+                        <div class="spec-row">
+                          <strong>Status</strong>
+                          <span><span class="badge warning">Processing</span></span>
+                        </div>
+                        <div class="spec-row">
+                          <strong>Created</strong>
+                          <span>Jun 28, 2026</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="detail-card">
+                      <div class="panel-title">
+                        <h2>Index progress</h2>
+                        <span>Current SSE task preview</span>
+                      </div>
+                      <div class="progress-track">
+                        <div class="progress-fill"></div>
+                      </div>
+                      <div class="event-log">
+                        <div class="event-row">
+                          <strong>start</strong>
+                          <span>Indexing 2 selected items</span>
+                          <span>0%</span>
+                        </div>
+                        <div class="event-row">
+                          <strong>parse</strong>
+                          <span>release-notes.md extracted</span>
+                          <span>36%</span>
+                        </div>
+                        <div class="event-row">
+                          <strong>embed</strong>
+                          <span>Writing vectors for 18 chunks</span>
+                          <span>72%</span>
+                        </div>
+                      </div>
+                    </section>
+                  </aside>
+                </div>
+              </section>
+            </section>
+          </main>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State D: Web crawl source detail</h1>
+        <span>/sources/:sourceUid manages crawl sync and indexing</span>
+      </div>
+
+      <section class="frame" aria-label="Web crawl source detail state">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+            <button class="project-switcher" type="button">
+              <div class="project-avatar">D</div>
+              <div>
+                <small>Current project</small>
+                <strong>Docs Assistant</strong>
+              </div>
+              <div class="chevron">v</div>
+            </button>
+            <nav class="nav">
+              <section class="nav-group">
+                <p class="nav-title">Configuration</p>
+                <div class="nav-item active">
+                  <span class="nav-icon">D</span>
+                  <span>Sources</span>
+                </div>
+              </section>
+            </nav>
+          </aside>
+
+          <main class="main">
+            <header class="topbar">
+              <div></div>
+              <nav class="breadcrumb" aria-label="Breadcrumb">
+                <span>Console</span>
+                <span>/</span>
+                <span>Sources</span>
+                <span>/</span>
+                <strong>Main website pages</strong>
+              </nav>
+              <div class="account">
+                <span>admin</span>
+                <div class="account-avatar">A</div>
+              </div>
+            </header>
+
+            <section class="content">
+              <section class="console-page">
+                <header class="page-head-row">
+                  <div class="page-head">
+                    <p class="kicker">Web crawl source</p>
+                    <h1 class="page-title">Main website pages</h1>
+                    <p class="subtitle">
+                      Sync the configured crawl target to produce source items,
+                      then index selected pages for RAG retrieval.
+                    </p>
+                  </div>
+                  <div class="button-row">
+                    <button class="button" type="button">Back to sources</button>
+                    <button class="button primary" type="button">Sync crawl</button>
+                    <button class="button disabled" type="button">
+                      Edit source
+                    </button>
+                  </div>
+                </header>
+
+                <div class="detail-grid">
+                  <main class="console-page">
+                    <section class="panel">
+                      <div class="panel-header">
+                        <div class="panel-title">
+                          <h2>Crawl sync</h2>
+                          <span>
+                            SSE progress from crawl discovery and upsert.
+                          </span>
+                        </div>
+                        <span class="badge warning">Running</span>
+                      </div>
+                      <div style="display: grid; gap: 14px; padding: 16px">
+                        <div class="progress-track">
+                          <div class="progress-fill" style="width: 48%"></div>
+                        </div>
+                        <div class="event-log">
+                          <div class="event-row">
+                            <strong>sync_start</strong>
+                            <span>Reading site root https://docs.example.com</span>
+                            <span>0%</span>
+                          </div>
+                          <div class="event-row">
+                            <strong>discover</strong>
+                            <span>Found /docs/intro and /docs/install</span>
+                            <span>22%</span>
+                          </div>
+                          <div class="event-row">
+                            <strong>upsert</strong>
+                            <span>Saved 12 source items as pending</span>
+                            <span>48%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="table-panel">
+                      <div class="toolbar">
+                        <div class="toolbar-left">
+                          <input
+                            class="input search"
+                            value="Search crawled pages"
+                            aria-label="Search crawled pages"
+                          />
+                          <select class="select">
+                            <option>Status: all</option>
+                            <option>Pending</option>
+                            <option>Completed</option>
+                            <option>Failed</option>
+                          </select>
+                        </div>
+                        <div class="toolbar-right">
+                          <button class="button primary" type="button">
+                            Index selected
+                          </button>
+                        </div>
+                      </div>
+                      <div class="table-scroll">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th style="width: 44px">Pick</th>
+                              <th>Page</th>
+                              <th>Status</th>
+                              <th>Updated</th>
+                              <th style="text-align: right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td><span class="badge">x</span></td>
+                              <td>
+                                <div class="source-name">
+                                  <strong>Getting Started</strong>
+                                  <span>https://docs.example.com/docs/intro</span>
+                                </div>
+                              </td>
+                              <td><span class="badge">Pending</span></td>
+                              <td>just now</td>
+                              <td style="text-align: right">
+                                <button class="menu-trigger" type="button">
+                                  ...
+                                </button>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td><span class="badge">x</span></td>
+                              <td>
+                                <div class="source-name">
+                                  <strong>Install TadaAsk</strong>
+                                  <span>https://docs.example.com/docs/install</span>
+                                </div>
+                              </td>
+                              <td><span class="badge success">Completed</span></td>
+                              <td>6 minutes ago</td>
+                              <td style="text-align: right">
+                                <button class="menu-trigger" type="button">
+                                  ...
+                                </button>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td><span class="badge">x</span></td>
+                              <td>
+                                <div class="source-name">
+                                  <strong>API Reference</strong>
+                                  <span>https://docs.example.com/api</span>
+                                </div>
+                              </td>
+                              <td><span class="badge danger">Failed</span></td>
+                              <td>10 minutes ago</td>
+                              <td style="text-align: right">
+                                <button class="menu-trigger" type="button">
+                                  ...
+                                </button>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  </main>
+
+                  <aside class="detail-aside">
+                    <section class="detail-card">
+                      <div class="panel-title">
+                        <h2>Web crawl config</h2>
+                        <span>Read-only preview until update API exists.</span>
+                      </div>
+                      <div class="spec-list">
+                        <div class="spec-row">
+                          <strong>Entry</strong>
+                          <span>site_root</span>
+                        </div>
+                        <div class="spec-row">
+                          <strong>Root URL</strong>
+                          <span>https://docs.example.com/</span>
+                        </div>
+                        <div class="spec-row">
+                          <strong>Domains</strong>
+                          <span>docs.example.com</span>
+                        </div>
+                        <div class="spec-row">
+                          <strong>Include</strong>
+                          <span>/docs/, /api/</span>
+                        </div>
+                        <div class="spec-row">
+                          <strong>Exclude</strong>
+                          <span>/blog/, /changelog/drafts/</span>
+                        </div>
+                        <div class="spec-row">
+                          <strong>Selectors</strong>
+                          <span>main, article, .docs-content</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section class="detail-card">
+                      <div class="panel-title">
+                        <h2>Operational notes</h2>
+                        <span>Expected source workflow</span>
+                      </div>
+                      <div class="callout">
+                        <span class="dot" style="margin-top: 6px"></span>
+                        <div>
+                          <strong>Sync creates source items</strong>
+                          <span>
+                            Crawl sync discovers and upserts pages as pending
+                            items. Indexing is a separate action.
+                          </span>
+                        </div>
+                      </div>
+                      <div class="callout warning">
+                        <span class="dot yellow" style="margin-top: 6px"></span>
+                        <div>
+                          <strong>Public does not mean searchable yet</strong>
+                          <span>
+                            Visitor RAG only uses public sources with at least
+                            one completed item.
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+                  </aside>
+                </div>
+              </section>
+            </section>
+          </main>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
