@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import router from "@/console/router";
+import { translate as t } from "@/console/i18n";
 import {
   createProject as createProjectRequest,
   listProjectOptions,
@@ -49,7 +50,10 @@ export const useProjectStore = defineStore("console-project", () => {
 
       return projects.value;
     } catch (error) {
-      errorMessage.value = getErrorMessage(error, "Unable to load projects.");
+      errorMessage.value = getErrorMessage(
+        error,
+        t("project.service.errors.loadProjects"),
+      );
       throw error;
     } finally {
       isLoading.value = false;
@@ -72,7 +76,7 @@ export const useProjectStore = defineStore("console-project", () => {
     if (!exists) {
       // 如果 projectUid 不存在情况
       selectedProjectUid.value = null;
-      errorMessage.value = "Project not found.";
+      errorMessage.value = t("common.errors.projectNotFound");
       return false;
     }
 
@@ -92,7 +96,7 @@ export const useProjectStore = defineStore("console-project", () => {
     input: CreateProjectInput,
   ): Promise<ProjectOption> {
     if (!input.name.trim()) {
-      errorMessage.value = "Project name is required.";
+      errorMessage.value = t("common.errors.projectNameRequired");
       throw new Error(errorMessage.value);
     }
 
@@ -115,7 +119,10 @@ export const useProjectStore = defineStore("console-project", () => {
         uid: project.uid,
       };
     } catch (error) {
-      errorMessage.value = getErrorMessage(error, "Unable to create project.");
+      errorMessage.value = getErrorMessage(
+        error,
+        t("project.service.errors.createProject"),
+      );
       throw error;
     } finally {
       isLoading.value = false;

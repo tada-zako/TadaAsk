@@ -1,5 +1,6 @@
 import { projectApi } from "@/console/api/projects";
 import { sourceApi } from "@/console/api/sources";
+import { translate as t } from "@/console/i18n";
 import type { components } from "@/shared/api/generated/schema";
 
 export type ProjectRead = components["schemas"]["ProjectRead"];
@@ -50,8 +51,8 @@ export interface ProjectWidgetRow {
   name: string;
   siteOrigin: string;
   isEnabled: boolean;
-  enabledLabel: "Enabled" | "Disabled";
-  enabledActionLabel: "Enable" | "Disable";
+  enabledLabel: string;
+  enabledActionLabel: string;
   createdLabel: string;
   updatedLabel: string;
 }
@@ -133,7 +134,11 @@ function toProjectOption(project: ProjectRead): ProjectOption {
 
 export async function listProjectOptions(): Promise<ProjectOption[]> {
   const { data, error } = await projectApi.list({ limit: 100, offset: 0 });
-  const projects = unwrapApiData(data, error, "Unable to load projects.");
+  const projects = unwrapApiData(
+    data,
+    error,
+    t("project.service.errors.loadProjects"),
+  );
   return projects.map(toProjectOption);
 }
 
@@ -145,7 +150,7 @@ export async function createProject(
     description: normalizeOptionalText(input.description),
   });
 
-  return unwrapApiData(data, error, "Unable to create project.");
+  return unwrapApiData(data, error, t("project.service.errors.createProject"));
 }
 
 /**
@@ -174,27 +179,27 @@ export async function loadProjectWorkspace(
   const project = unwrapApiData(
     projectResult.data,
     projectResult.error,
-    "Unable to load project.",
+    t("project.service.errors.loadProject"),
   );
   const settings = unwrapApiData(
     settingsResult.data,
     settingsResult.error,
-    "Unable to load project settings.",
+    t("project.service.errors.loadSettings"),
   );
   const linkedSources = unwrapApiData(
     sourcesResult.data,
     sourcesResult.error,
-    "Unable to load linked sources.",
+    t("project.service.errors.loadSources"),
   );
   const widgets = unwrapApiData(
     widgetsResult.data,
     widgetsResult.error,
-    "Unable to load project widgets.",
+    t("project.service.errors.loadWidgets"),
   );
   const globalSources = unwrapApiData(
     allSources.data,
     allSources.error,
-    "Unable to load global sources.",
+    t("project.service.errors.loadGlobalSources"),
   );
 
   return createWorkspaceViewModel({
@@ -211,7 +216,7 @@ export async function importProjectSources(
   sourceUids: string[],
 ): Promise<void> {
   const { data, error } = await projectApi.bindSources(projectUid, sourceUids);
-  unwrapApiData(data, error, "Unable to import sources.");
+  unwrapApiData(data, error, t("project.service.errors.importSources"));
 }
 
 export async function unbindProjectSource(
@@ -221,7 +226,7 @@ export async function unbindProjectSource(
   const { data, error } = await projectApi.unbindSources(projectUid, [
     sourceUid,
   ]);
-  unwrapApiData(data, error, "Unable to unbind source.");
+  unwrapApiData(data, error, t("project.service.errors.unbindSource"));
 }
 
 export async function createProjectWidget(
@@ -234,7 +239,7 @@ export async function createProjectWidget(
     isEnabled: input.isEnabled,
   });
 
-  return unwrapApiData(data, error, "Unable to create widget.");
+  return unwrapApiData(data, error, t("project.service.errors.createWidget"));
 }
 
 export async function updateProjectWidget(
@@ -263,7 +268,7 @@ export async function updateProjectWidget(
     payload,
   );
 
-  return unwrapApiData(data, error, "Unable to update widget.");
+  return unwrapApiData(data, error, t("project.service.errors.updateWidget"));
 }
 
 export async function deleteProjectWidget(
@@ -271,7 +276,7 @@ export async function deleteProjectWidget(
   widgetUid: string,
 ): Promise<void> {
   const { data, error } = await projectApi.removeWidget(projectUid, widgetUid);
-  unwrapApiData(data, error, "Unable to delete widget.");
+  unwrapApiData(data, error, t("project.service.errors.deleteWidget"));
 }
 
 /**
@@ -315,39 +320,50 @@ function createProjectMetrics(
   const enabledWidgetCount = widgetRows.filter(
     (widget) => widget.isEnabled,
   ).length;
-  const modelName = settings.visitorDefaultModelProfile?.model ?? "Not set";
+  const modelName =
+    settings.visitorDefaultModelProfile?.model ??
+    t("project.service.metrics.modelNotSet");
 
   return [
     {
       key: "sources",
-      label: "Linked sources",
+      label: t("project.service.metrics.linkedSources"),
       value: String(sourceRows.length),
-      foot: `${publicSourceCount} public for visitor RAG`,
+      foot: t("project.service.metrics.linkedSourcesFoot", {
+        count: publicSourceCount,
+      }),
       tone: publicSourceCount > 0 ? "success" : "muted",
     },
     {
       key: "widgets",
-      label: "Widget deployments",
+      label: t("project.service.metrics.widgetDeployments"),
       value: String(widgetRows.length),
-      foot: `${enabledWidgetCount} enabled origin${enabledWidgetCount === 1 ? "" : "s"}`,
+      foot: t("project.service.metrics.widgetDeploymentsFoot", {
+        count: enabledWidgetCount,
+        plural: enabledWidgetCount === 1 ? "" : "s",
+      }),
       tone: enabledWidgetCount > 0 ? "success" : "muted",
     },
     {
       key: "model",
-      label: "Provider / model",
+      label: t("project.service.metrics.providerModel"),
       value: modelName,
       foot: settings.visitorDefaultProvider
-        ? `${settings.visitorDefaultProvider.name} is configured`
-        : "Visitor default is not set",
+        ? t("project.service.metrics.providerConfigured", {
+            provider: settings.visitorDefaultProvider.name,
+          })
+        : t("project.service.metrics.visitorDefaultNotSet"),
       tone: settings.visitorDefaultProvider ? "success" : "warning",
     },
     {
       key: "rag",
-      label: "RAG status",
-      value: settings.visitorRagEnabled ? "Enabled" : "Disabled",
+      label: t("project.service.metrics.ragStatus"),
+      value: settings.visitorRagEnabled
+        ? t("project.service.metrics.enabled")
+        : t("project.service.metrics.disabled"),
       foot: settings.visitorRagEnabled
-        ? "Project sources are used by Ask"
-        : "Visitor RAG is currently off",
+        ? t("project.service.metrics.ragEnabledFoot")
+        : t("project.service.metrics.ragDisabledFoot"),
       tone: settings.visitorRagEnabled ? "primary" : "warning",
     },
   ];
@@ -372,48 +388,67 @@ function createProjectHealth(
       key: "ask",
       title:
         sourceRows.length > 0
-          ? "Project scoped Ask is available"
-          : "Project scoped Ask needs sources",
+          ? t("project.service.health.askReadyTitle")
+          : t("project.service.health.askNeedsSourcesTitle"),
       detail:
         sourceRows.length > 0
-          ? "It uses this project's linked sources by default."
-          : "Import at least one source before testing project RAG.",
-      status: sourceRows.length > 0 ? "Configured" : "No sources",
+          ? t("project.service.health.askReadyDetail")
+          : t("project.service.health.askNeedsSourcesDetail"),
+      status:
+        sourceRows.length > 0
+          ? t("project.service.health.configured")
+          : t("project.service.health.noSources"),
       tone: sourceRows.length > 0 ? "success" : "warning",
     },
     {
       key: "widget",
       title: enabledWidget
-        ? "Widget origin is explicitly bound"
-        : "No enabled widget origin",
+        ? t("project.service.health.widgetReadyTitle")
+        : t("project.service.health.widgetMissingTitle"),
       detail: enabledWidget
-        ? `${enabledWidget.siteOrigin} is enabled for visitor requests.`
-        : "Create or enable a widget deployment before embedding the visitor widget.",
-      status: enabledWidget ? "CORS ready" : "Action needed",
+        ? t("project.service.health.widgetReadyDetail", {
+            origin: enabledWidget.siteOrigin,
+          })
+        : t("project.service.health.widgetMissingDetail"),
+      status: enabledWidget
+        ? t("project.service.health.corsReady")
+        : t("project.service.health.actionNeeded"),
       tone: enabledWidget ? "success" : "warning",
     },
     {
       key: "model",
       title: hasModel
-        ? "Visitor model is configured"
-        : "Visitor model is not configured",
+        ? t("project.service.health.modelReadyTitle")
+        : t("project.service.health.modelMissingTitle"),
       detail: hasModel
-        ? `${settings.visitorDefaultProvider?.name} / ${settings.visitorDefaultModelProfile?.model} is used by default.`
-        : "Project settings should select provider and model together.",
-      status: hasModel ? "Ready" : "Review",
+        ? t("project.service.health.modelReadyDetail", {
+            model: settings.visitorDefaultModelProfile?.model ?? "",
+            provider: settings.visitorDefaultProvider?.name ?? "",
+          })
+        : t("project.service.health.modelMissingDetail"),
+      status: hasModel
+        ? t("project.service.health.ready")
+        : t("project.service.health.review"),
       tone: hasModel ? "success" : "warning",
     },
     {
       key: "visibility",
       title:
         privateSourceCount > 0
-          ? `${privateSourceCount} linked source${privateSourceCount === 1 ? " is" : "s are"} private`
-          : "Linked sources are visitor-ready",
+          ? t("project.service.health.privateSourcesTitle", {
+              count: privateSourceCount,
+              plural: privateSourceCount === 1 ? "" : "s",
+              verb: privateSourceCount === 1 ? "is" : "are",
+            })
+          : t("project.service.health.visitorReadyTitle"),
       detail:
         privateSourceCount > 0
-          ? "Private sources remain available to Admin testing but not visitor RAG."
-          : "All linked sources can be used by visitor-facing retrieval.",
-      status: privateSourceCount > 0 ? "Review" : "Public",
+          ? t("project.service.health.privateSourcesDetail")
+          : t("project.service.health.visitorReadyDetail"),
+      status:
+        privateSourceCount > 0
+          ? t("project.service.health.review")
+          : t("project.service.health.public"),
       tone: privateSourceCount > 0 ? "warning" : "success",
     },
   ];
@@ -424,7 +459,9 @@ function toSourceRow(source: SourceRead): ProjectSourceRow {
     uid: source.uid,
     name: source.sourceName,
     typeLabel: sourceTypeLabel(source.sourceType),
-    visibilityLabel: source.isPublic ? "Public" : "Private",
+    visibilityLabel: source.isPublic
+      ? t("project.service.visibility.public")
+      : t("project.service.visibility.private"),
     visibilityTone: source.isPublic ? "success" : "muted",
     statusLabel: sourceStatusLabel(source.status),
     statusTone: sourceStatusTone(source.status),
@@ -439,8 +476,12 @@ function toWidgetRow(widget: ProjectWidgetRead): ProjectWidgetRow {
     name: widget.name,
     siteOrigin: widget.siteOrigin,
     isEnabled: widget.isEnabled,
-    enabledLabel: widget.isEnabled ? "Enabled" : "Disabled",
-    enabledActionLabel: widget.isEnabled ? "Disable" : "Enable",
+    enabledLabel: widget.isEnabled
+      ? t("project.service.widgets.enabled")
+      : t("project.service.widgets.disabled"),
+    enabledActionLabel: widget.isEnabled
+      ? t("project.service.widgets.disable")
+      : t("project.service.widgets.enable"),
     createdLabel: formatDate(widget.createdAt),
     updatedLabel: formatDate(widget.updatedAt),
   };
@@ -448,10 +489,10 @@ function toWidgetRow(widget: ProjectWidgetRead): ProjectWidgetRow {
 
 function sourceTypeLabel(sourceType: SourceRead["sourceType"]): string {
   const labels: Record<SourceRead["sourceType"], string> = {
-    custom_content: "Custom",
-    github_repo: "GitHub",
-    local_file: "Local file",
-    web_crawl: "Web crawl",
+    custom_content: t("project.service.sourceType.custom_content"),
+    github_repo: t("project.service.sourceType.github_repo"),
+    local_file: t("project.service.sourceType.local_file"),
+    web_crawl: t("project.service.sourceType.web_crawl"),
   };
 
   return labels[sourceType];
@@ -459,12 +500,12 @@ function sourceTypeLabel(sourceType: SourceRead["sourceType"]): string {
 
 function sourceStatusLabel(status: SourceRead["status"]): string {
   const labels: Record<SourceRead["status"], string> = {
-    completed: "Indexed",
-    failed: "Failed",
-    pause_requested: "Pausing",
-    paused: "Paused",
-    pending: "Pending",
-    processing: "Processing",
+    completed: t("project.service.sourceStatus.completed"),
+    failed: t("project.service.sourceStatus.failed"),
+    pause_requested: t("project.service.sourceStatus.pause_requested"),
+    paused: t("project.service.sourceStatus.paused"),
+    pending: t("project.service.sourceStatus.pending"),
+    processing: t("project.service.sourceStatus.processing"),
   };
 
   return labels[status];
@@ -503,7 +544,7 @@ function formatDate(value: string): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Unknown";
+    return t("project.service.dates.unknown");
   }
 
   return date.toLocaleDateString(undefined, {
@@ -517,28 +558,28 @@ function formatRelativeDate(value: string): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Not synced";
+    return t("project.service.dates.notSynced");
   }
 
   const diffMs = Date.now() - date.getTime();
   const diffMinutes = Math.max(0, Math.round(diffMs / 60_000));
 
   if (diffMinutes < 1) {
-    return "just now";
+    return t("project.service.dates.justNow");
   }
 
   if (diffMinutes < 60) {
-    return `${diffMinutes} minutes ago`;
+    return t("project.service.dates.minutesAgo", { count: diffMinutes });
   }
 
   const diffHours = Math.round(diffMinutes / 60);
   if (diffHours < 24) {
-    return `${diffHours} hours ago`;
+    return t("project.service.dates.hoursAgo", { count: diffHours });
   }
 
   const diffDays = Math.round(diffHours / 24);
   if (diffDays < 8) {
-    return `${diffDays} days ago`;
+    return t("project.service.dates.daysAgo", { count: diffDays });
   }
 
   return formatDate(value);
