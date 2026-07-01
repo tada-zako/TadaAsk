@@ -98,7 +98,7 @@ export const en = {
       creating: "Creating",
     },
     overview: {
-      title: "Project",
+      title: "Project Overview",
       fallbackDescription:
         "Project workspace for deployed widgets, linked sources, and visitor-facing RAG configuration.",
       healthTitle: "Project health",
