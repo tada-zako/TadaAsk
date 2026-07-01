@@ -11,9 +11,9 @@
 - 当文档与实际源代码、后端接口或运行行为冲突时，以实际源代码和真实接口为准。
 - 如果实现过程中发现文档过时，应优先修正文档，而不是为了符合文档去扭曲代码。
 
-## 2. 通用阅读顺序
+## 2. 相关文档
 
-首次参与前端开发时，建议按以下顺序阅读：
+前端相关文档如下：
 
 1. `../../docs/requirements.md`：理解项目定位、用户角色、Widget-first 方向和 MVP 功能背景。
 2. `./tutorial/frontend-ui-scope-constraints.md`：理解当前已确认的前端产品范围、Admin Console 页面组织和 Widget UI 边界。
@@ -22,6 +22,7 @@
 5. `./console-ui-code-guidelines.md`: 了解前端 UI 组件、样式和布局的设计倾向。
 6. `../../backend/docs/tutorial/sse-contract.md`：实现聊天、ingestion、web crawl 等流式交互前阅读。
 7. `../../backend/docs/tutorial/source-source-item-flow.md`：实现 Source、SourceItem、文件上传、索引流程相关 UI 前阅读。
+8. `./console-project-workflow.md`: 理解 project UI 构建的完整闭环，包括 vue 页面实现，services, stores, API, i18n 等关键模块的实现方案。
 
 ## 3. 按开发任务阅读
 
