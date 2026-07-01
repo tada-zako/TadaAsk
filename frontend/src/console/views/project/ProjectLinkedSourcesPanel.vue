@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Ellipsis, ExternalLink, Link, Unlink } from "@lucide/vue";
 
 import { Badge } from "@/shared/components/ui/badge";
@@ -44,6 +45,7 @@ const emit = defineEmits<{
   unbindSource: [sourceUid: string];
 }>();
 
+const { t } = useI18n();
 const importDialogOpen = ref(false);
 const selectedSourceUid = ref("");
 
@@ -91,43 +93,47 @@ function badgeClass(
     <div
       class="flex min-h-12 items-center justify-between gap-4 border-b border-(--line-soft) px-4 max-[760px]:items-start max-[760px]:py-3"
     >
-      <p class="text-xs text-(--text-faint)">{{ sources.length }} linked</p>
+      <p class="text-xs text-(--text-faint)">
+        {{ t("project.sources.linkedCount", { count: sources.length }) }}
+      </p>
       <div
         class="flex shrink-0 flex-wrap justify-end gap-2 max-[760px]:justify-start"
       >
         <Button
           type="button"
-          aria-label="Open global sources"
+          :aria-label="t('project.sources.openGlobalSources')"
           variant="outline"
           size="sm"
           @click="emit('openGlobalSources')"
         >
           <ExternalLink class="size-4" />
-          Global sources
+          {{ t("project.sources.globalSources") }}
         </Button>
         <!-- 导入数据源对话框 -->
         <Dialog v-model:open="importDialogOpen">
           <DialogTrigger as-child>
             <Button
               type="button"
-              aria-label="Import source"
+              :aria-label="t('project.sources.importSource')"
               size="sm"
               :disabled="isMutating || availableSources.length === 0"
             >
               <Link class="size-4" />
-              Import
+              {{ t("common.actions.import") }}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Import source</DialogTitle>
+              <DialogTitle>{{ t("project.sources.dialogTitle") }}</DialogTitle>
               <DialogDescription>
-                Binds an existing global source to this project.
+                {{ t("project.sources.dialogDescription") }}
               </DialogDescription>
             </DialogHeader>
             <div class="grid gap-4">
               <div class="grid gap-2">
-                <Label for="source-pick">Source</Label>
+                <Label for="source-pick">
+                  {{ t("project.sources.sourceLabel") }}
+                </Label>
                 <select
                   id="source-pick"
                   v-model="selectedSourceUid"
@@ -142,8 +148,7 @@ function badgeClass(
                   </option>
                 </select>
                 <p class="text-muted-foreground text-xs leading-5">
-                  No source creation here. Create and index source items from
-                  global Sources.
+                  {{ t("project.sources.importHelp") }}
                 </p>
               </div>
               <div
@@ -151,10 +156,11 @@ function badgeClass(
               >
                 <span class="bg-primary mt-1 size-2 rounded-full"></span>
                 <div>
-                  <strong class="text-sm">Binding only</strong>
+                  <strong class="text-sm">
+                    {{ t("project.sources.bindingOnlyTitle") }}
+                  </strong>
                   <p class="text-muted-foreground mt-1 text-xs leading-5">
-                    Import calls the project-source binding API and does not
-                    change source content.
+                    {{ t("project.sources.bindingOnlyBody") }}
                   </p>
                 </div>
               </div>
@@ -162,19 +168,19 @@ function badgeClass(
             <DialogFooter>
               <Button
                 type="button"
-                aria-label="Cancel import source"
+                :aria-label="t('project.sources.cancelImport')"
                 variant="outline"
                 @click="importDialogOpen = false"
               >
-                Cancel
+                {{ t("common.actions.cancel") }}
               </Button>
               <Button
                 type="button"
-                aria-label="Confirm import source"
+                :aria-label="t('project.sources.confirmImport')"
                 :disabled="isMutating || !selectedSourceUid"
                 @click="submitImport"
               >
-                Import
+                {{ t("common.actions.import") }}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -186,12 +192,14 @@ function badgeClass(
     <Table class="console-scrollbar">
       <TableHeader>
         <TableRow>
-          <TableHead>Source</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Visibility</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Last synced</TableHead>
-          <TableHead class="w-16 text-right">Actions</TableHead>
+          <TableHead>{{ t("project.sources.table.source") }}</TableHead>
+          <TableHead>{{ t("project.sources.table.type") }}</TableHead>
+          <TableHead>{{ t("project.sources.table.visibility") }}</TableHead>
+          <TableHead>{{ t("project.sources.table.status") }}</TableHead>
+          <TableHead>{{ t("project.sources.table.lastSynced") }}</TableHead>
+          <TableHead class="w-16 text-right">
+            {{ t("project.sources.table.actions") }}
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -216,7 +224,9 @@ function badgeClass(
               <DropdownMenuTrigger as-child>
                 <Button
                   type="button"
-                  :aria-label="`${source.name} source actions`"
+                  :aria-label="
+                    t('project.sources.sourceActions', { name: source.name })
+                  "
                   variant="outline"
                   size="icon-sm"
                   :disabled="isMutating"
@@ -227,7 +237,7 @@ function badgeClass(
               <DropdownMenuContent align="end">
                 <DropdownMenuItem @select="emit('openSource', source.uid)">
                   <ExternalLink class="size-4" />
-                  Open source
+                  {{ t("project.sources.openSource") }}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -235,7 +245,7 @@ function badgeClass(
                   @select="emit('unbindSource', source.uid)"
                 >
                   <Unlink class="size-4" />
-                  Unbind
+                  {{ t("project.sources.unbind") }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -243,7 +253,7 @@ function badgeClass(
         </TableRow>
         <TableRow v-if="sources.length === 0">
           <TableCell colspan="6" class="h-28 text-center text-(--text-faint)">
-            No linked sources yet.
+            {{ t("project.sources.empty") }}
           </TableCell>
         </TableRow>
       </TableBody>

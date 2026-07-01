@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive } from "vue";
+import { useI18n } from "vue-i18n";
 import { LayoutDashboard, Plus } from "@lucide/vue";
 
 import { Button } from "@/shared/components/ui/button";
@@ -26,6 +27,8 @@ const emit = defineEmits<{
   openGlobalSources: [];
   selectProject: [projectUid: string];
 }>();
+
+const { t } = useI18n();
 
 // Project 创建表单数据
 const form = reactive({
@@ -59,29 +62,28 @@ function submitCreate() {
         </div>
         <div class="grid gap-3">
           <h1 class="console-page-title max-w-2xl">
-            Create your first project
+            {{ t("project.landing.createFirst") }}
           </h1>
           <p class="console-page-subtitle max-w-2xl">
-            A project is the working scope for linked sources, deployed widgets,
-            visitor-facing model settings, and project-scoped RAG testing.
+            {{ t("project.landing.intro") }}
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <Button
             type="button"
-            aria-label="Create project"
+            :aria-label="t('project.landing.createProject')"
             :disabled="isSubmitting"
             @click="submitCreate"
           >
-            Create project
+            {{ t("project.landing.createProject") }}
           </Button>
           <Button
             type="button"
-            aria-label="Open global sources"
+            :aria-label="t('project.sources.openGlobalSources')"
             variant="outline"
             @click="emit('openGlobalSources')"
           >
-            Global sources
+            {{ t("project.landing.globalSources") }}
           </Button>
         </div>
       </div>
@@ -89,10 +91,14 @@ function submitCreate() {
       <!-- 有项目时的项目列表主页 -->
       <div v-else class="grid gap-5">
         <div class="grid gap-2">
-          <p class="console-kicker">Projects</p>
-          <h1 class="console-page-title">Project home</h1>
+          <p class="console-kicker">
+            {{ t("project.landing.projectsKicker") }}
+          </p>
+          <h1 class="console-page-title">
+            {{ t("project.landing.projectHome") }}
+          </h1>
           <p class="console-page-subtitle">
-            Choose an existing project or create a new workspace.
+            {{ t("project.landing.projectHomeNote") }}
           </p>
         </div>
 
@@ -103,7 +109,9 @@ function submitCreate() {
             :key="project.uid"
             type="button"
             class="grid gap-1 rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-panel) p-4 text-left transition hover:border-(--line) hover:bg-(--surface-hover)"
-            :aria-label="`Open ${project.name}`"
+            :aria-label="
+              t('project.landing.openProject', { name: project.name })
+            "
             @click="emit('selectProject', project.uid)"
           >
             <span class="flex items-center gap-2 text-sm font-semibold">
@@ -111,7 +119,7 @@ function submitCreate() {
               {{ project.name }}
             </span>
             <span class="line-clamp-2 text-xs leading-5 text-(--text-faint)">
-              {{ project.description ?? "No description yet." }}
+              {{ project.description ?? t("common.empty.noDescription") }}
             </span>
           </button>
         </div>
@@ -121,32 +129,38 @@ function submitCreate() {
     <!-- 右侧项目详情配置面板 -->
     <aside class="console-panel grid gap-4 p-5">
       <div class="grid gap-1">
-        <h2 class="console-panel-title">Project Create</h2>
-        <p class="console-panel-note">Minimal fields for MVP creation</p>
+        <h2 class="console-panel-title">
+          {{ t("project.landing.createTitle") }}
+        </h2>
+        <p class="console-panel-note">
+          {{ t("project.landing.createNote") }}
+        </p>
       </div>
       <!-- 项目名称输入 -->
       <div class="grid gap-2">
-        <Label for="project-name">Project name</Label>
+        <Label for="project-name">{{ t("project.landing.nameLabel") }}</Label>
         <Input
           id="project-name"
           v-model="form.name"
-          placeholder="Docs Assistant"
+          :placeholder="t('project.landing.namePlaceholder')"
         />
         <p class="text-xs leading-5 text-(--text-faint)">
-          Must be unique. It appears in the sidebar project selector.
+          {{ t("project.landing.nameHelp") }}
         </p>
       </div>
       <!-- 项目描述输入 -->
       <div class="grid gap-2">
-        <Label for="project-description">Description</Label>
+        <Label for="project-description">
+          {{ t("project.landing.descriptionLabel") }}
+        </Label>
         <Textarea
           id="project-description"
           v-model="form.description"
           class="min-h-28"
-          placeholder="Answers questions from product documentation and release notes."
+          :placeholder="t('project.landing.descriptionPlaceholder')"
         />
         <p class="text-xs leading-5 text-(--text-faint)">
-          Optional. Keep it short enough to scan in project overview.
+          {{ t("project.landing.descriptionHelp") }}
         </p>
       </div>
       <!-- 提示信息 -->
@@ -156,11 +170,10 @@ function submitCreate() {
         <span class="bg-primary mt-1 size-2 rounded-full"></span>
         <div>
           <strong class="text-sm text-(--text-strong)">
-            Provider and sources can be configured later
+            {{ t("project.landing.setupLaterTitle") }}
           </strong>
           <p class="mt-1 text-xs leading-5 text-(--text-muted)">
-            Project creation should not block on model provider, widget, or
-            source setup.
+            {{ t("project.landing.setupLaterBody") }}
           </p>
         </div>
       </div>
@@ -173,19 +186,23 @@ function submitCreate() {
       <div class="flex justify-end gap-2">
         <Button
           type="button"
-          aria-label="Cancel project creation"
+          :aria-label="t('project.landing.cancelCreate')"
           variant="outline"
           :disabled="isSubmitting"
         >
-          Cancel
+          {{ t("common.actions.cancel") }}
         </Button>
         <Button
           type="button"
-          aria-label="Create project from details"
+          :aria-label="t('project.landing.createFromDetails')"
           :disabled="isSubmitting"
           @click="submitCreate"
         >
-          {{ isSubmitting ? "Creating" : "Create" }}
+          {{
+            isSubmitting
+              ? t("project.landing.creating")
+              : t("common.actions.create")
+          }}
         </Button>
       </div>
     </aside>

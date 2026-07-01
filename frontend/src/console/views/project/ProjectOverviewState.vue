@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { BadgeCheck, CircleAlert } from "@lucide/vue";
 
 import { Badge } from "@/shared/components/ui/badge";
@@ -20,6 +21,8 @@ const props = defineProps<{
   workspace: ProjectWorkspaceViewModel;
 }>();
 
+const { t } = useI18n();
+
 defineEmits<{
   createWidget: [input: ProjectWidgetCreate];
   deleteWidget: [widgetUid: string];
@@ -36,8 +39,8 @@ const healthBadge = computed(() => {
   );
 
   return hasWarning
-    ? { label: "Review", tone: "warning" as const }
-    : { label: "Ready", tone: "success" as const };
+    ? { label: t("project.overview.review"), tone: "warning" as const }
+    : { label: t("project.overview.ready"), tone: "success" as const };
 });
 
 // metric 提示 dot 样式定义
@@ -81,11 +84,11 @@ function badgeToneClass(tone: ProjectHealthItem["tone"]): string {
     <!-- 页面头部 -->
     <header class="console-page-head">
       <p class="console-kicker">{{ workspace.project.name }}</p>
-      <h1 class="console-page-title">Project</h1>
+      <h1 class="console-page-title">{{ t("project.overview.title") }}</h1>
       <p class="console-page-subtitle">
         {{
           workspace.project.description ??
-          "Project workspace for deployed widgets, linked sources, and visitor-facing RAG configuration."
+          t("project.overview.fallbackDescription")
         }}
       </p>
     </header>
@@ -117,9 +120,11 @@ function badgeToneClass(tone: ProjectHealthItem["tone"]): string {
     <section class="console-panel">
       <div class="console-panel-header">
         <div class="grid gap-1">
-          <h2 class="console-panel-title">Project health</h2>
+          <h2 class="console-panel-title">
+            {{ t("project.overview.healthTitle") }}
+          </h2>
           <p class="console-panel-note">
-            Current setup signals from available backend resources
+            {{ t("project.overview.healthNote") }}
           </p>
         </div>
         <Badge :class="badgeToneClass(healthBadge.tone)">
@@ -167,9 +172,11 @@ function badgeToneClass(tone: ProjectHealthItem["tone"]): string {
     <section class="console-section">
       <div class="console-section-head">
         <div>
-          <h2 class="console-section-title">Linked sources</h2>
+          <h2 class="console-section-title">
+            {{ t("project.sources.title") }}
+          </h2>
           <p class="console-section-note">
-            Bind existing global sources to this project.
+            {{ t("project.sources.note") }}
           </p>
         </div>
       </div>
@@ -188,9 +195,11 @@ function badgeToneClass(tone: ProjectHealthItem["tone"]): string {
     <section class="console-section">
       <div class="console-section-head">
         <div>
-          <h2 class="console-section-title">Widget deployments</h2>
+          <h2 class="console-section-title">
+            {{ t("project.widgets.title") }}
+          </h2>
           <p class="console-section-note">
-            Manage widget origins used by visitor CORS checks.
+            {{ t("project.widgets.note") }}
           </p>
         </div>
       </div>

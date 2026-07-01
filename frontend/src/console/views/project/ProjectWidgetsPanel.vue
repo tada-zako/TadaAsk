@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Ellipsis, Pencil, Plus, Trash2 } from "@lucide/vue";
 
 import { Button } from "@/shared/components/ui/button";
@@ -47,6 +48,7 @@ const emit = defineEmits<{
   updateWidget: [input: { widgetUid: string; payload: ProjectWidgetUpdate }];
 }>();
 
+const { t } = useI18n();
 const createDialogOpen = ref(false);
 const editDialogOpen = ref(false);
 const editingWidgetUid = ref<string | null>(null);
@@ -113,61 +115,69 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
       class="flex min-h-12 items-center justify-between gap-4 border-b border-(--line-soft) px-4 max-[760px]:items-start max-[760px]:py-3"
     >
       <p class="text-xs text-(--text-faint)">
-        {{ widgets.length }} deployments
+        {{ t("project.widgets.deploymentCount", { count: widgets.length }) }}
       </p>
       <!-- 创建 Widget 对话框 -->
       <Dialog v-model:open="createDialogOpen">
         <DialogTrigger as-child>
           <Button
             type="button"
-            aria-label="Create widget"
+            :aria-label="t('project.widgets.createWidget')"
             size="sm"
             :disabled="isMutating"
           >
             <Plus class="size-4" />
-            Create
+            {{ t("common.actions.create") }}
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create widget</DialogTitle>
+            <DialogTitle>{{
+              t("project.widgets.dialogCreateTitle")
+            }}</DialogTitle>
             <DialogDescription>
-              Creates a ProjectWidget deployment instance.
+              {{ t("project.widgets.dialogCreateDescription") }}
             </DialogDescription>
           </DialogHeader>
           <div class="grid gap-4">
             <!-- Widget 名称 -->
             <div class="grid gap-2">
-              <Label for="widget-name">Widget name</Label>
+              <Label for="widget-name">
+                {{ t("project.widgets.nameLabel") }}
+              </Label>
               <Input
                 id="widget-name"
                 v-model="createForm.name"
-                placeholder="Docs production"
+                :placeholder="t('project.widgets.namePlaceholder')"
               />
             </div>
             <!-- 部署站点域名 -->
             <div class="grid gap-2">
-              <Label for="site-origin">Site origin</Label>
+              <Label for="site-origin">
+                {{ t("project.widgets.siteOriginLabel") }}
+              </Label>
               <Input
                 id="site-origin"
                 v-model="createForm.siteOrigin"
-                placeholder="https://docs.example.com"
+                :placeholder="t('project.widgets.siteOriginPlaceholder')"
               />
               <p class="text-muted-foreground text-xs leading-5">
-                Normalized origin used by project/widget scoped CORS checks.
+                {{ t("project.widgets.siteOriginHelp") }}
               </p>
             </div>
             <!-- 启用状态开关 -->
             <div class="flex items-start gap-3">
               <Switch
                 :model-value="createForm.isEnabled"
-                aria-label="Enable widget after creation"
+                :aria-label="t('project.widgets.enableAfterCreation')"
                 @update:model-value="createForm.isEnabled = Boolean($event)"
               />
               <div class="grid gap-1">
-                <strong class="text-sm">Enabled</strong>
+                <strong class="text-sm">{{
+                  t("project.widgets.enabled")
+                }}</strong>
                 <span class="text-muted-foreground text-xs">
-                  Visitor widget requests are allowed from this origin.
+                  {{ t("project.widgets.enabledHelp") }}
                 </span>
               </div>
             </div>
@@ -175,19 +185,19 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
           <DialogFooter>
             <Button
               type="button"
-              aria-label="Cancel widget creation"
+              :aria-label="t('project.widgets.cancelCreate')"
               variant="outline"
               @click="createDialogOpen = false"
             >
-              Cancel
+              {{ t("common.actions.cancel") }}
             </Button>
             <Button
               type="button"
-              aria-label="Confirm create widget"
+              :aria-label="t('project.widgets.confirmCreate')"
               :disabled="isMutating"
               @click="submitCreate"
             >
-              Create
+              {{ t("common.actions.create") }}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -198,12 +208,14 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
     <Table class="console-scrollbar">
       <TableHeader>
         <TableRow>
-          <TableHead>Widget</TableHead>
-          <TableHead>Site origin</TableHead>
-          <TableHead>Enabled</TableHead>
-          <TableHead>Created</TableHead>
-          <TableHead>Updated</TableHead>
-          <TableHead class="w-16 text-right">Actions</TableHead>
+          <TableHead>{{ t("project.widgets.table.widget") }}</TableHead>
+          <TableHead>{{ t("project.widgets.table.siteOrigin") }}</TableHead>
+          <TableHead>{{ t("project.widgets.table.enabled") }}</TableHead>
+          <TableHead>{{ t("project.widgets.table.created") }}</TableHead>
+          <TableHead>{{ t("project.widgets.table.updated") }}</TableHead>
+          <TableHead class="w-16 text-right">
+            {{ t("project.widgets.table.actions") }}
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -215,7 +227,9 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
           <TableCell>
             <Switch
               :model-value="widget.isEnabled"
-              :aria-label="`${widget.name} widget enabled`"
+              :aria-label="
+                t('project.widgets.widgetEnabled', { name: widget.name })
+              "
               :disabled="isMutating"
               @update:model-value="toggleWidget(widget, Boolean($event))"
             />
@@ -227,7 +241,9 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
               <DropdownMenuTrigger as-child>
                 <Button
                   type="button"
-                  :aria-label="`${widget.name} widget actions`"
+                  :aria-label="
+                    t('project.widgets.widgetActions', { name: widget.name })
+                  "
                   variant="outline"
                   size="icon-sm"
                   :disabled="isMutating"
@@ -238,7 +254,7 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem @select="openEdit(widget)">
                   <Pencil class="size-4" />
-                  Edit
+                  {{ t("common.actions.edit") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   @select="toggleWidget(widget, !widget.isEnabled)"
@@ -251,7 +267,7 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
                   @select="emit('deleteWidget', widget.uid)"
                 >
                   <Trash2 class="size-4" />
-                  Delete
+                  {{ t("common.actions.delete") }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -259,7 +275,7 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
         </TableRow>
         <TableRow v-if="widgets.length === 0">
           <TableCell colspan="6" class="h-28 text-center text-(--text-faint)">
-            No widget deployments yet.
+            {{ t("project.widgets.empty") }}
           </TableCell>
         </TableRow>
       </TableBody>
@@ -269,30 +285,36 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
     <Dialog v-model:open="editDialogOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit widget</DialogTitle>
+          <DialogTitle>{{ t("project.widgets.dialogEditTitle") }}</DialogTitle>
           <DialogDescription>
-            Updates the widget deployment used by visitor CORS checks.
+            {{ t("project.widgets.dialogEditDescription") }}
           </DialogDescription>
         </DialogHeader>
         <div class="grid gap-4">
           <div class="grid gap-2">
-            <Label for="edit-widget-name">Widget name</Label>
+            <Label for="edit-widget-name">
+              {{ t("project.widgets.nameLabel") }}
+            </Label>
             <Input id="edit-widget-name" v-model="editForm.name" />
           </div>
           <div class="grid gap-2">
-            <Label for="edit-site-origin">Site origin</Label>
+            <Label for="edit-site-origin">
+              {{ t("project.widgets.siteOriginLabel") }}
+            </Label>
             <Input id="edit-site-origin" v-model="editForm.siteOrigin" />
           </div>
           <div class="flex items-start gap-3">
             <Switch
               :model-value="editForm.isEnabled"
-              aria-label="Edit widget enabled"
+              :aria-label="t('project.widgets.editEnabled')"
               @update:model-value="editForm.isEnabled = Boolean($event)"
             />
             <div class="grid gap-1">
-              <strong class="text-sm">Enabled</strong>
+              <strong class="text-sm">{{
+                t("project.widgets.enabled")
+              }}</strong>
               <span class="text-muted-foreground text-xs">
-                Visitor widget requests are allowed from this origin.
+                {{ t("project.widgets.enabledHelp") }}
               </span>
             </div>
           </div>
@@ -300,19 +322,19 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
         <DialogFooter>
           <Button
             type="button"
-            aria-label="Cancel widget edit"
+            :aria-label="t('project.widgets.cancelEdit')"
             variant="outline"
             @click="editDialogOpen = false"
           >
-            Cancel
+            {{ t("common.actions.cancel") }}
           </Button>
           <Button
             type="button"
-            aria-label="Confirm edit widget"
+            :aria-label="t('project.widgets.confirmEdit')"
             :disabled="isMutating"
             @click="submitEdit"
           >
-            Save
+            {{ t("common.actions.save") }}
           </Button>
         </DialogFooter>
       </DialogContent>

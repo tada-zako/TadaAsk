@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 
 import {
@@ -22,6 +23,7 @@ import ProjectOverviewState from "./ProjectOverviewState.vue";
 
 const route = useRoute();
 const router = useRouter();
+const { locale, t } = useI18n();
 const projectStore = useProjectStore();
 const {
   errorMessage: storeErrorMessage,
@@ -39,7 +41,9 @@ const actionMessage = ref<string | null>(null);
 
 const routeProjectUid = computed(() => getProjectUidFromRoute());
 const routeErrorMessage = computed(() =>
-  route.query.error === "project-not-found" ? "Project not found." : null,
+  route.query.error === "project-not-found"
+    ? t("common.errors.projectNotFound")
+    : null,
 );
 
 onMounted(async () => {
@@ -52,6 +56,14 @@ watch(
     await handleProjectRoute(routeProjectUid.value);
   },
 );
+
+watch(locale, async () => {
+  // service 内部存在展示文案相关的逻辑；
+  // 需要在语言切换时主动刷新 workspace view model。
+  if (routeProjectUid.value && workspace.value) {
+    await refreshWorkspace(routeProjectUid.value);
+  }
+});
 
 /**
  * 根据 path param 决定渲染 landing 或 overview。
@@ -80,7 +92,7 @@ async function handleProjectRoute(projectUid: string | null) {
   } catch (error) {
     pageErrorMessage.value = getErrorMessage(
       error,
-      "Unable to load project page.",
+      t("common.errors.projectPageLoadFailed"),
     );
   } finally {
     isInitialLoading.value = false;
@@ -108,7 +120,7 @@ async function refreshWorkspace(projectUid = routeProjectUid.value) {
 // 创建 project 操作
 async function handleCreateProject(input: CreateProjectInput) {
   if (!input.name.trim()) {
-    actionMessage.value = "Project name is required.";
+    actionMessage.value = t("common.errors.projectNameRequired");
     return;
   }
 
@@ -118,7 +130,10 @@ async function handleCreateProject(input: CreateProjectInput) {
   try {
     await projectStore.createProject(input);
   } catch (error) {
-    actionMessage.value = getErrorMessage(error, "Unable to create project.");
+    actionMessage.value = getErrorMessage(
+      error,
+      t("project.service.errors.createProject"),
+    );
   } finally {
     isMutating.value = false;
   }
@@ -176,7 +191,7 @@ async function handleDeleteWidget(widgetUid: string) {
     return;
   }
 
-  const shouldDelete = window.confirm("Delete this widget deployment?");
+  const shouldDelete = window.confirm(t("project.widgets.deleteConfirm"));
   if (!shouldDelete) {
     return;
   }
@@ -214,14 +229,17 @@ async function runProjectMutation(action: () => Promise<void>) {
     // 写操作后统一刷新，确保 metrics/health/table rows 同步。
     await refreshWorkspace();
   } catch (error) {
-    actionMessage.value = getErrorMessage(error, "Project action failed.");
+    actionMessage.value = getErrorMessage(
+      error,
+      t("common.errors.projectActionFailed"),
+    );
   } finally {
     isMutating.value = false;
   }
 }
 
 async function redirectToProjectLanding() {
-  projectStore.clearSelection("Project not found.");
+  projectStore.clearSelection(t("common.errors.projectNotFound"));
   workspace.value = null;
   await router.replace({
     name: "project-landing",
@@ -298,10 +316,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
   </section>
 
   <section v-else class="console-panel grid gap-3 p-6">
-    <h1 class="console-panel-title">Project unavailable</h1>
+    <h1 class="console-panel-title">
+      {{ t("project.overview.unavailableTitle") }}
+    </h1>
     <p class="console-panel-note">
-      The selected project could not be loaded. Choose another project from the
-      sidebar.
+      {{ t("project.overview.unavailableBody") }}
     </p>
   </section>
 </template>
