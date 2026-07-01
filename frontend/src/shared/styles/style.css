@@ -192,6 +192,7 @@
 
 @layer components {
   .console-scrollbar {
+    scrollbar-gutter: stable;
     scrollbar-color: var(--line-strong) transparent;
     scrollbar-width: thin;
   }

@@ -242,11 +242,11 @@ function getProjectUidFromRoute(): string | null {
     <nav
       class="console-scrollbar grid min-h-0 flex-1 content-start gap-5 overflow-y-auto pb-4"
     >
-      <!-- 项目管理模块 -->
       <section class="grid gap-1">
         <p class="mx-2 h-2 text-[10px] text-transparent uppercase select-none">
           {{ t("shell.sidebar.project") }}
         </p>
+        <!-- 项目管理模块 -->
         <a
           class="console-nav-link console-nav-link-active max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"
@@ -254,31 +254,48 @@ function getProjectUidFromRoute(): string | null {
         >
           <LayoutDashboard class="text-primary size-4" />
           <span class="min-w-0 flex-1 max-[1180px]:hidden">
-            {{ t("shell.sidebar.project") }}
+            {{
+              selectedProject
+                ? t("shell.sidebar.overview")
+                : t("shell.sidebar.project")
+            }}
           </span>
           <ChevronDown
-            class="text-muted-foreground size-4 max-[1180px]:hidden"
+            class="size-4 text-(--text-faint) transition duration-150 max-[1180px]:hidden"
+            :class="selectedProject ? 'opacity-100' : 'opacity-0'"
           />
         </a>
         <!-- 子导航 -->
-        <div
-          class="ml-7 grid gap-1 border-l border-(--line-soft) pl-2 max-[1180px]:hidden"
+        <Transition
+          enter-active-class="overflow-hidden transition-[max-height,opacity,transform] duration-150 ease-out"
+          enter-from-class="max-h-0 -translate-y-1 opacity-0"
+          enter-to-class="max-h-20 translate-y-0 opacity-100"
+          leave-active-class="overflow-hidden transition-[max-height,opacity,transform] duration-150 ease-in"
+          leave-from-class="max-h-20 translate-y-0 opacity-100"
+          leave-to-class="max-h-0 -translate-y-1 opacity-0"
         >
-          <a
-            class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
-            href="#"
-            @click.prevent="openProjectChild('ask')"
+          <div
+            v-if="selectedProject"
+            class="ml-7 grid gap-1 border-l border-(--line-soft) pl-2 max-[1180px]:hidden"
           >
-            {{ t("shell.sidebar.ask") }}
-          </a>
-          <a
-            class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
-            href="#"
-            @click.prevent="openProjectChild('settings')"
-          >
-            {{ t("shell.sidebar.settings") }}
-          </a>
-        </div>
+            <a
+              class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
+              href="#"
+              @click.prevent="openProjectChild('ask')"
+            >
+              {{ t("shell.sidebar.ask") }}
+            </a>
+            <a
+              class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
+              href="#"
+              @click.prevent="openProjectChild('settings')"
+            >
+              {{ t("shell.sidebar.settings") }}
+            </a>
+          </div>
+        </Transition>
+
+        <!-- 全局 chat item -->
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
           href="#"

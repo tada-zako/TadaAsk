@@ -56,6 +56,7 @@ export const en = {
       newProject: "New project",
       returnProjectLanding: "Return to project landing",
       project: "Project",
+      overview: "Overview",
       ask: "Ask",
       settings: "Settings",
       chat: "Chat",
