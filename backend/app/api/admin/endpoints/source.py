@@ -10,6 +10,7 @@ from fastapi import (
     Body,
     HTTPException,
     status,
+    Header,
 )
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from loguru import logger
@@ -20,9 +21,15 @@ from ...deps import (
     SourceItemServiceDeps,
     SourceItemUploadServiceDeps,
     WebCrawlSyncServiceDeps,
-    SourceItemIndexingServiceDeps,
+    IndexingJobManagerDeps,
 )
-from ...schemas import IngestPausedResponse, SourceItemDeleteResponse
+from ...schemas import (
+    IngestPausedResponse,
+    SourceItemDeleteResponse,
+    IndexingJobStartResponse,
+    IndexingJobRead,
+    ActiveIndexingJobResponse,
+)
 from app.db.models import Source, SourceItem
 from app.db.schemas import (
     SourceCreate,
@@ -451,29 +458,82 @@ async def sync_web_crawl(
 
 
 # TODO: 缺少文件存在验证，如果用户上传了相同的文件，应该复用已经存在的文件
-@router.post("/{source_uid}/document/indexing", response_class=EventSourceResponse)
+@router.post(
+    "/{source_uid}/document/indexing",
+    response_model=IndexingJobStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def indexing_documents(
     source_uid: Annotated[str, Depends(valid_source_uid)],
     source_item_uids: Annotated[
         list[str],
         Depends(valid_source_item_uids),
     ],
-    source_item_indexing_service: SourceItemIndexingServiceDeps,
-) -> AsyncIterable[ServerSentEvent]:
+    indexing_job_manager: IndexingJobManagerDeps,
+) -> IndexingJobStartResponse:
     """
-    解析文档
+    创建 index 任务
     """
-    async for event in source_item_indexing_service.ingest_source_items(
+    job = await indexing_job_manager.start_job(
         source_uid=source_uid,
         source_item_uids=source_item_uids,
+    )
+
+    return IndexingJobStartResponse(
+        job_uid=job.job_uid,
+        source_uid=job.source_uid,
+        source_item_uids=job.source_item_uids,
+        status=job.status,
+    )
+
+
+@router.get(
+    "/{source_uid}/document/indexing/jobs/{job_uid}/events",
+    response_class=EventSourceResponse,
+)
+async def stream_indexing_job_events(
+    source_uid: Annotated[str, Depends(valid_source_uid)],
+    job_uid: str,
+    indexing_job_manager: IndexingJobManagerDeps,
+    last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
+) -> AsyncIterable[ServerSentEvent]:
+    """Indexing job SSE 观察接口"""
+    job = indexing_job_manager.get_job(job_uid)
+    if not job or job.source_uid != source_uid:
+        # 验证 job_uid
+        raise HTTPException(status_code=404, detail="Indexing job not found")
+
+    # 从 Last-Event-ID 头部获取上次事件的 sequence
+    after_sequence = int(last_event_id or 0)
+
+    # 订阅 job 事件流，并持续输出 SSE
+    async for stored in indexing_job_manager.subscribe(
+        job_uid=job_uid,
+        after_sequence=after_sequence,
     ):
         yield ServerSentEvent(
-            event=event.event,
-            data=event.model_dump_json(
-                exclude={"event"},
-                by_alias=True,
-            ),
+            id=str(stored.sequence),
+            event=stored.event.event,
+            data=stored.event.model_dump_json(exclude={"event"}, by_alias=True),
         )
+
+
+@router.get(
+    "/{source_uid}/document/indexing/jobs/active",
+    response_model=ActiveIndexingJobResponse,
+)
+async def get_active_indexing_job(
+    source_uid: Annotated[str, Depends(valid_source_uid)],
+    indexing_job_manager: IndexingJobManagerDeps,
+) -> ActiveIndexingJobResponse:
+    """获取当前 source 对应的 job"""
+    job = indexing_job_manager.get_active_job_by_source(source_uid=source_uid)
+
+    job_read = IndexingJobRead.model_validate(job) if job else None
+
+    return ActiveIndexingJobResponse(
+        job=job_read,
+    )
 
 
 @router.post("/{source_uid}/document/pause", response_model=list[IngestPausedResponse])

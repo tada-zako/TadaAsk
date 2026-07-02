@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
 
@@ -7,6 +9,7 @@ from app.core.constants import (
     IngestStage,
     RAGSyncEventType,
     SourceProcessStatus,
+    IndexingJobStatus,
 )
 from app.db.schemas import HybridSearchResult, HybridSearchRequest, SourceItemRead
 from app.services import SearchDebugInfo
@@ -213,6 +216,42 @@ class RAGSyncEvent(BaseModel):
     model_config = ConfigDict(
         alias_generator=to_camel,
         validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class IndexingJobStartResponse(BaseModel):
+    """Indexing job 启动响应结构体"""
+
+    job_uid: str
+    source_uid: str
+    source_item_uids: list[str]
+    status: IndexingJobStatus
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class IndexingJobRead(IndexingJobStartResponse):
+    """Indexing job 读取结构体"""
+
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    error: str | None = None
+
+
+class ActiveIndexingJobResponse(BaseModel):
+    """Active indexing job 响应结构体；
+    允许为 None, 表示当前 source 未进行 indexing"""
+
+    job: IndexingJobRead | None = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
         validate_by_name=True,
     )
 
