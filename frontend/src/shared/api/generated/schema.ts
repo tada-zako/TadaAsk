@@ -267,6 +267,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/source/{source_uid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Source
+         * @description 获取 source 详情
+         */
+        get: operations["get_source_admin_source__source_uid__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Source
+         * @description 删除 source，并清理向量集合、本地文件和级联数据库记录。
+         */
+        delete: operations["delete_source_admin_source__source_uid__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Source
+         * @description 更新 source 基础配置；webCrawlConfig 更新后会重置 source status。
+         */
+        patch: operations["update_source_admin_source__source_uid__patch"];
+        trace?: never;
+    };
     "/admin/source/{source_uid}/items/upload": {
         parameters: {
             query?: never;
@@ -330,6 +358,30 @@ export interface paths {
          * @description 删除 source item，并清理对应的向量与文件对象
          */
         delete: operations["delete_source_item_admin_source__source_uid__items__source_item_uid__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename Source Item
+         * @description 重命名 source item 展示字段，不修改 storage_key 或物理文件。
+         */
+        patch: operations["rename_source_item_admin_source__source_uid__items__source_item_uid__patch"];
+        trace?: never;
+    };
+    "/admin/source/{source_uid}/items/{source_item_uid}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Source Item Download
+         * @description 获取 local file source item 的下载地址；web crawl 暂不支持下载。
+         */
+        get: operations["get_source_item_download_admin_source__source_uid__items__source_item_uid__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1688,6 +1740,29 @@ export interface components {
             webCrawlConfig?: components["schemas"]["WebCrawlConfig-Input"] | null;
         };
         /**
+         * SourceDeleteResponse
+         * @description Source 删除响应结构体
+         */
+        SourceDeleteResponse: {
+            /** Sourceuid */
+            sourceUid: string;
+            /**
+             * Status
+             * @default deleted
+             */
+            status: string;
+            /** Deletedsourceitemcount */
+            deletedSourceItemCount: number;
+            /** Filedeletedcount */
+            fileDeletedCount: number;
+            /** Filedeletefailedcount */
+            fileDeleteFailedCount: number;
+            /** Vectorcollectiondeleted */
+            vectorCollectionDeleted: boolean;
+            /** Cleanuperrors */
+            cleanupErrors?: string[];
+        };
+        /**
          * SourceItemDeleteResponse
          * @description Source item 删除响应结构体
          */
@@ -1700,6 +1775,20 @@ export interface components {
             deletedVectorCount: number;
             /** Filedeleted */
             fileDeleted: boolean;
+        };
+        /**
+         * SourceItemDownloadResponse
+         * @description Source item 下载响应结构体
+         */
+        SourceItemDownloadResponse: {
+            /** Sourceuid */
+            sourceUid: string;
+            /** Sourceitemuid */
+            sourceItemUid: string;
+            /** Downloadurl */
+            downloadUrl: string;
+            /** Filename */
+            filename: string;
         };
         /**
          * SourceItemProcessStatus
@@ -1742,6 +1831,11 @@ export interface components {
              * Format: date-time
              */
             createdAt: string;
+        };
+        /** SourceItemRenameRequest */
+        SourceItemRenameRequest: {
+            /** Title */
+            title: string;
         };
         /**
          * SourceProcessStatus
@@ -1788,6 +1882,18 @@ export interface components {
          * @enum {string}
          */
         SourceType: "local_file" | "web_crawl" | "github_repo" | "custom_content";
+        /**
+         * SourceUpdate
+         * @description Source 更新 schema
+         */
+        SourceUpdate: {
+            /** Sourcename */
+            sourceName?: string | null;
+            /** Ispublic */
+            isPublic?: boolean | null;
+            /** @description Configuration for web crawling; only accepted by web_crawl sources */
+            webCrawlConfig?: components["schemas"]["WebCrawlConfig-Input"] | null;
+        };
         /** @enum {string} */
         ThinkingEffort: "minimal" | "low" | "medium" | "high" | "xhigh";
         ThinkingLevel: boolean | components["schemas"]["ThinkingEffort"];
@@ -2698,12 +2804,112 @@ export interface operations {
             };
         };
     };
+    get_source_admin_source__source_uid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Source UID */
+                source_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_source_admin_source__source_uid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Source UID */
+                source_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceDeleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_source_admin_source__source_uid__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Source UID */
+                source_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_source_item_admin_source__source_uid__items_upload_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Project UID */
+                /** @description Source UID */
                 source_uid: string;
             };
             cookie?: never;
@@ -2742,7 +2948,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Project UID */
+                /** @description Source UID */
                 source_uid: string;
             };
             cookie?: never;
@@ -2774,7 +2980,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Project UID */
+                /** @description Source UID */
                 source_uid: string;
                 /** @description 数据项 UID */
                 source_item_uid: string;
@@ -2803,12 +3009,84 @@ export interface operations {
             };
         };
     };
+    rename_source_item_admin_source__source_uid__items__source_item_uid__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Source UID */
+                source_uid: string;
+                /** @description 数据项 UID */
+                source_item_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceItemRenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_source_item_download_admin_source__source_uid__items__source_item_uid__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Source UID */
+                source_uid: string;
+                /** @description 数据项 UID */
+                source_item_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceItemDownloadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     sync_web_crawl_admin_source__source_uid__crawl_sync_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description Project UID */
+                /** @description Source UID */
                 source_uid: string;
             };
             cookie?: never;
@@ -2840,7 +3118,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Project UID */
+                /** @description Source UID */
                 source_uid: string;
             };
             cookie?: never;
@@ -2960,7 +3238,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Project UID */
+                /** @description Source UID */
                 source_uid: string;
             };
             cookie?: never;
@@ -2996,7 +3274,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Project UID */
+                /** @description Source UID */
                 source_uid: string;
             };
             cookie?: never;
