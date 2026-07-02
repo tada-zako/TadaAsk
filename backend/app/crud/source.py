@@ -207,8 +207,8 @@ class SourceCRUD:
             return existing_item
         else:
             # 创建新数据项
-            new_item = SourceItem(**item_data.model_dump())
-            source.source_items.append(new_item)
+            new_item = SourceItem(source_id=source.id, **item_data.model_dump())
+            self.session.add(new_item)
             await self.session.flush()  # 获取新数据项的完整字段
             return new_item
 
@@ -289,13 +289,22 @@ class SourceCRUD:
         await self.session.execute(stmt)
 
     async def claim_source_item_for_ingest(
-        self, *, source_uid: str, source_item_uid: str
+        self,
+        *,
+        source_uid: str,
+        source_item_uid: str,
+        allowed_statuses: list[SourceItemProcessStatus] | None = None,
     ) -> bool:
         """
         声明 source_item 进入 ingest 流程；
         确保并发请求同一个 source_item_uid 时，
         只有一个请求能成功 claim 到该数据项进行处理
         """
+        claim_statuses = allowed_statuses or [
+            SourceItemProcessStatus.PENDING,
+            SourceItemProcessStatus.PAUSED,
+            SourceItemProcessStatus.FAILED,
+        ]
         source_id_stmt = (
             select(Source.id).where(Source.uid == source_uid).scalar_subquery()
         )
@@ -304,13 +313,7 @@ class SourceCRUD:
             .where(
                 SourceItem.uid == source_item_uid,
                 SourceItem.source_id == (source_id_stmt),
-                SourceItem.status.in_(
-                    [
-                        SourceItemProcessStatus.PENDING,
-                        SourceItemProcessStatus.PAUSED,
-                        SourceItemProcessStatus.FAILED,
-                    ]
-                ),
+                SourceItem.status.in_(claim_statuses),
             )
             .values(status=SourceItemProcessStatus.PROCESSING)
         )

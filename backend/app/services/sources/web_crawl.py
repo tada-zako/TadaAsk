@@ -1,8 +1,9 @@
 import asyncio
+from dataclasses import asdict, dataclass
 from typing import AsyncIterable, cast
-from dataclasses import asdict
 
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ingestion.crawler import (
     WebCrawler,
@@ -16,7 +17,12 @@ from app.db.models import Source, SourceItem
 from app.db.schemas import WebCrawlConfig, SourceItemInternal, DocumentContentInternal
 from app.crud import SourceCRUD
 from app.api.schemas import RAGSyncCounters, RAGSyncEvent
-from app.core.constants import SourceItemProcessStatus, IngestStage, RAGSyncEventType
+from app.core.constants import (
+    SourceItemProcessStatus,
+    IngestStage,
+    RAGSyncEventType,
+    SourceType,
+)
 
 
 # ingest runner 并发控制
@@ -30,22 +36,43 @@ _INDEX_BUSY_STATUSES = {
 }
 
 
+@dataclass
+class CrawlWorkerDone:
+    """crawl worker 完成信号，用于避免失败 worker 导致主循环等待。"""
+
+
+@dataclass(frozen=True)
+class SourceRef:
+    """
+    后台任务使用的 source 轻量引用，避免跨 session 持有 ORM 对象
+    NOTE:
+        使用该 ref 是由于 WebCrawlSyncService.sync_source() 内部并不直接操作 Source 对象，
+        实际只有启动时的状态确认和 source.uid 的使用；使用 ref 可以减轻内部 IO 压力；
+        但是需要注意，sync_source() 内部会导致 source 数据改变，
+        如果后续需要直接使用 source 对象，需要确保避免状态不一致问题。
+    """
+
+    id: int
+    uid: str
+    source_type: SourceType
+
+
 class WebCrawlSyncService:
     def __init__(
         self,
         *,
-        source_crud: SourceCRUD,
+        session_factory: async_sessionmaker[AsyncSession],
         crawler: WebCrawler,
         html_parser: HTMLPageParser,
     ):
-        self.source_crud = source_crud
+        self.session_factory = session_factory
         self.crawler = crawler
         self.html_parser = html_parser
 
     async def sync_source(
         self,
         *,
-        source: Source,
+        source_uid: str,
         config: WebCrawlConfig,
     ) -> AsyncIterable[RAGSyncEvent]:
         """
@@ -62,10 +89,12 @@ class WebCrawlSyncService:
         counters = RAGSyncCounters()
         changed_source_item_uids: list[str] = []
 
+        source_ref = await self._load_web_crawl_source_ref(source_uid=source_uid)
+
         # 0. 发送开始事件
         yield RAGSyncEvent(
             event=RAGSyncEventType.SYNC_START,
-            source_uid=source.uid,
+            source_uid=source_ref.uid,
             ingest_stage=IngestStage.DISCOVERING,
             sync_progress=0.0,
             message="Web crawl materialization started",
@@ -73,7 +102,7 @@ class WebCrawlSyncService:
 
         # 1.0 加载历史爬取元数据
         previous_metadata_by_item_key = await self._load_previous_metadata_by_item_key(
-            source=source
+            source_ref=source_ref
         )
 
         # 1.1 discover URL
@@ -83,7 +112,7 @@ class WebCrawlSyncService:
         if not discovered_urls:
             yield RAGSyncEvent(
                 event=RAGSyncEventType.SYNC_COMPLETE,
-                source_uid=source.uid,
+                source_uid=source_ref.uid,
                 ingest_stage=IngestStage.COMPLETED,
                 sync_progress=1.0,
                 counters=counters,
@@ -95,14 +124,16 @@ class WebCrawlSyncService:
         for discovered in discovered_urls:
             yield RAGSyncEvent(
                 event=RAGSyncEventType.ITEM_DISCOVERED,
-                source_uid=source.uid,
+                source_uid=source_ref.uid,
                 ingest_stage=IngestStage.DISCOVERING,
                 message=f"Discovered URL: {discovered.discovered_url}",
                 counters=counters,
             )
 
         # 2.0 依次 fetch 页面
-        queue: asyncio.Queue[RAGSyncEvent | ParsedPage | FetchedPage] = asyncio.Queue()
+        queue: asyncio.Queue[
+            RAGSyncEvent | ParsedPage | FetchedPage | CrawlWorkerDone
+        ] = asyncio.Queue()
         semaphore = asyncio.Semaphore(WEB_CRAWL_INDEX_MAX_CONCURRENCY)
 
         # 2.1 定义 fetch worker
@@ -127,38 +158,46 @@ class WebCrawlSyncService:
                     await queue.put(
                         RAGSyncEvent(
                             event=RAGSyncEventType.ITEM_FAILED,
-                            source_uid=source.uid,
+                            source_uid=source_ref.uid,
                             ingest_stage=IngestStage.FAILED,
                             message=f"Failed to crawl page: {discovered.discovered_url}",
                             error=str(exc),
                             counters=counters,
                         )
                     )
+                finally:
+                    await queue.put(CrawlWorkerDone())
 
         # 2.2 创建 fetch worker 任务队列
         tasks = [asyncio.create_task(worker(url)) for url in discovered_urls]
-        completed_tasks = 0
+        completed_workers = 0
+        processed_results = 0
 
         # 3.0 处理 worker 结果
         try:
-            while completed_tasks < len(discovered_urls):
+            while completed_workers < len(discovered_urls):
                 result = await queue.get()
+
+                if isinstance(result, CrawlWorkerDone):
+                    # worker 任务完成
+                    completed_workers += 1
+                    continue
 
                 if isinstance(result, RAGSyncEvent):
                     # 输出 fetch/parse 过程中的事件
                     yield result
                     continue
 
-                completed_tasks += 1
+                processed_results += 1
 
                 # 处理成功 fetch + parse 的页面
                 synced_uid = await self._sync_crawled_page(
                     result=result,
-                    source=source,
+                    source_ref=source_ref,
                     counters=counters,
                 )
 
-                sync_progress = completed_tasks / len(discovered_urls)
+                sync_progress = processed_results / len(discovered_urls)
 
                 if synced_uid:
                     changed_source_item_uids.append(synced_uid)
@@ -166,7 +205,7 @@ class WebCrawlSyncService:
                     # 发送进度事件
                     yield RAGSyncEvent(
                         event=RAGSyncEventType.ITEM_UPSERTED,
-                        source_uid=source.uid,
+                        source_uid=source_ref.uid,
                         source_item_uid=synced_uid,
                         source_item_status=SourceItemProcessStatus.PENDING,
                         ingest_stage=IngestStage.UPSERTING,
@@ -179,7 +218,7 @@ class WebCrawlSyncService:
                 # 发送页面跳过事件
                 yield RAGSyncEvent(
                     event=RAGSyncEventType.ITEM_SKIPPED,
-                    source_uid=source.uid,
+                    source_uid=source_ref.uid,
                     ingest_stage=IngestStage.SKIPPED,
                     sync_progress=sync_progress,
                     message=f"Web page unchanged or skipped: {result.discovered_url}",
@@ -197,7 +236,7 @@ class WebCrawlSyncService:
         # 4. 发送完成事件
         yield RAGSyncEvent(
             event=RAGSyncEventType.SYNC_COMPLETE,
-            source_uid=source.uid,
+            source_uid=source_ref.uid,
             ingest_stage=IngestStage.COMPLETED,
             sync_progress=1.0,
             counters=counters,
@@ -243,7 +282,7 @@ class WebCrawlSyncService:
     async def _sync_crawled_page(
         self,
         *,
-        source: Source,
+        source_ref: SourceRef,
         result: ParsedPage | FetchedPage,
         counters: RAGSyncCounters,
     ) -> str | None:
@@ -258,7 +297,26 @@ class WebCrawlSyncService:
         - 如果 source_item 存在且页面未修改，则更新 metadata 并跳过 COMPLETED 状态的 source_item；对于其他状态的 source_item，更新状态为 PENDING
         - 如果 source_item 存在且页面已修改，则更新内容和 metadata，并标记为 PENDING
         """
-        existing_item = await self.source_crud.get_source_item_by_item_key(
+        async with self.session_factory() as session:
+            async with session.begin():
+                source_crud = SourceCRUD(session)
+                return await self._sync_crawled_page_with_crud(
+                    source_crud=source_crud,
+                    source=cast(Source, source_ref),
+                    result=result,
+                    counters=counters,
+                )
+
+    async def _sync_crawled_page_with_crud(
+        self,
+        *,
+        source_crud: SourceCRUD,
+        source: Source,
+        result: ParsedPage | FetchedPage,
+        counters: RAGSyncCounters,
+    ) -> str | None:
+        """在当前短事务内同步单个抓取结果。"""
+        existing_item = await source_crud.get_source_item_by_item_key(
             source=source,
             item_key=result.item_key,
         )
@@ -270,7 +328,7 @@ class WebCrawlSyncService:
             )  # 类型断言，确保 result 是 ParsedPage
 
             # 创建新 source_item，并标记为需要 index
-            source_item = await self.source_crud.upsert_source_item_by_item_key(
+            source_item = await source_crud.upsert_source_item_by_item_key(
                 source=source,
                 item_data=SourceItemInternal(
                     item_key=parsed_page.item_key,
@@ -284,7 +342,7 @@ class WebCrawlSyncService:
                 ),
             )
             # 创建 DocumentContent
-            await self.source_crud.upsert_document_content(
+            await source_crud.upsert_document_content(
                 source_item=source_item,
                 content_data=DocumentContentInternal(
                     content=parsed_page.parsed_document.text,
@@ -306,6 +364,7 @@ class WebCrawlSyncService:
         if isinstance(result, FetchedPage) and result.not_modified:
             # 更新 checked metadata
             await self._update_checked_metadata(
+                source_crud=source_crud,
                 source=source,
                 source_item=existing_item,
                 extra_metadata=WebPageMetadata(
@@ -333,6 +392,7 @@ class WebCrawlSyncService:
         if existing_item.item_hash == parsed_page.parsed_markdown_hash:
             # 更新 checked metadata
             await self._update_checked_metadata(
+                source_crud=source_crud,
                 source=source,
                 source_item=existing_item,
                 extra_metadata=WebPageMetadata(
@@ -349,7 +409,7 @@ class WebCrawlSyncService:
                 return None
 
             # 对于其他状态的 source_item，更新状态为 PENDING
-            await self.source_crud.update_source_item_status(
+            await source_crud.update_source_item_status(
                 source_item=existing_item,
                 new_status=SourceItemProcessStatus.PENDING,
             )
@@ -357,7 +417,7 @@ class WebCrawlSyncService:
             return existing_item.uid
 
         # 处理页面内容发生变化的 source_item
-        await self.source_crud.upsert_source_item_by_item_key(
+        await source_crud.upsert_source_item_by_item_key(
             source=source,
             item_data=SourceItemInternal(
                 item_key=parsed_page.item_key,
@@ -371,7 +431,7 @@ class WebCrawlSyncService:
             ),
         )
         # 更新 DocumentContent
-        await self.source_crud.upsert_document_content(
+        await source_crud.upsert_document_content(
             source_item=existing_item,
             content_data=DocumentContentInternal(
                 content=parsed_page.parsed_document.text,
@@ -391,23 +451,42 @@ class WebCrawlSyncService:
         return existing_item.uid
 
     async def _load_previous_metadata_by_item_key(
-        self, source: Source
+        self, source_ref: SourceRef
     ) -> dict[str, WebPageMetadata]:
         """加载指定 source 的历史爬取元数据"""
-        source_items = await self.source_crud.list_source_items_by_source_id(
-            source_id=source.id,
-            limit=10_000,  # NOTE: 这里会一次性加载所有的 source_item
-            offset=0,
-        )
+        async with self.session_factory() as session:
+            source_crud = SourceCRUD(session)
+            source_items = await source_crud.list_source_items_by_source_id(
+                source_id=source_ref.id,
+                limit=10_000,  # NOTE: 这里会一次性加载所有的 source_item
+                offset=0,
+            )
+
         # 将 source_item.metadata_json 转换为 item_key -> metadata 的字典
         return {
             item.item_key: WebPageMetadata.from_dict(item.metadata_json)
             for item in source_items
         }
 
+    async def _load_web_crawl_source_ref(self, *, source_uid: str) -> SourceRef:
+        """加载 source 轻量引用，并确认类型为 Web Crawl。"""
+        async with self.session_factory() as session:
+            source_crud = SourceCRUD(session)
+            source = await source_crud.get_source_by_uid(source_uid=source_uid)
+            if not source:
+                raise ValueError(f"Source not found: {source_uid}")
+            if source.source_type != SourceType.WEB_CRAWL:
+                raise ValueError("Source type does not support web crawl sync")
+            return SourceRef(
+                id=source.id,
+                uid=source.uid,
+                source_type=source.source_type,
+            )
+
     async def _update_checked_metadata(
         self,
         *,
+        source_crud: SourceCRUD,
         source: Source,
         source_item: SourceItem,
         extra_metadata: WebPageMetadata,
@@ -418,7 +497,7 @@ class WebCrawlSyncService:
             **asdict(extra_metadata),
         }
 
-        return await self.source_crud.upsert_source_item_by_item_key(
+        return await source_crud.upsert_source_item_by_item_key(
             source=source,
             item_data=SourceItemInternal(
                 item_key=source_item.item_key,
