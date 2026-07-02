@@ -1235,7 +1235,7 @@
                     "Source"
                 ],
                 "summary": "Sync Web Crawl",
-                "description": "触发 Web Crawl 同步操作，返回 SSE 流式事件",
+                "description": "创建 Web Crawl 同步任务",
                 "operationId": "sync_web_crawl_admin_source__source_uid__crawl_sync_post",
                 "security": [
                     {
@@ -1253,6 +1253,132 @@
                             "title": "Source Uid"
                         },
                         "description": "Project UID"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RAGJobStartResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/source/{source_uid}/document/indexing": {
+            "post": {
+                "tags": [
+                    "Admin",
+                    "Source"
+                ],
+                "summary": "Indexing Documents",
+                "description": "创建 index 任务",
+                "operationId": "indexing_documents_admin_source__source_uid__document_indexing_post",
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "source_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Project UID",
+                            "title": "Source Uid"
+                        },
+                        "description": "Project UID"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Body_indexing_documents_admin_source__source_uid__document_indexing_post"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RAGJobStartResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/source/jobs/{job_uid}/events": {
+            "get": {
+                "tags": [
+                    "Admin",
+                    "Source"
+                ],
+                "summary": "Stream Rag Job Events",
+                "description": "RAG job SSE 观察接口",
+                "operationId": "stream_rag_job_events_admin_source_jobs__job_uid__events_get",
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "job_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Job Uid"
+                        }
+                    },
+                    {
+                        "name": "Last-Event-ID",
+                        "in": "header",
+                        "required": false,
+                        "schema": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "null"
+                                }
+                            ],
+                            "title": "Last-Event-Id"
+                        }
                     }
                 ],
                 "responses": {
@@ -1294,15 +1420,43 @@
                 }
             }
         },
-        "/admin/source/{source_uid}/document/indexing": {
-            "post": {
+        "/admin/source/jobs/active": {
+            "get": {
                 "tags": [
                     "Admin",
                     "Source"
                 ],
-                "summary": "Indexing Documents",
-                "description": "解析文档",
-                "operationId": "indexing_documents_admin_source__source_uid__document_indexing_post",
+                "summary": "List Active Rag Jobs",
+                "description": "获取所有正在运行的 RAG job。",
+                "operationId": "list_active_rag_jobs_admin_source_jobs_active_get",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ActiveRAGJobsResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ]
+            }
+        },
+        "/admin/source/jobs/{job_uid}": {
+            "get": {
+                "tags": [
+                    "Admin",
+                    "Source"
+                ],
+                "summary": "Get Rag Job",
+                "description": "获取指定 RAG job 状态。",
+                "operationId": "get_rag_job_admin_source_jobs__job_uid__get",
                 "security": [
                     {
                         "OAuth2PasswordBearer": []
@@ -1310,49 +1464,22 @@
                 ],
                 "parameters": [
                     {
-                        "name": "source_uid",
+                        "name": "job_uid",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "description": "Project UID",
-                            "title": "Source Uid"
-                        },
-                        "description": "Project UID"
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Body_indexing_documents_admin_source__source_uid__document_indexing_post"
-                            }
+                            "title": "Job Uid"
                         }
                     }
-                },
+                ],
                 "responses": {
                     "200": {
                         "description": "Successful Response",
                         "content": {
-                            "text/event-stream": {
-                                "itemSchema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        },
-                                        "event": {
-                                            "type": "string"
-                                        },
-                                        "id": {
-                                            "type": "string"
-                                        },
-                                        "retry": {
-                                            "type": "integer",
-                                            "minimum": 0
-                                        }
-                                    }
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RAGJobRead"
                                 }
                             }
                         }
@@ -1442,7 +1569,7 @@
                     "Source"
                 ],
                 "summary": "Resume Ingest",
-                "description": "恢复文档解析",
+                "description": "创建恢复文档解析任务",
                 "operationId": "resume_ingest_admin_source__source_uid__document_resume_post",
                 "security": [
                     {
@@ -1473,27 +1600,12 @@
                     }
                 },
                 "responses": {
-                    "200": {
+                    "202": {
                         "description": "Successful Response",
                         "content": {
-                            "text/event-stream": {
-                                "itemSchema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "string"
-                                        },
-                                        "event": {
-                                            "type": "string"
-                                        },
-                                        "id": {
-                                            "type": "string"
-                                        },
-                                        "retry": {
-                                            "type": "integer",
-                                            "minimum": 0
-                                        }
-                                    }
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RAGJobStartResponse"
                                 }
                             }
                         }
@@ -2787,6 +2899,20 @@
     },
     "components": {
         "schemas": {
+            "ActiveRAGJobsResponse": {
+                "properties": {
+                    "jobs": {
+                        "items": {
+                            "$ref": "#/components/schemas/RAGJobRead"
+                        },
+                        "type": "array",
+                        "title": "Jobs"
+                    }
+                },
+                "type": "object",
+                "title": "ActiveRAGJobsResponse",
+                "description": "当前运行中的 RAG 后台任务列表。"
+            },
             "AdminChatCancelResponse": {
                 "properties": {
                     "sessionUid": {
@@ -4369,6 +4495,137 @@
                 ],
                 "title": "ProviderWithModelProfilesRead",
                 "description": "包含模型配置列表的 Provider 读取模型；对外接口使用"
+            },
+            "RAGJobRead": {
+                "properties": {
+                    "jobUid": {
+                        "type": "string",
+                        "title": "Jobuid"
+                    },
+                    "jobType": {
+                        "$ref": "#/components/schemas/RAGJobType"
+                    },
+                    "sourceUid": {
+                        "type": "string",
+                        "title": "Sourceuid"
+                    },
+                    "sourceItemUids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Sourceitemuids"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/RAGJobStatus"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "Createdat"
+                    },
+                    "startedAt": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Startedat"
+                    },
+                    "finishedAt": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Finishedat"
+                    },
+                    "error": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Error"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "jobUid",
+                    "jobType",
+                    "sourceUid",
+                    "status",
+                    "createdAt"
+                ],
+                "title": "RAGJobRead",
+                "description": "RAG 后台任务读取结构体"
+            },
+            "RAGJobStartResponse": {
+                "properties": {
+                    "jobUid": {
+                        "type": "string",
+                        "title": "Jobuid"
+                    },
+                    "jobType": {
+                        "$ref": "#/components/schemas/RAGJobType"
+                    },
+                    "sourceUid": {
+                        "type": "string",
+                        "title": "Sourceuid"
+                    },
+                    "sourceItemUids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Sourceitemuids"
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/RAGJobStatus"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "jobUid",
+                    "jobType",
+                    "sourceUid",
+                    "status"
+                ],
+                "title": "RAGJobStartResponse",
+                "description": "RAG 后台任务启动响应结构体"
+            },
+            "RAGJobStatus": {
+                "type": "string",
+                "enum": [
+                    "queued",
+                    "running",
+                    "completed",
+                    "failed",
+                    "cancelled"
+                ],
+                "title": "RAGJobStatus",
+                "description": "RAG 后台任务状态"
+            },
+            "RAGJobType": {
+                "type": "string",
+                "enum": [
+                    "indexing",
+                    "resume_ingest",
+                    "web_crawl_sync"
+                ],
+                "title": "RAGJobType",
+                "description": "RAG 后台任务类型"
             },
             "RAGSnapshot": {
                 "properties": {
