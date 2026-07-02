@@ -127,25 +127,17 @@ class SourceItemIndexingService:
 
         return responses
 
-    async def resume_ingest(
+    async def resume_source_items(
         self,
         *,
         source_uid: str,
-        source_items: list[SourceItem],
+        source_item_uids: list[str],
     ) -> AsyncIterable[RAGSyncEvent]:
-        """批量恢复文档处理。"""
-        not_paused_uids = [
-            item.uid
-            for item in source_items
-            if item.status != SourceItemProcessStatus.PAUSED
-        ]
-        if not_paused_uids:
-            raise ValueError(f"Source items are not paused: {not_paused_uids}")
-
-        # 恢复处理流程
+        """基于 UID 恢复文档处理，适合后台 job 使用。"""
         async for event in self.ingest_source_items(
             source_uid=source_uid,
-            source_item_uids=[item.uid for item in source_items],
+            source_item_uids=source_item_uids,
+            allowed_statuses=[SourceItemProcessStatus.PAUSED],
         ):
             yield event
 
@@ -154,6 +146,7 @@ class SourceItemIndexingService:
         *,
         source_uid: str,
         source_item_uids: list[str],
+        allowed_statuses: list[SourceItemProcessStatus] | None = None,
     ) -> AsyncIterable[RAGSyncEvent]:
         """处理文档并存储到数据库中"""
         queue: asyncio.Queue[RAGSyncEvent | WorkerDone] = asyncio.Queue()
@@ -175,6 +168,7 @@ class SourceItemIndexingService:
                     async for event in self._process_single_document(
                         source_uid=source_uid,
                         source_item_uid=source_item_uid,
+                        allowed_statuses=allowed_statuses,
                     ):
                         await queue.put(event)
                 finally:
@@ -231,6 +225,7 @@ class SourceItemIndexingService:
         *,
         source_uid: str,
         source_item_uid: str,
+        allowed_statuses: list[SourceItemProcessStatus] | None = None,
     ) -> AsyncIterable[RAGSyncEvent]:
         """处理单个文档的完整流程，返回处理进度事件的异步生成器"""
         # NOTE: document_ingest 内部创建 AsyncSession，避免跨线程/协程共享 session 导致的问题
@@ -247,6 +242,7 @@ class SourceItemIndexingService:
                     source_crud=source_crud,
                     source_uid=source_uid,
                     source_item_uid=source_item_uid,
+                    allowed_statuses=allowed_statuses,
                 )
                 await session.commit()
 
@@ -382,12 +378,14 @@ class SourceItemIndexingService:
         source_crud: SourceCRUD,
         source_uid: str,
         source_item_uid: str,
+        allowed_statuses: list[SourceItemProcessStatus] | None = None,
     ) -> tuple[Source, SourceItem, bool]:
         """声明占用 source_item，并返回 source/source_item"""
         # 声明占用 source_item，通过数据库锁机制，确保只有一次请求能够 claim 到 source_item
         should_process = await source_crud.claim_source_item_for_ingest(
             source_uid=source_uid,
             source_item_uid=source_item_uid,
+            allowed_statuses=allowed_statuses,
         )  # NOTE: claim 操作并不能保证数据存在
 
         if not should_process:
