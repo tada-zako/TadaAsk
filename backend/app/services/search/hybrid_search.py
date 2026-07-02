@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 from numpy.typing import NDArray
-from loguru import logger
 
 from ..schemas import RawSearchConfidence, SearchDebugInfo
 from ..utils import track_latency
