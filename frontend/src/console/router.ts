@@ -54,6 +54,18 @@ const router = createRouter({
           name: "sources",
           component: () => import("./views/sources/SourcesView.vue"),
         },
+        {
+          path: "sources/local-file-items",
+          name: "source-local-file-items",
+          component: () =>
+            import("./views/sources/SourceLocalFileItemsView.vue"),
+        },
+        {
+          path: "sources/web-crawl-items",
+          name: "source-web-crawl-items",
+          component: () =>
+            import("./views/sources/SourceWebCrawlItemsView.vue"),
+        },
       ],
     },
   ],
