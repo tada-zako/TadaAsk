@@ -306,6 +306,22 @@ class SourceCRUD:
         source_item.status = new_status
         return source_item
 
+    async def rename_source_item(
+        self,
+        *,
+        source_item: SourceItem,
+        title: str,
+        filename: str | None = None,
+    ) -> SourceItem:
+        """更新数据项展示名称，不改变 storage_key 或物理文件"""
+        source_item.title = title
+        if filename is not None:
+            # local file 类型 source 额外修改 filename 字段
+            source_item.filename = filename
+
+        await self.session.flush()
+        return source_item
+
     async def bulk_update_source_items_status(
         self,
         source: Source,

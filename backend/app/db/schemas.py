@@ -494,6 +494,25 @@ class SourceItemUpdate(BaseModel):
     )
 
 
+class SourceItemRenameRequest(BaseModel):
+    title: str
+
+    @field_validator("title")
+    @classmethod
+    def normalize_title(cls, value: str) -> str:
+        """确保 title 不为空"""
+        value = value.strip()
+        if not value:
+            raise ValueError("title must not be empty")
+        return value
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 # ======= Document Content Schemas =======
 class DocumentContentInternal(BaseModel):
     content: str

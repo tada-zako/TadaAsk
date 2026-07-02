@@ -40,8 +40,32 @@ class SourceCreateStorageError(SourceCreateError):
     pass
 
 
+class SourceUpdateValidationError(Exception):
+    """Source 更新数据验证错误"""
+
+    pass
+
+
+class SourceUpdateConflictError(Exception):
+    """Source 更新冲突错误，例如同名数据源已存在"""
+
+    pass
+
+
+class SourceDeleteStorageError(Exception):
+    """Source 删除外部存储资源失败"""
+
+    pass
+
+
 class SourceItemDeleteConflictError(Exception):
     """SourceItem 当前状态不允许删除"""
+
+    pass
+
+
+class SourceItemDownloadUnsupportedError(Exception):
+    """SourceItem 当前类型不支持下载"""
 
     pass
 

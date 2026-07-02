@@ -7,8 +7,11 @@ from app.crud import SourceCRUD
 from app.db.models import Source, SourceItem
 from app.rag import VectorDatabase
 from app.storage import FileStorage
-from app.core.constants import SourceItemProcessStatus
-from app.core.exceptions import SourceItemDeleteConflictError
+from app.core.constants import SourceItemProcessStatus, SourceType
+from app.core.exceptions import (
+    SourceItemDeleteConflictError,
+    SourceItemDownloadUnsupportedError,
+)
 
 
 # 不允许删除的状态集合
@@ -24,6 +27,14 @@ class SourceItemDeleteResult:
 
     deleted_vector_count: int
     file_deleted: bool  # 是否删除文件
+
+
+@dataclass
+class SourceItemDownloadInfo:
+    """Source item 下载信息"""
+
+    download_url: str
+    filename: str
 
 
 class SourceItemService:
@@ -87,4 +98,50 @@ class SourceItemService:
         return SourceItemDeleteResult(
             deleted_vector_count=len(vector_ids),
             file_deleted=file_deleted,
+        )
+
+    async def rename_source_item(
+        self,
+        *,
+        source: Source,
+        source_item: SourceItem,
+        title: str,
+    ) -> SourceItem:
+        """重命名 SourceItem 展示字段，不修改 storage_key 或物理文件。"""
+        # local file 类型 source 额外修改 filename 字段
+        filename = title if source.source_type == SourceType.LOCAL_FILE else None
+
+        return await self.source_crud.rename_source_item(
+            source_item=source_item,
+            title=title,
+            filename=filename,
+        )
+
+    async def get_download_info(
+        self,
+        *,
+        source: Source,
+        source_item: SourceItem,
+    ) -> SourceItemDownloadInfo:
+        """获取本地文件下载信息；web crawl 暂不支持下载。"""
+        if source.source_type != SourceType.LOCAL_FILE:
+            # 不支持下载
+            raise SourceItemDownloadUnsupportedError(
+                "Source item type does not support download"
+            )
+
+        if not source_item.storage_key:
+            raise FileNotFoundError("Source item file not found")
+
+        exists = await self.file_storage.exists(key=source_item.storage_key)
+        if not exists:
+            raise FileNotFoundError("Source item file not found")
+
+        # 获取下载 url
+        download_url = await self.file_storage.get_access_url(
+            key=source_item.storage_key
+        )
+        return SourceItemDownloadInfo(
+            download_url=download_url,
+            filename=source_item.filename or source_item.title,
         )
