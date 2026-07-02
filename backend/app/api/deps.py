@@ -32,7 +32,8 @@ from app.services.sources import (
     WebCrawlSyncService,
     SourceCreationService,
 )
-from app.services.indexing import IndexingJobManager
+from app.services.indexing import SourceItemIndexingService
+from app.services.jobs import RAGJobManager
 from app.services.search import HybridSearchService, RAGRetrievalService
 from app.services.model_profiles import ModelProfileService
 from app.services.chat import (
@@ -118,11 +119,21 @@ def get_token_counter(request: Request) -> TokenCounter:
     return request.app.state.token_counter
 
 
-def get_indexing_job_manager(
+def get_source_item_indexing_service(request: Request) -> SourceItemIndexingService:
+    """返回全局挂载的 SourceItemIndexingService 实例"""
+    return request.app.state.source_item_indexing_service
+
+
+def get_web_crawl_sync_service(request: Request) -> WebCrawlSyncService:
+    """返回全局挂载的 WebCrawlSyncService 实例"""
+    return request.app.state.web_crawl_sync_service
+
+
+def get_rag_job_manager(
     request: Request,
-) -> IndexingJobManager:
-    """返回全局挂载的 IndexingJobManager 实例"""
-    return request.app.state.indexing_job_manager
+) -> RAGJobManager:
+    """返回全局挂载的 RAGJobManager 实例"""
+    return request.app.state.rag_job_manager
 
 
 # ============ CRUD 依赖注入接口 ============
@@ -300,19 +311,6 @@ def get_source_item_service(
     )
 
 
-def get_web_crawl_sync_service(
-    source_crud: "SourceCRUDeps",
-    crawler: "WebCrawlerDeps",
-    html_parser: "HTMLPageParserDeps",
-) -> WebCrawlSyncService:
-    """WebCrawlSyncService 依赖注入接口"""
-    return WebCrawlSyncService(
-        source_crud=source_crud,
-        crawler=crawler,
-        html_parser=html_parser,
-    )
-
-
 def get_hybrid_search_service(
     session: "SessionDeps",
     source_crud: "SourceCRUDeps",
@@ -426,9 +424,7 @@ WebCrawlerDeps = Annotated[WebCrawler, Depends(get_web_crawler)]
 HTMLPageParserDeps = Annotated[HTMLPageParser, Depends(get_html_page_parser)]
 TokenCounterDeps = Annotated[TokenCounter, Depends(get_token_counter)]
 
-IndexingJobManagerDeps = Annotated[
-    IndexingJobManager, Depends(get_indexing_job_manager)
-]
+RAGJobManagerDeps = Annotated[RAGJobManager, Depends(get_rag_job_manager)]
 
 # CRUD 依赖
 ProjectCRUDeps = Annotated[ProjectCRUD, Depends(get_project_crud)]
@@ -467,6 +463,10 @@ SourceItemServiceDeps = Annotated[
 WebCrawlSyncServiceDeps = Annotated[
     WebCrawlSyncService,
     Depends(get_web_crawl_sync_service),
+]
+SourceItemIndexingServiceDeps = Annotated[
+    SourceItemIndexingService,
+    Depends(get_source_item_indexing_service),
 ]
 HybridSearchServiceDeps = Annotated[
     HybridSearchService,

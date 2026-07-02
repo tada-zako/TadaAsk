@@ -37,7 +37,9 @@ from app.rag.utils import FTSTokenizer, JiebaFTSTokenizer
 from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer, TokenCounter
 from app.services.chat import GenerationRegistry
 from app.services.model_profiles import ModelProfileService
-from app.services.indexing import SourceItemIndexingService, IndexingJobManager
+from app.services.indexing import SourceItemIndexingService
+from app.services.jobs import RAGJobManager
+from app.services.sources import WebCrawlSyncService
 from app.api import admin, visitor
 from app.api.visitor.widget_cors import WidgetScopedCORSMiddleware
 
@@ -193,7 +195,7 @@ async def lifespan(app: FastAPI):
     token_counter = TokenCounter(tokenizer=embedding_tokenizer)
     app.state.token_counter = token_counter
 
-    # ======= Indexing 任务管理器挂载 =======
+    # ======= RAG 后台任务相关服务挂载 =======
     indexing_service = SourceItemIndexingService(
         session_factory=async_session,
         file_storage=file_storage,
@@ -203,9 +205,13 @@ async def lifespan(app: FastAPI):
         embedding=embedding_provider,
         fts_provider=fts_search_provider,
     )
-    app.state.indexing_job_manager = IndexingJobManager(
-        indexing_service=indexing_service
+    app.state.source_item_indexing_service = indexing_service
+    app.state.web_crawl_sync_service = WebCrawlSyncService(
+        session_factory=async_session,
+        crawler=app.state.web_crawler,
+        html_parser=app.state.html_page_parser,
     )
+    app.state.rag_job_manager = RAGJobManager()
 
     # TODO: MVP 实现：在应用启动时验证管理员账号，如果不存在则创建一个默认管理员
     await valid_or_create_admin()
@@ -213,7 +219,8 @@ async def lifespan(app: FastAPI):
     yield  # 运行应用
 
     # await drop_db()  # 应用关闭时清理数据库连接
-    # TODO: indexing job manager cleanup
+    # job manager 清理操作
+    await app.state.rag_job_manager.shutdown()
     logger.info("Shutting down the application...")
 
 
