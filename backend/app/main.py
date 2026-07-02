@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import HTTPException as StarletteHTTPException
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from app.core.config import settings
@@ -243,6 +244,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(WidgetScopedCORSMiddleware, session_factory=async_session)
+
+# 本地上传文件静态访问；当前仅用于 Admin 控制台下载 local_file source item。
+app.mount(
+    settings.upload_static_base_url,
+    StaticFiles(directory=settings.upload_folder_path),
+    name="uploaded_files",
+)
 
 
 @app.exception_handler(ValueError)
