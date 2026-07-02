@@ -1023,6 +1023,166 @@
                 }
             }
         },
+        "/admin/source/{source_uid}": {
+            "get": {
+                "tags": [
+                    "Admin",
+                    "Source"
+                ],
+                "summary": "Get Source",
+                "description": "获取 source 详情",
+                "operationId": "get_source_admin_source__source_uid__get",
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "source_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Source UID",
+                            "title": "Source Uid"
+                        },
+                        "description": "Source UID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SourceRead"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "Admin",
+                    "Source"
+                ],
+                "summary": "Update Source",
+                "description": "更新 source 基础配置；webCrawlConfig 更新后会重置 source status。",
+                "operationId": "update_source_admin_source__source_uid__patch",
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "source_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Source UID",
+                            "title": "Source Uid"
+                        },
+                        "description": "Source UID"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SourceUpdate",
+                                "description": "Source 更新数据"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SourceRead"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Admin",
+                    "Source"
+                ],
+                "summary": "Delete Source",
+                "description": "删除 source，并清理向量集合、本地文件和级联数据库记录。",
+                "operationId": "delete_source_admin_source__source_uid__delete",
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "source_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Source UID",
+                            "title": "Source Uid"
+                        },
+                        "description": "Source UID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SourceDeleteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/source/{source_uid}/items/upload": {
             "post": {
                 "tags": [
@@ -1044,10 +1204,10 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "description": "Project UID",
+                            "description": "Source UID",
                             "title": "Source Uid"
                         },
-                        "description": "Project UID"
+                        "description": "Source UID"
                     }
                 ],
                 "requestBody": {
@@ -1109,10 +1269,10 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "description": "Project UID",
+                            "description": "Source UID",
                             "title": "Source Uid"
                         },
-                        "description": "Project UID"
+                        "description": "Source UID"
                     },
                     {
                         "name": "limit",
@@ -1167,6 +1327,77 @@
             }
         },
         "/admin/source/{source_uid}/items/{source_item_uid}": {
+            "patch": {
+                "tags": [
+                    "Admin",
+                    "Source"
+                ],
+                "summary": "Rename Source Item",
+                "description": "重命名 source item 展示字段，不修改 storage_key 或物理文件。",
+                "operationId": "rename_source_item_admin_source__source_uid__items__source_item_uid__patch",
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "source_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Source UID",
+                            "title": "Source Uid"
+                        },
+                        "description": "Source UID"
+                    },
+                    {
+                        "name": "source_item_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "数据项 UID",
+                            "title": "Source Item Uid"
+                        },
+                        "description": "数据项 UID"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SourceItemRenameRequest",
+                                "description": "SourceItem 展示名称更新数据"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SourceItemRead"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "delete": {
                 "tags": [
                     "Admin",
@@ -1187,10 +1418,10 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "description": "Project UID",
+                            "description": "Source UID",
                             "title": "Source Uid"
                         },
-                        "description": "Project UID"
+                        "description": "Source UID"
                     },
                     {
                         "name": "source_item_uid",
@@ -1211,6 +1442,68 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/SourceItemDeleteResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/source/{source_uid}/items/{source_item_uid}/download": {
+            "get": {
+                "tags": [
+                    "Admin",
+                    "Source"
+                ],
+                "summary": "Get Source Item Download",
+                "description": "获取 local file source item 的下载地址；web crawl 暂不支持下载。",
+                "operationId": "get_source_item_download_admin_source__source_uid__items__source_item_uid__download_get",
+                "security": [
+                    {
+                        "OAuth2PasswordBearer": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "source_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Source UID",
+                            "title": "Source Uid"
+                        },
+                        "description": "Source UID"
+                    },
+                    {
+                        "name": "source_item_uid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "数据项 UID",
+                            "title": "Source Item Uid"
+                        },
+                        "description": "数据项 UID"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SourceItemDownloadResponse"
                                 }
                             }
                         }
@@ -1249,10 +1542,10 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "description": "Project UID",
+                            "description": "Source UID",
                             "title": "Source Uid"
                         },
-                        "description": "Project UID"
+                        "description": "Source UID"
                     }
                 ],
                 "responses": {
@@ -1300,10 +1593,10 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "description": "Project UID",
+                            "description": "Source UID",
                             "title": "Source Uid"
                         },
-                        "description": "Project UID"
+                        "description": "Source UID"
                     }
                 ],
                 "requestBody": {
@@ -1518,10 +1811,10 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "description": "Project UID",
+                            "description": "Source UID",
                             "title": "Source Uid"
                         },
-                        "description": "Project UID"
+                        "description": "Source UID"
                     }
                 ],
                 "requestBody": {
@@ -1583,10 +1876,10 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "description": "Project UID",
+                            "description": "Source UID",
                             "title": "Source Uid"
                         },
-                        "description": "Project UID"
+                        "description": "Source UID"
                     }
                 ],
                 "requestBody": {
@@ -4902,6 +5195,52 @@
                 ],
                 "title": "SourceCreate"
             },
+            "SourceDeleteResponse": {
+                "properties": {
+                    "sourceUid": {
+                        "type": "string",
+                        "title": "Sourceuid"
+                    },
+                    "status": {
+                        "type": "string",
+                        "title": "Status",
+                        "default": "deleted"
+                    },
+                    "deletedSourceItemCount": {
+                        "type": "integer",
+                        "title": "Deletedsourceitemcount"
+                    },
+                    "fileDeletedCount": {
+                        "type": "integer",
+                        "title": "Filedeletedcount"
+                    },
+                    "fileDeleteFailedCount": {
+                        "type": "integer",
+                        "title": "Filedeletefailedcount"
+                    },
+                    "vectorCollectionDeleted": {
+                        "type": "boolean",
+                        "title": "Vectorcollectiondeleted"
+                    },
+                    "cleanupErrors": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "title": "Cleanuperrors"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "sourceUid",
+                    "deletedSourceItemCount",
+                    "fileDeletedCount",
+                    "fileDeleteFailedCount",
+                    "vectorCollectionDeleted"
+                ],
+                "title": "SourceDeleteResponse",
+                "description": "Source 删除响应结构体"
+            },
             "SourceItemDeleteResponse": {
                 "properties": {
                     "sourceUid": {
@@ -4930,6 +5269,35 @@
                 ],
                 "title": "SourceItemDeleteResponse",
                 "description": "Source item 删除响应结构体"
+            },
+            "SourceItemDownloadResponse": {
+                "properties": {
+                    "sourceUid": {
+                        "type": "string",
+                        "title": "Sourceuid"
+                    },
+                    "sourceItemUid": {
+                        "type": "string",
+                        "title": "Sourceitemuid"
+                    },
+                    "downloadUrl": {
+                        "type": "string",
+                        "title": "Downloadurl"
+                    },
+                    "filename": {
+                        "type": "string",
+                        "title": "Filename"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "sourceUid",
+                    "sourceItemUid",
+                    "downloadUrl",
+                    "filename"
+                ],
+                "title": "SourceItemDownloadResponse",
+                "description": "Source item 下载响应结构体"
             },
             "SourceItemProcessStatus": {
                 "type": "string",
@@ -5034,6 +5402,19 @@
                 ],
                 "title": "SourceItemRead"
             },
+            "SourceItemRenameRequest": {
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "title": "Title"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "title"
+                ],
+                "title": "SourceItemRenameRequest"
+            },
             "SourceProcessStatus": {
                 "type": "string",
                 "enum": [
@@ -5125,6 +5506,45 @@
                 ],
                 "title": "SourceType",
                 "description": "数据源类型"
+            },
+            "SourceUpdate": {
+                "properties": {
+                    "sourceName": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Sourcename"
+                    },
+                    "isPublic": {
+                        "anyOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Ispublic"
+                    },
+                    "webCrawlConfig": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/WebCrawlConfig-Input"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Configuration for web crawling; only accepted by web_crawl sources"
+                    }
+                },
+                "type": "object",
+                "title": "SourceUpdate"
             },
             "ThinkingEffort": {
                 "type": "string",

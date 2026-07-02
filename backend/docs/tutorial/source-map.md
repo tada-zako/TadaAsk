@@ -26,7 +26,7 @@
 
 ## Source And Ingestion
 
-- Source creation and type validation：[app/services/sources/source_create.py](../../app/services/sources/source_create.py)
+- Source create/update/delete and config normalization：[app/services/sources/source.py](../../app/services/sources/source.py)
 - Local file upload to SourceItem：[app/services/sources/file_upload.py](../../app/services/sources/file_upload.py)
 - SourceItem delete and vector/file cleanup：[app/services/sources/source_item.py](../../app/services/sources/source_item.py)
 - Web crawl materialization：[app/services/sources/web_crawl.py](../../app/services/sources/web_crawl.py)
