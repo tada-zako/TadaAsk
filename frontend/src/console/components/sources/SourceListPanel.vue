@@ -23,8 +23,7 @@ import {
 } from "@/shared/components/ui/table";
 
 // 导入设置抽屉组件
-import SourceLocalFileSettingsSheet from "./SourceLocalFileSettingsSheet.vue";
-import SourceWebCrawlSettingsSheet from "./SourceWebCrawlSettingsSheet.vue";
+import SourceSettingsSheet from "./SourceSettingsSheet.vue";
 </script>
 
 <template>
@@ -114,7 +113,7 @@ import SourceWebCrawlSettingsSheet from "./SourceWebCrawlSettingsSheet.vue";
               >
                 Items
               </Button>
-              <SourceLocalFileSettingsSheet />
+              <SourceSettingsSheet source-type="local-file" />
             </div>
           </TableCell>
         </TableRow>
@@ -162,7 +161,7 @@ import SourceWebCrawlSettingsSheet from "./SourceWebCrawlSettingsSheet.vue";
               >
                 Items
               </Button>
-              <SourceWebCrawlSettingsSheet />
+              <SourceSettingsSheet source-type="web-crawl" />
             </div>
           </TableCell>
         </TableRow>
@@ -210,7 +209,7 @@ import SourceWebCrawlSettingsSheet from "./SourceWebCrawlSettingsSheet.vue";
               >
                 Items
               </Button>
-              <SourceLocalFileSettingsSheet />
+              <SourceSettingsSheet source-type="local-file" />
             </div>
           </TableCell>
         </TableRow>

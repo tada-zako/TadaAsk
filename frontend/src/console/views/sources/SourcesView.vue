@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import SourceCreateSheet from "./SourceCreateSheet.vue";
-import SourceListPanel from "./SourceListPanel.vue";
+import SourceCreateSheet from "@/console/components/sources/SourceCreateSheet.vue";
+import SourceListPanel from "@/console/components/sources/SourceListPanel.vue";
 </script>
 
 <template>

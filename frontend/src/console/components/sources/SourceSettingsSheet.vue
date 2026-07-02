@@ -1,6 +1,8 @@
 <script setup lang="ts">
+// 导入 Vue 核心 API
+import { computed } from "vue";
 // 导入 Lucide 图标
-import { Globe2, Settings } from "@lucide/vue";
+import { FileText, Globe2, Settings } from "@lucide/vue";
 
 // 导入 UI 组件
 import { Badge } from "@/shared/components/ui/badge";
@@ -24,15 +26,44 @@ import {
   SheetTrigger,
 } from "@/shared/components/ui/sheet";
 import { Switch } from "@/shared/components/ui/switch";
+
+// 定义组件属性
+const props = defineProps<{
+  sourceType: "local-file" | "web-crawl";
+}>();
+
+// 辅助计算属性：判断是否为网页爬取类型
+const isWebCrawl = computed(() => props.sourceType === "web-crawl");
+// 抽屉标题
+const sheetTitle = computed(() =>
+  isWebCrawl.value ? "Web crawl settings" : "Local file settings",
+);
+// 默认数据源名称
+const sourceName = computed(() =>
+  isWebCrawl.value ? "Main website pages" : "Product docs PDF",
+);
+// 数据源类型标签
+const sourceTypeLabel = computed(() =>
+  isWebCrawl.value ? "WEB CRAWL" : "LOCAL FILE",
+);
+// 状态标签
+const statusLabel = computed(() =>
+  isWebCrawl.value ? "Processing" : "Indexed",
+);
+// 可见性提示文本
+const visibilityHelp = computed(() =>
+  isWebCrawl.value
+    ? "Keep enabled only after crawl results are reviewed."
+    : "Disable while uploading or reviewing imported files.",
+);
 </script>
 
 <template>
-  <!-- 网页爬取数据源的设置抽屉 -->
   <Sheet>
     <SheetTrigger as-child>
       <Button
         type="button"
-        aria-label="Open web crawl source settings"
+        :aria-label="`Open ${sourceTypeLabel.toLowerCase()} source settings`"
         variant="outline"
         size="sm"
         class="w-24 overflow-hidden"
@@ -44,31 +75,26 @@ import { Switch } from "@/shared/components/ui/switch";
     <SheetContent
       class="w-[min(520px,100vw)] gap-0 border-(--line) bg-[#0d0e10] p-0 sm:max-w-none"
     >
-      <!-- 抽屉头部 -->
       <SheetHeader class="border-b border-(--line-soft) px-4.5 py-4">
-        <SheetTitle class="text-[15px]">Web crawl settings</SheetTitle>
+        <SheetTitle class="text-[15px]">{{ sheetTitle }}</SheetTitle>
       </SheetHeader>
 
-      <!-- 设置表单滚动区域 -->
       <div
         class="console-scrollbar grid min-h-0 flex-1 content-start gap-5 overflow-auto px-4.5 py-4.5"
       >
-        <!-- 数据源基本信息配置 -->
         <section class="grid gap-4">
           <div>
             <h2 class="console-panel-title">Source profile</h2>
             <p class="console-panel-note">
-              Edit the source container before changing crawl rules.
+              Edit the container name and visitor visibility for this source.
             </p>
           </div>
 
-          <!-- 数据源名称 -->
           <div class="grid gap-2">
-            <Label for="web-source-name">Name</Label>
-            <Input id="web-source-name" value="Main website pages" />
+            <Label for="source-settings-name">Name</Label>
+            <Input id="source-settings-name" :value="sourceName" />
           </div>
 
-          <!-- 数据源类型展示 -->
           <div class="grid gap-2">
             <Label>Type</Label>
             <div
@@ -77,33 +103,39 @@ import { Switch } from "@/shared/components/ui/switch";
               <span
                 class="flex items-center gap-2 text-[13px] text-(--text-body)"
               >
-                <Globe2 class="text-primary size-4" />
-                WEB CRAWL
+                <Globe2 v-if="isWebCrawl" class="text-primary size-4" />
+                <FileText v-else class="text-primary size-4" />
+                {{ sourceTypeLabel }}
               </span>
               <Badge
-                class="border-yellow-300/25 bg-yellow-300/10 text-yellow-100"
+                :class="
+                  isWebCrawl
+                    ? 'border-yellow-300/25 bg-yellow-300/10 text-yellow-100'
+                    : 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
+                "
               >
-                Processing
+                {{ statusLabel }}
               </Badge>
             </div>
           </div>
 
-          <!-- 可见性开关 -->
           <div
             class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-(--console-radius-lg) border border-(--line) bg-(--surface-panel-soft) p-3"
           >
             <div>
               <Label>Public for visitor RAG</Label>
               <p class="mt-1 text-xs leading-5 text-(--text-faint)">
-                Keep enabled only after crawl results are reviewed.
+                {{ visibilityHelp }}
               </p>
             </div>
-            <Switch checked aria-label="Web crawl source visibility" />
+            <Switch checked aria-label="Source visibility" />
           </div>
         </section>
 
-        <!-- 网页爬取规则配置 -->
-        <section class="grid gap-4 border-t border-(--line-soft) pt-4.5">
+        <section
+          v-if="isWebCrawl"
+          class="grid gap-4 border-t border-(--line-soft) pt-4.5"
+        >
           <div>
             <h2 class="console-panel-title">Web crawl config</h2>
             <p class="console-panel-note">
@@ -111,7 +143,6 @@ import { Switch } from "@/shared/components/ui/switch";
             </p>
           </div>
 
-          <!-- 入口类型 -->
           <div class="grid gap-2">
             <Label>Entry type</Label>
             <Select default-value="site_root">
@@ -126,13 +157,11 @@ import { Switch } from "@/shared/components/ui/switch";
             </Select>
           </div>
 
-          <!-- 起始 URL -->
           <div class="grid gap-2">
             <Label for="web-root-url">Root URL</Label>
             <Input id="web-root-url" value="https://docs.example.com/" />
           </div>
 
-          <!-- 限制参数 -->
           <div class="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
             <div class="grid gap-2">
               <Label for="web-max-pages">Max pages</Label>
@@ -144,19 +173,16 @@ import { Switch } from "@/shared/components/ui/switch";
             </div>
           </div>
 
-          <!-- 包含路径 -->
           <div class="grid gap-2">
             <Label for="web-include-paths">Include paths</Label>
             <Input id="web-include-paths" value="/docs/, /api/" />
           </div>
 
-          <!-- 排除路径 -->
           <div class="grid gap-2">
             <Label for="web-exclude-paths">Exclude paths</Label>
             <Input id="web-exclude-paths" value="/blog/, /changelog/drafts/" />
           </div>
 
-          <!-- 内容提取选择器 -->
           <div class="grid gap-2">
             <Label for="web-content-selectors">Content selectors</Label>
             <Input
@@ -167,24 +193,19 @@ import { Switch } from "@/shared/components/ui/switch";
         </section>
       </div>
 
-      <!-- 底部操作按钮 -->
       <SheetFooter
         class="mt-0 flex-row justify-end border-t border-(--line-soft) p-4.5"
       >
         <SheetClose as-child>
           <Button
             type="button"
-            aria-label="Close web crawl source settings"
+            aria-label="Close source settings"
             variant="outline"
           >
             Close
           </Button>
         </SheetClose>
-        <Button
-          type="button"
-          aria-label="Save web crawl source settings"
-          disabled
-        >
+        <Button type="button" aria-label="Save source settings" disabled>
           Save changes
         </Button>
       </SheetFooter>
