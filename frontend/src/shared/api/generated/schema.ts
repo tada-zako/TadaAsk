@@ -346,7 +346,7 @@ export interface paths {
         put?: never;
         /**
          * Sync Web Crawl
-         * @description 触发 Web Crawl 同步操作，返回 SSE 流式事件
+         * @description 创建 Web Crawl 同步任务
          */
         post: operations["sync_web_crawl_admin_source__source_uid__crawl_sync_post"];
         delete?: never;
@@ -366,9 +366,69 @@ export interface paths {
         put?: never;
         /**
          * Indexing Documents
-         * @description 解析文档
+         * @description 创建 index 任务
          */
         post: operations["indexing_documents_admin_source__source_uid__document_indexing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/source/jobs/{job_uid}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Rag Job Events
+         * @description RAG job SSE 观察接口
+         */
+        get: operations["stream_rag_job_events_admin_source_jobs__job_uid__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/source/jobs/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Active Rag Jobs
+         * @description 获取所有正在运行的 RAG job。
+         */
+        get: operations["list_active_rag_jobs_admin_source_jobs_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/source/jobs/{job_uid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rag Job
+         * @description 获取指定 RAG job 状态。
+         */
+        get: operations["get_rag_job_admin_source_jobs__job_uid__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -406,7 +466,7 @@ export interface paths {
         put?: never;
         /**
          * Resume Ingest
-         * @description 恢复文档解析
+         * @description 创建恢复文档解析任务
          */
         post: operations["resume_ingest_admin_source__source_uid__document_resume_post"];
         delete?: never;
@@ -832,6 +892,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * ActiveRAGJobsResponse
+         * @description 当前运行中的 RAG 后台任务列表。
+         */
+        ActiveRAGJobsResponse: {
+            /** Jobs */
+            jobs?: components["schemas"]["RAGJobRead"][];
+        };
         /**
          * AdminChatCancelResponse
          * @description Admin chat cancel 响应结构体
@@ -1479,6 +1547,57 @@ export interface components {
             /** Modelprofiles */
             modelProfiles?: components["schemas"]["ModelProfileRead"][];
         };
+        /**
+         * RAGJobRead
+         * @description RAG 后台任务读取结构体
+         */
+        RAGJobRead: {
+            /** Jobuid */
+            jobUid: string;
+            jobType: components["schemas"]["RAGJobType"];
+            /** Sourceuid */
+            sourceUid: string;
+            /** Sourceitemuids */
+            sourceItemUids?: string[];
+            status: components["schemas"]["RAGJobStatus"];
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Startedat */
+            startedAt?: string | null;
+            /** Finishedat */
+            finishedAt?: string | null;
+            /** Error */
+            error?: string | null;
+        };
+        /**
+         * RAGJobStartResponse
+         * @description RAG 后台任务启动响应结构体
+         */
+        RAGJobStartResponse: {
+            /** Jobuid */
+            jobUid: string;
+            jobType: components["schemas"]["RAGJobType"];
+            /** Sourceuid */
+            sourceUid: string;
+            /** Sourceitemuids */
+            sourceItemUids?: string[];
+            status: components["schemas"]["RAGJobStatus"];
+        };
+        /**
+         * RAGJobStatus
+         * @description RAG 后台任务状态
+         * @enum {string}
+         */
+        RAGJobStatus: "queued" | "running" | "completed" | "failed" | "cancelled";
+        /**
+         * RAGJobType
+         * @description RAG 后台任务类型
+         * @enum {string}
+         */
+        RAGJobType: "indexing" | "resume_ingest" | "web_crawl_sync";
         /**
          * RAGSnapshot
          * @description RAG 检索结果快照
@@ -2697,12 +2816,12 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/event-stream": unknown;
+                    "application/json": components["schemas"]["RAGJobStartResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2733,12 +2852,96 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RAGJobStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_rag_job_events_admin_source_jobs__job_uid__events_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Last-Event-ID"?: string | null;
+            };
+            path: {
+                job_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_active_rag_jobs_admin_source_jobs_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveRAGJobsResponse"];
+                };
+            };
+        };
+    };
+    get_rag_job_admin_source_jobs__job_uid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RAGJobRead"];
                 };
             };
             /** @description Validation Error */
@@ -2805,12 +3008,12 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "text/event-stream": unknown;
+                    "application/json": components["schemas"]["RAGJobStartResponse"];
                 };
             };
             /** @description Validation Error */
