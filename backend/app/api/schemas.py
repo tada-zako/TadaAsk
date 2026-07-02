@@ -9,7 +9,8 @@ from app.core.constants import (
     IngestStage,
     RAGSyncEventType,
     SourceProcessStatus,
-    IndexingJobStatus,
+    RAGJobStatus,
+    RAGJobType,
 )
 from app.db.schemas import HybridSearchResult, HybridSearchRequest, SourceItemRead
 from app.services import SearchDebugInfo
@@ -220,23 +221,25 @@ class RAGSyncEvent(BaseModel):
     )
 
 
-class IndexingJobStartResponse(BaseModel):
-    """Indexing job 启动响应结构体"""
+class RAGJobStartResponse(BaseModel):
+    """RAG 后台任务启动响应结构体"""
 
     job_uid: str
+    job_type: RAGJobType
     source_uid: str
-    source_item_uids: list[str]
-    status: IndexingJobStatus
+    source_item_uids: list[str] = Field(default_factory=list)
+    status: RAGJobStatus
 
     model_config = ConfigDict(
+        from_attributes=True,
         alias_generator=to_camel,
         validate_by_alias=True,
         validate_by_name=True,
     )
 
 
-class IndexingJobRead(IndexingJobStartResponse):
-    """Indexing job 读取结构体"""
+class RAGJobRead(RAGJobStartResponse):
+    """RAG 后台任务读取结构体"""
 
     created_at: datetime
     started_at: datetime | None = None
@@ -244,11 +247,10 @@ class IndexingJobRead(IndexingJobStartResponse):
     error: str | None = None
 
 
-class ActiveIndexingJobResponse(BaseModel):
-    """Active indexing job 响应结构体；
-    允许为 None, 表示当前 source 未进行 indexing"""
+class ActiveRAGJobsResponse(BaseModel):
+    """当前运行中的 RAG 后台任务列表。"""
 
-    job: IndexingJobRead | None = None
+    jobs: list[RAGJobRead] = Field(default_factory=list)
 
     model_config = ConfigDict(
         alias_generator=to_camel,

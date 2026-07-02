@@ -21,14 +21,15 @@ from ...deps import (
     SourceItemServiceDeps,
     SourceItemUploadServiceDeps,
     WebCrawlSyncServiceDeps,
-    IndexingJobManagerDeps,
+    SourceItemIndexingServiceDeps,
+    RAGJobManagerDeps,
 )
 from ...schemas import (
     IngestPausedResponse,
     SourceItemDeleteResponse,
-    IndexingJobStartResponse,
-    IndexingJobRead,
-    ActiveIndexingJobResponse,
+    RAGJobStartResponse,
+    RAGJobRead,
+    ActiveRAGJobsResponse,
 )
 from app.db.models import Source, SourceItem
 from app.db.schemas import (
@@ -37,7 +38,12 @@ from app.db.schemas import (
     SourceItemRead,
     WebCrawlConfig,
 )
-from app.core.constants import ALLOWED_FILE_TYPES, SourceType
+from app.core.constants import (
+    ALLOWED_FILE_TYPES,
+    SourceItemProcessStatus,
+    SourceType,
+    RAGJobType,
+)
 from app.core.exceptions import (
     SourceCreateStorageError,
     SourceCreateValidationError,
@@ -281,6 +287,33 @@ async def valid_source_item_uids(
 ValidSourceDeps = Annotated[Source, Depends(valid_source)]
 
 
+def _parse_last_event_sequence(last_event_id: str | None) -> int:
+    """解析 SSE Last-Event-ID；避免非法值"""
+    if not last_event_id:
+        return 0
+
+    try:
+        sequence = int(last_event_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Last-Event-ID",
+        ) from exc
+
+    if sequence < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Last-Event-ID",
+        )
+
+    return sequence
+
+
+def _source_rag_active_group(source_uid: str) -> str:
+    """同一个 source 的 RAG 后台任务互斥。"""
+    return f"source_rag:{source_uid}"
+
+
 # ===============================
 # API 端点实现
 # ===============================
@@ -435,32 +468,44 @@ async def get_web_crawl_config(
     return WebCrawlConfig.model_validate(source.web_crawl_config)
 
 
-@router.post("/{source_uid}/crawl/sync", response_class=EventSourceResponse)
+@router.post(
+    "/{source_uid}/crawl/sync",
+    response_model=RAGJobStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def sync_web_crawl(
     source: Annotated[Source, Depends(valid_web_crawl_source)],
     config: Annotated[WebCrawlConfig, Depends(get_web_crawl_config)],
     web_crawl_sync_service: WebCrawlSyncServiceDeps,
-) -> AsyncIterable[ServerSentEvent]:
+    rag_job_manager: RAGJobManagerDeps,
+) -> RAGJobStartResponse:
     """
-    触发 Web Crawl 同步操作，返回 SSE 流式事件
+    创建 Web Crawl 同步任务
     """
-    async for event in web_crawl_sync_service.sync_source(
-        source=source,
-        config=config,
-    ):
-        yield ServerSentEvent(
-            event=event.event,
-            data=event.model_dump_json(
-                exclude={"event"},
-                by_alias=True,
-            ),
-        )
+    source_uid = source.uid
+
+    async def run_web_crawl(_):
+        """web crawl sync service 封装函数；兼容 job manager 调用"""
+        async for event in web_crawl_sync_service.sync_source(
+            source_uid=source_uid,
+            config=config,
+        ):
+            yield event
+
+    job = await rag_job_manager.start_job(
+        job_type=RAGJobType.WEB_CRAWL_SYNC,
+        source_uid=source_uid,
+        active_group=_source_rag_active_group(source_uid),
+        runner=run_web_crawl,
+    )
+
+    return RAGJobStartResponse.model_validate(job)
 
 
 # TODO: 缺少文件存在验证，如果用户上传了相同的文件，应该复用已经存在的文件
 @router.post(
     "/{source_uid}/document/indexing",
-    response_model=IndexingJobStartResponse,
+    response_model=RAGJobStartResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def indexing_documents(
@@ -469,45 +514,52 @@ async def indexing_documents(
         list[str],
         Depends(valid_source_item_uids),
     ],
-    indexing_job_manager: IndexingJobManagerDeps,
-) -> IndexingJobStartResponse:
+    source_item_indexing_service: SourceItemIndexingServiceDeps,
+    rag_job_manager: RAGJobManagerDeps,
+) -> RAGJobStartResponse:
     """
     创建 index 任务
     """
-    job = await indexing_job_manager.start_job(
+
+    async def run_indexing(_):
+        """文档 indexing service 封装函数；兼容 job manager 调用"""
+        async for event in source_item_indexing_service.ingest_source_items(
+            source_uid=source_uid,
+            source_item_uids=source_item_uids,
+        ):
+            yield event
+
+    job = await rag_job_manager.start_job(
+        job_type=RAGJobType.INDEXING,
         source_uid=source_uid,
         source_item_uids=source_item_uids,
+        active_group=_source_rag_active_group(source_uid),
+        runner=run_indexing,
     )
 
-    return IndexingJobStartResponse(
-        job_uid=job.job_uid,
-        source_uid=job.source_uid,
-        source_item_uids=job.source_item_uids,
-        status=job.status,
-    )
+    return RAGJobStartResponse.model_validate(job)
 
 
 @router.get(
-    "/{source_uid}/document/indexing/jobs/{job_uid}/events",
+    "/jobs/{job_uid}/events",
     response_class=EventSourceResponse,
 )
-async def stream_indexing_job_events(
-    source_uid: Annotated[str, Depends(valid_source_uid)],
+async def stream_rag_job_events(
     job_uid: str,
-    indexing_job_manager: IndexingJobManagerDeps,
+    rag_job_manager: RAGJobManagerDeps,
     last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
 ) -> AsyncIterable[ServerSentEvent]:
-    """Indexing job SSE 观察接口"""
-    job = indexing_job_manager.get_job(job_uid)
-    if not job or job.source_uid != source_uid:
+    """RAG job SSE 观察接口"""
+    job = rag_job_manager.get_job(job_uid)
+    if not job:
         # 验证 job_uid
-        raise HTTPException(status_code=404, detail="Indexing job not found")
+        raise HTTPException(status_code=404, detail="RAG job not found")
 
     # 从 Last-Event-ID 头部获取上次事件的 sequence
-    after_sequence = int(last_event_id or 0)
+    after_sequence = _parse_last_event_sequence(last_event_id)
 
     # 订阅 job 事件流，并持续输出 SSE
-    async for stored in indexing_job_manager.subscribe(
+    async for stored in rag_job_manager.subscribe(
         job_uid=job_uid,
         after_sequence=after_sequence,
     ):
@@ -519,21 +571,31 @@ async def stream_indexing_job_events(
 
 
 @router.get(
-    "/{source_uid}/document/indexing/jobs/active",
-    response_model=ActiveIndexingJobResponse,
+    "/jobs/active",
+    response_model=ActiveRAGJobsResponse,
 )
-async def get_active_indexing_job(
-    source_uid: Annotated[str, Depends(valid_source_uid)],
-    indexing_job_manager: IndexingJobManagerDeps,
-) -> ActiveIndexingJobResponse:
-    """获取当前 source 对应的 job"""
-    job = indexing_job_manager.get_active_job_by_source(source_uid=source_uid)
-
-    job_read = IndexingJobRead.model_validate(job) if job else None
-
-    return ActiveIndexingJobResponse(
-        job=job_read,
+async def list_active_rag_jobs(
+    rag_job_manager: RAGJobManagerDeps,
+) -> ActiveRAGJobsResponse:
+    """获取所有正在运行的 RAG job。"""
+    return ActiveRAGJobsResponse(
+        jobs=[
+            RAGJobRead.model_validate(job) for job in rag_job_manager.list_active_jobs()
+        ]
     )
+
+
+@router.get("/jobs/{job_uid}", response_model=RAGJobRead)
+async def get_rag_job(
+    job_uid: str,
+    rag_job_manager: RAGJobManagerDeps,
+) -> RAGJobRead:
+    """获取指定 RAG job 状态。"""
+    job = rag_job_manager.get_job(job_uid)
+    if not job:
+        raise HTTPException(status_code=404, detail="RAG job not found")
+
+    return RAGJobRead.model_validate(job)
 
 
 @router.post("/{source_uid}/document/pause", response_model=list[IngestPausedResponse])
@@ -556,30 +618,54 @@ async def pause_ingest(
     )
 
 
-@router.post("/{source_uid}/document/resume", response_class=EventSourceResponse)
+@router.post(
+    "/{source_uid}/document/resume",
+    response_model=RAGJobStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def resume_ingest(
-    source_crud: SourceCRUDeps,
     source_uid: Annotated[str, Depends(valid_source_uid)],
     source_items: Annotated[
         list[SourceItem],
         Depends(valid_source_items),
     ],
     source_item_indexing_service: SourceItemIndexingServiceDeps,
-) -> AsyncIterable[ServerSentEvent]:
+    rag_job_manager: RAGJobManagerDeps,
+) -> RAGJobStartResponse:
     """
-    恢复文档解析
+    创建恢复文档解析任务
     """
-    async for event in source_item_indexing_service.resume_ingest(
-        source_uid=source_uid,
-        source_items=source_items,
-    ):
-        yield ServerSentEvent(
-            event=event.event,
-            data=event.model_dump_json(
-                exclude={"event"},
-                by_alias=True,
-            ),
+
+    not_paused_uids = [
+        item.uid
+        for item in source_items
+        if item.status != SourceItemProcessStatus.PAUSED
+    ]
+    if not_paused_uids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Source items are not paused: {not_paused_uids}",
         )
+
+    source_item_uids = [item.uid for item in source_items]
+
+    async def run_resume(_):
+        """文档 resume service 封装函数；兼容 job manager 调用"""
+        async for event in source_item_indexing_service.resume_source_items(
+            source_uid=source_uid,
+            source_item_uids=source_item_uids,
+        ):
+            yield event
+
+    job = await rag_job_manager.start_job(
+        job_type=RAGJobType.RESUME_INGEST,
+        source_uid=source_uid,
+        source_item_uids=source_item_uids,
+        active_group=_source_rag_active_group(source_uid),
+        runner=run_resume,
+    )
+
+    return RAGJobStartResponse.model_validate(job)
 
 
 # NOTE: 文档检索时，需要注意 status = "completed" 的数据项，才是可以被检索的；
