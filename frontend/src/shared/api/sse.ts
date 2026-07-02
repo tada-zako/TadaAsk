@@ -2,6 +2,7 @@
  * SSE 流解析后返回的封装对象
  */
 interface SseFrame {
+  id?: string;
   event: string;
   data: string;
 }
@@ -37,7 +38,7 @@ export async function* parseSseStream<TEvent>(
           // NOTE: 目前后端 SSE 传输的都是 schema data，
           // 这里可以直接 JSON.parse 解析
           const payload = frame.data ? JSON.parse(frame.data) : {};
-          yield { event: frame.event, ...payload } as TEvent;
+          yield { ...payload, event: frame.event, sseId: frame.id } as TEvent;
         }
 
         boundary = findFrameBoundary(buffer);
@@ -59,7 +60,7 @@ export async function* parseSseStream<TEvent>(
  * 解析单个 SSE frame
  *
  * Frame example:
- * vent: chat_update
+ * event: chat_update
  * data: {
  * data:   "generationUid": "gen-8f9d0c2e",
  * data:   "sessionUid": "sess-3a2b1c0d",
@@ -74,6 +75,7 @@ export async function* parseSseStream<TEvent>(
 function parseSseFrame(frameText: string): SseFrame | null {
   const lines = frameText.split(/\r?\n/);
   const dataLines: string[] = [];
+  let id: string | undefined;
   let event = "message"; // 默认 event 类型
 
   for (const line of lines) {
@@ -88,7 +90,9 @@ function parseSseFrame(frameText: string): SseFrame | null {
       separatorIndex === -1 ? "" : line.slice(separatorIndex + 1);
     const value = rawValue.startsWith(" ") ? rawValue.slice(1) : rawValue;
 
-    if (field === "event") {
+    if (field === "id") {
+      id = value;
+    } else if (field === "event") {
       event = value;
     } else if (field === "data") {
       dataLines.push(value);
@@ -100,6 +104,7 @@ function parseSseFrame(frameText: string): SseFrame | null {
   }
 
   return {
+    id,
     event,
     data: dataLines.join("\n"),
   };
