@@ -155,6 +155,16 @@ class RAGSyncEventType(str, enum.Enum):
     ITEM_FAILED = "item_failed"
 
 
+class IndexingJobStatus(str, enum.Enum):
+    """文档 index 任务状态"""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class SearchMode(str, enum.Enum):
     """
     搜索模式
