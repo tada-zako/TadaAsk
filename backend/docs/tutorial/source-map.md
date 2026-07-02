@@ -8,7 +8,7 @@
 - Visitor router 汇总：[app/api/visitor/router.py](../../app/api/visitor/router.py)
 - Admin auth：[app/api/admin/endpoints/auth.py](../../app/api/admin/endpoints/auth.py)
 - Project / Widget / Project Settings / Project-Source 绑定：[app/api/admin/endpoints/project.py](../../app/api/admin/endpoints/project.py)
-- Source / SourceItem / upload / crawl sync / indexing / pause / resume：[app/api/admin/endpoints/source.py](../../app/api/admin/endpoints/source.py)
+- Source / SourceItem / upload / RAG job start/query/events / pause / resume：[app/api/admin/endpoints/source.py](../../app/api/admin/endpoints/source.py)
 - Provider / Model Profile：[app/api/admin/endpoints/model_profile.py](../../app/api/admin/endpoints/model_profile.py)
 - Admin chat stream / revert / cancel / citation reserved endpoint：[app/api/admin/endpoints/chat.py](../../app/api/admin/endpoints/chat.py)
 - Admin session / message timeline：[app/api/admin/endpoints/session.py](../../app/api/admin/endpoints/session.py)
@@ -17,7 +17,7 @@
 
 ## Schema And Constants
 
-- API request/response helpers, SSE sync event, delete/cancel responses：[app/api/schemas.py](../../app/api/schemas.py)
+- API request/response helpers, RAG job schemas, SSE sync event, delete/cancel responses：[app/api/schemas.py](../../app/api/schemas.py)
 - DB-facing Pydantic schemas, Project/Source/Chat/RAGSnapshot：[app/db/schemas.py](../../app/db/schemas.py)
 - ORM models：[app/db/models.py](../../app/db/models.py)
 - enums and file type constants：[app/core/constants.py](../../app/core/constants.py)
@@ -30,6 +30,7 @@
 - Local file upload to SourceItem：[app/services/sources/file_upload.py](../../app/services/sources/file_upload.py)
 - SourceItem delete and vector/file cleanup：[app/services/sources/source_item.py](../../app/services/sources/source_item.py)
 - Web crawl materialization：[app/services/sources/web_crawl.py](../../app/services/sources/web_crawl.py)
+- RAG background job manager and event replay cache：[app/services/jobs/rag_job_manager.py](../../app/services/jobs/rag_job_manager.py)
 - SourceItem indexing orchestration：[app/services/indexing/source_item_indexing.py](../../app/services/indexing/source_item_indexing.py)
 - Chunk SQL/vector index writer：[app/services/indexing/chunk_index_writer.py](../../app/services/indexing/chunk_index_writer.py)
 - File parser factory and parser implementations：[app/ingestion/parser/](../../app/ingestion/parser/)
@@ -57,7 +58,7 @@ Citation display data is currently stored in `ChatMessage.rag_snapshot` as `RAGS
 - Compaction service：[app/services/chat/compaction_service.py](../../app/services/chat/compaction_service.py)
 - Active generation registry：[app/services/chat/generation_registry.py](../../app/services/chat/generation_registry.py)
 
-Chat SSE events are defined in `app/services/schemas.py`; source sync/indexing SSE events are defined by `RAGSyncEvent` in `app/api/schemas.py`.
+Chat SSE events are defined in `app/services/schemas.py`. Source crawl/index/resume jobs are started from the Source router, tracked by `RAGJobManager`, and observed through `RAGSyncEvent` events defined in `app/api/schemas.py`.
 
 ## CRUD Layer
 
