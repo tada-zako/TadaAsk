@@ -288,14 +288,31 @@ class SourceWithItemsCount(SourceRead):
 
 
 class SourceUpdate(BaseModel):
-    status: SourceProcessStatus | None = None
-    sync_interval: int | None = Field(
-        default=None, ge=1, description="Synchronization interval (in hours)"
+    """Source 更新 schema"""
+
+    source_name: str | None = None
+    is_public: bool | None = None
+    web_crawl_config: "WebCrawlConfig | None" = Field(
+        default=None,
+        description="Configuration for web crawling; only accepted by web_crawl sources",
     )
+
+    @field_validator("source_name")
+    @classmethod
+    def normalize_source_name(cls, value: str | None) -> str | None:
+        """确保传入的 source name 不为空"""
+        if value is None:
+            return None
+
+        value = value.strip()
+        if not value:
+            raise ValueError("source_name must not be empty")
+        return value
 
     model_config = ConfigDict(
         alias_generator=to_camel,
         validate_by_alias=True,
+        validate_by_name=True,
     )
 
 

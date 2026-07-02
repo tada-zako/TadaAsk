@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Source, SourceItem, DocumentContent, DocumentChunk
 from app.db.schemas import (
     SourceInternal,
+    SourceUpdate,
     SourceWithItemsCount,
     SourceItemInternal,
     DocumentChunkInternal,
@@ -107,12 +108,37 @@ class SourceCRUD:
             return True
         return False
 
+    async def update_source(
+        self,
+        *,
+        source: Source,
+        source_data: SourceUpdate,
+        reset_status: SourceProcessStatus | None = None,
+    ) -> Source:
+        """更新数据源基础信息"""
+        data = source_data.model_dump(exclude_unset=True, mode="json")
+        for key, value in data.items():
+            setattr(source, key, value)
+
+        if reset_status is not None:
+            source.status = reset_status
+
+        await self.session.flush()
+        return source
+
     async def update_source_status(
         self, source: Source, new_status: SourceProcessStatus
     ) -> Source:
         """更新数据源的处理状态"""
         source.status = new_status
         return source
+
+    async def count_source_items_by_source_id(self, *, source_id: int) -> int:
+        """统计数据源下的数据项数量"""
+        result = await self.session.execute(
+            select(func.count(SourceItem.id)).where(SourceItem.source_id == source_id)
+        )
+        return result.scalar_one()
 
     # =====================
     # SourceItem 相关操作
@@ -245,6 +271,18 @@ class SourceCRUD:
         result = await self.session.execute(stmt)
         filenames = result.scalars().all()
         return [name for name in filenames if name is not None]
+
+    async def list_source_item_storage_keys_by_source_id(
+        self, *, source_id: int
+    ) -> Sequence[str]:
+        """根据数据源 ID 获取本地存储 key 列表"""
+        stmt = select(SourceItem.storage_key).where(
+            SourceItem.source_id == source_id,
+            SourceItem.storage_key.is_not(None),
+        )
+        result = await self.session.execute(stmt)
+        storage_keys = result.scalars().all()
+        return [key for key in storage_keys if key is not None]
 
     async def get_source_items_by_uids_for_source(
         self, source_id: int, item_uids: list[str]
