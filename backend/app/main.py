@@ -37,6 +37,7 @@ from app.rag.utils import FTSTokenizer, JiebaFTSTokenizer
 from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer, TokenCounter
 from app.services.chat import GenerationRegistry
 from app.services.model_profiles import ModelProfileService
+from app.services.indexing import SourceItemIndexingService, IndexingJobManager
 from app.api import admin, visitor
 from app.api.visitor.widget_cors import WidgetScopedCORSMiddleware
 
@@ -192,12 +193,27 @@ async def lifespan(app: FastAPI):
     token_counter = TokenCounter(tokenizer=embedding_tokenizer)
     app.state.token_counter = token_counter
 
+    # ======= Indexing 任务管理器挂载 =======
+    indexing_service = SourceItemIndexingService(
+        session_factory=async_session,
+        file_storage=file_storage,
+        file_parser_factory=file_parser_factory,
+        vector_db=vector_db,
+        text_splitter=text_splitter,
+        embedding=embedding_provider,
+        fts_provider=fts_search_provider,
+    )
+    app.state.indexing_job_manager = IndexingJobManager(
+        indexing_service=indexing_service
+    )
+
     # TODO: MVP 实现：在应用启动时验证管理员账号，如果不存在则创建一个默认管理员
     await valid_or_create_admin()
 
     yield  # 运行应用
 
     # await drop_db()  # 应用关闭时清理数据库连接
+    # TODO: indexing job manager cleanup
     logger.info("Shutting down the application...")
 
 
