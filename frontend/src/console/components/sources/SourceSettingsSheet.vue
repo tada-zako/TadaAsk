@@ -2,7 +2,7 @@
 // 导入 Vue 核心 API
 import { computed } from "vue";
 // 导入 Lucide 图标
-import { FileText, Globe2, Settings } from "@lucide/vue";
+import { FileText, Globe2, Settings, Trash2 } from "@lucide/vue";
 
 // 导入 UI 组件
 import { Badge } from "@/shared/components/ui/badge";
@@ -18,7 +18,6 @@ import {
 } from "@/shared/components/ui/select";
 import {
   Sheet,
-  SheetClose,
   SheetContent,
   SheetFooter,
   SheetHeader,
@@ -194,20 +193,22 @@ const visibilityHelp = computed(() =>
       </div>
 
       <SheetFooter
-        class="mt-0 flex-row justify-end border-t border-(--line-soft) p-4.5"
+        class="mt-0 flex-row justify-between border-t border-(--line-soft) p-4.5"
       >
-        <SheetClose as-child>
-          <Button
-            type="button"
-            aria-label="Close source settings"
-            variant="outline"
-          >
-            Close
-          </Button>
-        </SheetClose>
-        <Button type="button" aria-label="Save source settings" disabled>
-          Save changes
+        <Button
+          type="button"
+          aria-label="Delete source"
+          variant="outline"
+          class="border-red-400/35 text-red-100 hover:bg-red-400/10 hover:text-red-100"
+        >
+          <Trash2 class="size-4" />
+          Delete
         </Button>
+        <div class="flex justify-end">
+          <Button type="button" aria-label="Save source settings" disabled>
+            Save changes
+          </Button>
+        </div>
       </SheetFooter>
     </SheetContent>
   </Sheet>

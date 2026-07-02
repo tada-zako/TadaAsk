@@ -48,10 +48,10 @@ import { Switch } from "@/shared/components/ui/switch";
         <!-- 数据源类型选择 -->
         <section class="grid gap-2">
           <Label>Source type</Label>
-          <div class="grid gap-2">
+          <div class="grid grid-cols-2 gap-2 max-[560px]:grid-cols-1">
             <!-- 本地文件类型 -->
             <button
-              class="border-primary/35 bg-primary/10 grid min-h-23 grid-cols-[34px_minmax(0,1fr)] items-center gap-x-3 rounded-(--console-radius-lg) border p-3 text-left"
+              class="border-primary/35 bg-primary/10 grid min-h-24 content-start gap-2 rounded-(--console-radius-lg) border p-3 text-left"
               type="button"
               aria-label="Local file source type"
             >
@@ -63,14 +63,14 @@ import { Switch } from "@/shared/components/ui/switch";
               <strong class="text-[13px] font-semibold text-(--text-strong)">
                 Local file
               </strong>
-              <span class="col-start-2 text-xs leading-5 text-(--text-faint)">
+              <span class="text-xs leading-5 text-(--text-faint)">
                 Upload files from the items page.
               </span>
             </button>
 
             <!-- 网页爬取类型 -->
             <button
-              class="grid min-h-23 grid-cols-[34px_minmax(0,1fr)] items-center gap-x-3 rounded-(--console-radius-lg) border border-(--line) bg-(--surface-panel-soft) p-3 text-left"
+              class="grid min-h-24 content-start gap-2 rounded-(--console-radius-lg) border border-(--line) bg-(--surface-panel-soft) p-3 text-left"
               type="button"
               aria-label="Web crawl source type"
             >
@@ -82,7 +82,7 @@ import { Switch } from "@/shared/components/ui/switch";
               <strong class="text-[13px] font-semibold text-(--text-strong)">
                 Web crawl
               </strong>
-              <span class="col-start-2 text-xs leading-5 text-(--text-faint)">
+              <span class="text-xs leading-5 text-(--text-faint)">
                 Configure crawl rules before sync.
               </span>
             </button>
@@ -114,21 +114,6 @@ import { Switch } from "@/shared/components/ui/switch";
           <p class="text-xs leading-5 text-(--text-faint)">
             Visitor RAG still requires at least one completed source item.
           </p>
-        </section>
-
-        <!-- 提示信息 -->
-        <section
-          class="border-primary/30 bg-primary/10 grid grid-cols-[24px_minmax(0,1fr)] gap-3 rounded-(--console-radius-lg) border p-3"
-        >
-          <span class="bg-primary mt-1.5 size-2 rounded-full"></span>
-          <div>
-            <strong class="block text-[13px] text-(--text-strong)">
-              Items are managed after creation
-            </strong>
-            <span class="mt-1 block text-xs leading-5 text-(--text-muted)">
-              Upload, sync, and indexing are source item workspace operations.
-            </span>
-          </div>
         </section>
 
         <!-- 网页爬取配置面板（仅在选择 Web crawl 时展示） -->
