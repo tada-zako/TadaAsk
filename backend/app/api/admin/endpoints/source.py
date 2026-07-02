@@ -14,10 +14,11 @@ from fastapi import (
 )
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from loguru import logger
+from sqlalchemy.exc import IntegrityError
 
 from ...deps import (
     SourceCRUDeps,
-    SourceCreationServiceDeps,
+    SourceServiceDeps,
     SourceItemServiceDeps,
     SourceItemUploadServiceDeps,
     WebCrawlSyncServiceDeps,
@@ -26,7 +27,9 @@ from ...deps import (
 )
 from ...schemas import (
     IngestPausedResponse,
+    SourceDeleteResponse,
     SourceItemDeleteResponse,
+    SourceItemDownloadResponse,
     RAGJobStartResponse,
     RAGJobRead,
     ActiveRAGJobsResponse,
@@ -35,6 +38,8 @@ from app.db.models import Source, SourceItem
 from app.db.schemas import (
     SourceCreate,
     SourceRead,
+    SourceUpdate,
+    SourceItemRenameRequest,
     SourceItemRead,
     WebCrawlConfig,
 )
@@ -48,7 +53,11 @@ from app.core.exceptions import (
     SourceCreateStorageError,
     SourceCreateValidationError,
     SourceCreateConflictError,
+    SourceDeleteStorageError,
+    SourceUpdateConflictError,
+    SourceUpdateValidationError,
     SourceItemDeleteConflictError,
+    SourceItemDownloadUnsupportedError,
 )
 from app.core.config import settings
 
@@ -124,7 +133,7 @@ def valid_files(files: list[UploadFile]) -> list[UploadFile]:
 
 async def valid_source(
     source_crud: SourceCRUDeps,
-    source_uid: Annotated[str, FastAPIPath(..., description="Project UID")],
+    source_uid: Annotated[str, FastAPIPath(..., description="Source UID")],
 ) -> Source:
     """验证 source UID 是否有效，返回 source 实例或抛出 HTTPException"""
     source = await source_crud.get_source_by_uid(source_uid=source_uid)
@@ -135,7 +144,7 @@ async def valid_source(
 
 async def valid_source_uid(
     source_crud: SourceCRUDeps,
-    source_uid: Annotated[str, FastAPIPath(..., description="Project UID")],
+    source_uid: Annotated[str, FastAPIPath(..., description="Source UID")],
 ) -> str:
     """验证 source UID 是否有效，返回 source_uid 或抛出 HTTPException"""
     source = await source_crud.get_source_by_uid(source_uid=source_uid)
@@ -314,16 +323,40 @@ def _source_rag_active_group(source_uid: str) -> str:
     return f"source_rag:{source_uid}"
 
 
+def _ensure_no_active_source_rag_job(
+    *,
+    source_uid: str,
+    rag_job_manager: RAGJobManagerDeps,
+) -> None:
+    """
+    检查目标 source 是否被用于 rag job;
+    删除或修改关键配置前，避免和正在运行的 RAG job 互相踩踏
+    """
+    active_job = next(
+        (
+            job
+            for job in rag_job_manager.list_active_jobs()
+            if job.source_uid == source_uid
+        ),
+        None,
+    )
+    if active_job:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Source has an active RAG job: {active_job.job_uid}",
+        )
+
+
 # ===============================
 # API 端点实现
 # ===============================
 @router.post("/new", response_model=SourceRead)
 async def create_source(
     source_data: Annotated[SourceCreate, Body(..., description="数据源创建信息")],
-    source_creation_service: SourceCreationServiceDeps,
+    source_service: SourceServiceDeps,
 ):
     try:
-        source = await source_creation_service.create_source(source_data=source_data)
+        source = await source_service.create_source(source_data=source_data)
     except SourceCreateConflictError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except SourceCreateValidationError as exc:
@@ -351,6 +384,75 @@ async def list_sources(
 
     sources = await source_crud.list_sources(limit=limit, offset=offset)
     return [SourceRead.model_validate(source) for source in sources]
+
+
+@router.get("/{source_uid}", response_model=SourceRead)
+async def get_source(
+    source: ValidSourceDeps,
+):
+    """获取 source 详情"""
+    return SourceRead.model_validate(source)
+
+
+@router.patch("/{source_uid}", response_model=SourceRead)
+async def update_source(
+    source: ValidSourceDeps,
+    payload: Annotated[SourceUpdate, Body(..., description="Source 更新数据")],
+    source_service: SourceServiceDeps,
+    rag_job_manager: RAGJobManagerDeps,
+):
+    """更新 source 基础配置；webCrawlConfig 更新后会重置 source status。"""
+    if "web_crawl_config" in payload.model_fields_set:
+        # 修改 web crawl config，需要确保 source 未被 rag job 使用
+        _ensure_no_active_source_rag_job(
+            source_uid=source.uid,
+            rag_job_manager=rag_job_manager,
+        )
+
+    try:
+        updated_source = await source_service.update_source(
+            source=source,
+            source_data=payload,
+        )
+    except SourceUpdateConflictError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except SourceUpdateValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        logger.warning(f"更新 source 失败，存在唯一约束冲突：{exc}")
+        raise HTTPException(
+            status_code=400,
+            detail="source with the same name already exists",
+        ) from exc
+
+    return SourceRead.model_validate(updated_source)
+
+
+@router.delete("/{source_uid}", response_model=SourceDeleteResponse)
+async def delete_source(
+    source: ValidSourceDeps,
+    source_service: SourceServiceDeps,
+    rag_job_manager: RAGJobManagerDeps,
+):
+    """删除 source，并清理向量集合、本地文件和级联数据库记录。"""
+    _ensure_no_active_source_rag_job(
+        source_uid=source.uid,
+        rag_job_manager=rag_job_manager,
+    )
+
+    try:
+        result = await source_service.delete_source(source=source)
+    except SourceDeleteStorageError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return SourceDeleteResponse(
+        source_uid=source.uid,
+        deleted_source_item_count=result.deleted_source_item_count,
+        file_deleted_count=result.file_deleted_count,
+        file_delete_failed_count=result.file_delete_failed_count,
+        vector_collection_deleted=result.vector_collection_deleted,
+        cleanup_errors=result.cleanup_errors,
+    )
 
 
 async def valid_local_file_source(
@@ -406,6 +508,53 @@ async def list_source_items(
         offset=offset,
     )
     return [SourceItemRead.model_validate(item) for item in items]
+
+
+@router.patch("/{source_uid}/items/{source_item_uid}", response_model=SourceItemRead)
+async def rename_source_item(
+    source: ValidSourceDeps,
+    source_item: Annotated[SourceItem, Depends(valid_source_item_from_path)],
+    payload: Annotated[
+        SourceItemRenameRequest,
+        Body(..., description="SourceItem 展示名称更新数据"),
+    ],
+    source_item_service: SourceItemServiceDeps,
+):
+    """重命名 source item 展示字段，不修改 storage_key 或物理文件。"""
+    renamed_item = await source_item_service.rename_source_item(
+        source=source,
+        source_item=source_item,
+        title=payload.title,
+    )
+    return SourceItemRead.model_validate(renamed_item)
+
+
+@router.get(
+    "/{source_uid}/items/{source_item_uid}/download",
+    response_model=SourceItemDownloadResponse,
+)
+async def get_source_item_download(
+    source: ValidSourceDeps,
+    source_item: Annotated[SourceItem, Depends(valid_source_item_from_path)],
+    source_item_service: SourceItemServiceDeps,
+):
+    """获取 local file source item 的下载地址；web crawl 暂不支持下载。"""
+    try:
+        download_info = await source_item_service.get_download_info(
+            source=source,
+            source_item=source_item,
+        )
+    except SourceItemDownloadUnsupportedError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return SourceItemDownloadResponse(
+        source_uid=source.uid,
+        source_item_uid=source_item.uid,
+        download_url=download_info.download_url,
+        filename=download_info.filename,
+    )
 
 
 @router.delete(

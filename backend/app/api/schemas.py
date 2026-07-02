@@ -127,6 +127,39 @@ class SourceItemDeleteResponse(BaseModel):
     )
 
 
+class SourceDeleteResponse(BaseModel):
+    """Source 删除响应结构体"""
+
+    source_uid: str
+    status: str = "deleted"
+    deleted_source_item_count: int
+    file_deleted_count: int
+    file_delete_failed_count: int
+    vector_collection_deleted: bool
+    cleanup_errors: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class SourceItemDownloadResponse(BaseModel):
+    """Source item 下载响应结构体"""
+
+    source_uid: str
+    source_item_uid: str
+    download_url: str
+    filename: str
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 class ModelSelection(BaseModel):
     """模型选择请求结构体"""
 

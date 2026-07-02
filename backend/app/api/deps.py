@@ -27,10 +27,10 @@ from app.rag import (
 )
 from app.utils import TokenCounter
 from app.services.sources import (
+    SourceService,
     SourceItemUploadService,
     SourceItemService,
     WebCrawlSyncService,
-    SourceCreationService,
 )
 from app.services.indexing import SourceItemIndexingService
 from app.services.jobs import RAGJobManager
@@ -269,13 +269,15 @@ async def valid_chat_session(
 
 
 # =========== Service 层依赖注入接口 ===========
-def get_source_creation_service(
+def get_source_service(
     source_crud: "SourceCRUDeps",
+    file_storage: "FileStorageDeps",
     vector_db: "VectorDBDeps",
-) -> SourceCreationService:
-    """SourceCreationService 依赖注入接口"""
-    return SourceCreationService(
+) -> SourceService:
+    """SourceService 依赖注入接口"""
+    return SourceService(
         source_crud=source_crud,
+        file_storage=file_storage,
         vector_db=vector_db,
     )
 
@@ -444,9 +446,9 @@ ValidChatSessionDeps = Annotated[ChatSession, Depends(valid_chat_session)]
 
 
 # Service 依赖
-SourceCreationServiceDeps = Annotated[
-    SourceCreationService,
-    Depends(get_source_creation_service),
+SourceServiceDeps = Annotated[
+    SourceService,
+    Depends(get_source_service),
 ]
 ModelProfileServiceDeps = Annotated[
     ModelProfileService,
