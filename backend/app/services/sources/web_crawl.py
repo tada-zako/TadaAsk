@@ -296,6 +296,7 @@ class WebCrawlSyncService:
         - 如果 source_item 正在 indexing 阶段， 则跳过修改，避免内容和索引不一致
         - 如果 source_item 存在且页面未修改，则更新 metadata 并跳过 COMPLETED 状态的 source_item；对于其他状态的 source_item，更新状态为 PENDING
         - 如果 source_item 存在且页面已修改，则更新内容和 metadata，并标记为 PENDING
+        - TODO: 这里逻辑不完备，如果 source_items 中残留了本次 discovered_urls 未检索到的历史记录，会出现残余废文件，影响后续 RAG
         """
         async with self.session_factory() as session:
             async with session.begin():
