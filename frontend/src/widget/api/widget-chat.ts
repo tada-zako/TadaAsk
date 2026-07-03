@@ -1,5 +1,8 @@
 import { client } from "./client";
-import type { VisitorChatRequest } from "@/shared/types/chat-stream";
+import type { components } from "@/shared/api/generated/schema";
+
+/** OpenAPI 生成类型别名 */
+export type VisitorChatRequest = components["schemas"]["VisitorChatRequest"];
 
 /** Visitor Widget 侧的公开聊天接口 */
 export const widgetChatApi = {

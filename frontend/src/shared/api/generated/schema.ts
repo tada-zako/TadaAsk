@@ -1866,10 +1866,10 @@ export interface components {
             /** Uid */
             uid: string;
             /**
-             * Syncedat
+             * Updatedat
              * Format: date-time
              */
-            syncedAt: string;
+            updatedAt: string;
             /**
              * Createdat
              * Format: date-time

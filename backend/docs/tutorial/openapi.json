@@ -5475,10 +5475,10 @@
                         "type": "string",
                         "title": "Uid"
                     },
-                    "syncedAt": {
+                    "updatedAt": {
                         "type": "string",
                         "format": "date-time",
-                        "title": "Syncedat"
+                        "title": "Updatedat"
                     },
                     "createdAt": {
                         "type": "string",
@@ -5491,7 +5491,7 @@
                     "sourceName",
                     "sourceType",
                     "uid",
-                    "syncedAt",
+                    "updatedAt",
                     "createdAt"
                 ],
                 "title": "SourceRead"
@@ -5544,7 +5544,8 @@
                     }
                 },
                 "type": "object",
-                "title": "SourceUpdate"
+                "title": "SourceUpdate",
+                "description": "Source 更新 schema"
             },
             "ThinkingEffort": {
                 "type": "string",
