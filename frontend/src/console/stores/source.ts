@@ -16,6 +16,7 @@ import {
   pauseSourceItems as pauseSourceItemsRequest,
   renameSourceItem as renameSourceItemRequest,
   resumeSourceItems as resumeSourceItemsRequest,
+  streamRagJobEvents,
   syncWebCrawlSource,
   toSourceJobViewModel,
   toSourceRow,
@@ -27,6 +28,7 @@ import {
 } from "@/console/services/source-workspace";
 import type {
   IngestPausedResponse,
+  RAGJobCounters,
   RAGJobEvent,
   RAGJobStartResponse,
   SourceDeleteResponse,
@@ -52,6 +54,14 @@ export const useSourceStore = defineStore("console-source", () => {
   const activeJobsBySourceUid = ref<Record<string, SourceJobViewModel[]>>({});
   const itemProgressByUid = ref<Record<string, number | null>>({});
   const jobProgressBySourceUid = ref<Record<string, number | null>>({});
+  // SSE 事件流实时数据字段
+  const jobMessageBySourceUid = ref<Record<string, string | null>>({});
+  const jobErrorBySourceUid = ref<Record<string, string | null>>({});
+  const jobCountersBySourceUid = ref<Record<string, RAGJobCounters | null>>({});
+  // SSE 流控制：每个 job 一个 AbortController，支持断连与重连
+  const jobStreamControllersByUid = ref<Record<string, AbortController>>({});
+  // SSE Last-Event-ID，用于断线重连时续传
+  const jobLastEventIdByUid = ref<Record<string, string>>({});
   const isLoading = ref(false);
   const isMutating = ref(false);
   const errorMessage = ref<string | null>(null);
@@ -76,7 +86,7 @@ export const useSourceStore = defineStore("console-source", () => {
   );
 
   // --- 异步动作 ---
-  // 加载并初始化所有知识库列表
+  /** 加载并初始化所有知识库列表 */
   async function loadSources(): Promise<SourceRead[]> {
     isLoading.value = true;
     errorMessage.value = null;
@@ -245,14 +255,16 @@ export const useSourceStore = defineStore("console-source", () => {
     }
   }
 
-  // 触发 web_crawl 同步任务，并将返回的 job 写入活跃任务状态
+  // 触发 web_crawl 同步任务，写入活跃任务并连接 SSE 进度流
   async function syncWebCrawl(sourceUid: string): Promise<RAGJobStartResponse> {
     isMutating.value = true;
     errorMessage.value = null;
 
     try {
       const job = await syncWebCrawlSource(sourceUid);
-      upsertActiveJob(toSourceJobViewModel(job));
+      const jobView = toSourceJobViewModel(job);
+      upsertActiveJob(jobView);
+      void connectJobStream(jobView);
       return job;
     } catch (error) {
       errorMessage.value = getErrorMessage(
@@ -265,7 +277,7 @@ export const useSourceStore = defineStore("console-source", () => {
     }
   }
 
-  // 对选中子项启动索引，并将返回的 job 写入活跃任务状态
+  // 对选中子项启动索引，写入活跃任务并连接 SSE 进度流
   async function indexItems(
     sourceUid: string,
     sourceItemUids: string[],
@@ -275,7 +287,9 @@ export const useSourceStore = defineStore("console-source", () => {
 
     try {
       const job = await indexSourceItemsRequest(sourceUid, sourceItemUids);
-      upsertActiveJob(toSourceJobViewModel(job));
+      const jobView = toSourceJobViewModel(job);
+      upsertActiveJob(jobView);
+      void connectJobStream(jobView);
       return job;
     } catch (error) {
       errorMessage.value = getErrorMessage(
@@ -288,7 +302,7 @@ export const useSourceStore = defineStore("console-source", () => {
     }
   }
 
-  // 暂停指定子项的索引处理
+  // 暂停指定子项的索引处理，并立即将返回的处理状态 patch 到本地
   async function pauseItems(
     sourceUid: string,
     sourceItemUids: string[],
@@ -297,7 +311,18 @@ export const useSourceStore = defineStore("console-source", () => {
     errorMessage.value = null;
 
     try {
-      return await pauseSourceItemsRequest(sourceUid, sourceItemUids);
+      const pausedItems = await pauseSourceItemsRequest(
+        sourceUid,
+        sourceItemUids,
+      );
+      for (const item of pausedItems) {
+        patchSourceItemStatus(
+          sourceUid,
+          item.sourceItemUid,
+          item.processStatus,
+        );
+      }
+      return pausedItems;
     } catch (error) {
       errorMessage.value = getErrorMessage(
         error,
@@ -309,7 +334,7 @@ export const useSourceStore = defineStore("console-source", () => {
     }
   }
 
-  // 恢复已暂停子项的索引，并将返回的 job 写入活跃任务状态
+  // 恢复已暂停子项的索引，写入活跃任务并连接 SSE 进度流
   async function resumeItems(
     sourceUid: string,
     sourceItemUids: string[],
@@ -319,7 +344,9 @@ export const useSourceStore = defineStore("console-source", () => {
 
     try {
       const job = await resumeSourceItemsRequest(sourceUid, sourceItemUids);
-      upsertActiveJob(toSourceJobViewModel(job));
+      const jobView = toSourceJobViewModel(job);
+      upsertActiveJob(jobView);
+      void connectJobStream(jobView);
       return job;
     } catch (error) {
       errorMessage.value = getErrorMessage(
@@ -426,10 +453,121 @@ export const useSourceStore = defineStore("console-source", () => {
     }
   }
 
-  // 应用 RAG 任务增量 SSE 事件，局部更新知识库及子项的状态与进度
+  // 为指定知识库的所有活跃 job 建立 SSE 事件流连接
+  async function connectSourceJobStreams(sourceUid: string): Promise<void> {
+    const jobs = activeJobsBySourceUid.value[sourceUid] ?? [];
+
+    for (const job of jobs) {
+      void connectJobStream(job);
+    }
+  }
+
+  // 连接单个 job 的 SSE 事件流，循环消费事件直到流关闭或主动断开
+  // 流正常结束后自动刷新 workspace 与活跃任务列表
+  async function connectJobStream(job: SourceJobViewModel): Promise<void> {
+    if (jobStreamControllersByUid.value[job.jobUid]) {
+      return; // 已有连接，避免重复
+    }
+
+    const controller = new AbortController(); // 实例化中断控制器
+    jobStreamControllersByUid.value = {
+      ...jobStreamControllersByUid.value,
+      [job.jobUid]: controller,
+    };
+
+    try {
+      // 请求 SSE 观察 API
+      const stream = await streamRagJobEvents(job.jobUid, {
+        lastEventId: jobLastEventIdByUid.value[job.jobUid],
+        signal: controller.signal,
+      });
+
+      for await (const event of stream) {
+        // 检查中断
+        if (controller.signal.aborted) {
+          break;
+        }
+
+        if (event.sseId) {
+          jobLastEventIdByUid.value = {
+            ...jobLastEventIdByUid.value,
+            [job.jobUid]: event.sseId, // 追加 job event
+          };
+        }
+
+        // 更新内存 source 相关状态
+        applyRagJobEvent(event);
+      }
+
+      if (!controller.signal.aborted) {
+        await refreshSourceWorkspaceInBackground(job.sourceUid);
+        await loadActiveJobs();
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        jobErrorBySourceUid.value = {
+          ...jobErrorBySourceUid.value,
+          [job.sourceUid]: getErrorMessage(
+            error,
+            t("sources.service.errors.streamJob"),
+          ),
+        };
+      }
+    } finally {
+      const nextControllers = { ...jobStreamControllersByUid.value };
+      delete nextControllers[job.jobUid];
+      jobStreamControllersByUid.value = nextControllers;
+    }
+  }
+
+  // 断开单个 job 的 SSE 连接并清理 controller
+  function disconnectJobStream(jobUid: string): void {
+    jobStreamControllersByUid.value[jobUid]?.abort();
+
+    const nextControllers = { ...jobStreamControllersByUid.value };
+    delete nextControllers[jobUid];
+    jobStreamControllersByUid.value = nextControllers;
+  }
+
+  // 断开指定知识库下所有活跃 job 的 SSE 连接
+  function disconnectSourceJobStreams(sourceUid: string): void {
+    for (const job of activeJobsBySourceUid.value[sourceUid] ?? []) {
+      disconnectJobStream(job.jobUid);
+    }
+  }
+
+  // 断开全部 job 的 SSE 连接（页面/组件卸载时调用）
+  function disconnectAllJobStreams(): void {
+    for (const jobUid of Object.keys(jobStreamControllersByUid.value)) {
+      disconnectJobStream(jobUid);
+    }
+  }
+
+  // 应用 RAG 任务增量 SSE 事件，局部更新知识库及子项的状态、进度、消息等
   function applyRagJobEvent(event: RAGJobEvent): void {
     if (event.sourceStatus) {
       patchSourceStatus(event.sourceUid, event.sourceStatus);
+    }
+
+    if (event.message) {
+      jobMessageBySourceUid.value = {
+        ...jobMessageBySourceUid.value,
+        [event.sourceUid]: event.message,
+      };
+    }
+
+    if (event.error) {
+      jobErrorBySourceUid.value = {
+        ...jobErrorBySourceUid.value,
+        [event.sourceUid]: event.error,
+      };
+    }
+
+    if (event.counters) {
+      jobCountersBySourceUid.value = {
+        ...jobCountersBySourceUid.value,
+        [event.sourceUid]: event.counters,
+      };
     }
 
     if (event.sourceItem) {
@@ -502,9 +640,10 @@ export const useSourceStore = defineStore("console-source", () => {
     };
   }
 
-  // 清除指定知识库的运行时临时数据（选中、活跃任务、任务进度）
+  // 清除指定知识库的运行时临时数据（选中、活跃任务、SSE 连接、进度等）
   function clearSourceRuntimeState(sourceUid: string): void {
     clearItemSelection(sourceUid);
+    disconnectSourceJobStreams(sourceUid);
 
     const nextJobs = { ...activeJobsBySourceUid.value };
     delete nextJobs[sourceUid];
@@ -513,6 +652,18 @@ export const useSourceStore = defineStore("console-source", () => {
     const nextJobProgress = { ...jobProgressBySourceUid.value };
     delete nextJobProgress[sourceUid];
     jobProgressBySourceUid.value = nextJobProgress;
+
+    const nextMessages = { ...jobMessageBySourceUid.value };
+    delete nextMessages[sourceUid];
+    jobMessageBySourceUid.value = nextMessages;
+
+    const nextErrors = { ...jobErrorBySourceUid.value };
+    delete nextErrors[sourceUid];
+    jobErrorBySourceUid.value = nextErrors;
+
+    const nextCounters = { ...jobCountersBySourceUid.value };
+    delete nextCounters[sourceUid];
+    jobCountersBySourceUid.value = nextCounters;
   }
 
   // --- 内部状态变更 ---
@@ -531,6 +682,24 @@ export const useSourceStore = defineStore("console-source", () => {
     if (currentSource.value?.uid === source.uid) {
       currentSource.value = source;
     }
+  }
+
+  // SSE 流结束后静默刷新 workspace 数据，同步最新状态
+  async function refreshSourceWorkspaceInBackground(
+    sourceUid: string,
+  ): Promise<void> {
+    const workspace = await loadSourceWorkspaceRequest(sourceUid, {
+      itemProgressByUid: itemProgressByUid.value,
+    });
+
+    upsertSource(workspace.source);
+    if (currentSource.value?.uid === sourceUid) {
+      currentSource.value = workspace.source;
+    }
+    setSourceItems(
+      sourceUid,
+      workspace.sourceItemRows.map((row) => row.sourceItem),
+    );
   }
 
   // 移除知识库及其关联子项、运行时数据
@@ -573,7 +742,7 @@ export const useSourceStore = defineStore("console-source", () => {
     );
   }
 
-  // 局部更新知识库状态
+  /** 局部更新知识库状态 */
   function patchSourceStatus(
     sourceUid: string,
     status: SourceRead["status"],
@@ -646,12 +815,17 @@ export const useSourceStore = defineStore("console-source", () => {
     applyRagJobEvent,
     clearItemSelection,
     clearSourceRuntimeState,
+    connectJobStream,
+    connectSourceJobStreams,
     createSource,
     currentSource,
     currentSourceItems,
     currentWorkspace,
     deleteItem,
     deleteSource,
+    disconnectAllJobStreams,
+    disconnectJobStream,
+    disconnectSourceJobStreams,
     downloadItem,
     errorMessage,
     indexItems,
@@ -659,7 +833,12 @@ export const useSourceStore = defineStore("console-source", () => {
     isMutating,
     itemProgressByUid,
     itemsBySourceUid,
+    jobCountersBySourceUid,
+    jobErrorBySourceUid,
+    jobLastEventIdByUid,
+    jobMessageBySourceUid,
     jobProgressBySourceUid,
+    jobStreamControllersByUid,
     loadActiveJobs,
     loadSourceItems,
     loadSourceWorkspace,
@@ -695,12 +874,14 @@ function mergeSourceItems(
 }
 
 // 规范化进度值（0-100 整数），非法值返回 null
+// 后端可能返回 0-1 小数或 0-100 整数，统一按 ≤1 判别并放大
 function normalizeProgress(value: number | null | undefined): number | null {
   if (value === null || value === undefined || Number.isNaN(value)) {
     return null;
   }
 
-  return Math.min(100, Math.max(0, Math.round(value)));
+  const normalized = value <= 1 ? value * 100 : value;
+  return Math.min(100, Math.max(0, Math.round(normalized)));
 }
 
 // 从 unknown 错误中提取可读消息

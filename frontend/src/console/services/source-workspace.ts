@@ -276,7 +276,7 @@ export async function deleteSourceItem(
   return unwrapApiData(data, error, t("sources.service.errors.deleteItem"));
 }
 
-// 获取 local_file 子项下载地址并触发浏览器下载
+// 获取 local_file 子项下载地址并通过动态 <a> 元素触发浏览器下载
 export async function downloadSourceItem(
   sourceUid: string,
   sourceItemUid: string,
@@ -291,9 +291,13 @@ export async function downloadSourceItem(
     t("sources.service.errors.downloadItem"),
   );
 
-  // TODO: 这里的文件下载触发逻辑需要优化
-  if (typeof window !== "undefined") {
-    window.open(download.downloadUrl, "_blank", "noopener,noreferrer");
+  if (typeof document !== "undefined") {
+    const link = document.createElement("a");
+    link.href = download.downloadUrl;
+    link.download = download.filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
   }
 
   return download;
@@ -655,12 +659,14 @@ function normalizeOptionalText(
 }
 
 // 规范化进度值（0-100 整数），非法值返回 null
+// 后端可能返回 0-1 小数或 0-100 整数，统一按 ≤1 判别并放大
 function normalizeProgress(value: number | null | undefined): number | null {
   if (value === null || value === undefined || Number.isNaN(value)) {
     return null;
   }
 
-  return Math.min(100, Math.max(0, Math.round(value)));
+  const normalized = value <= 1 ? value * 100 : value;
+  return Math.min(100, Math.max(0, Math.round(normalized)));
 }
 
 // 格式化绝对日期（如 "15 Jan 2026"）

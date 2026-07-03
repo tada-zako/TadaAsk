@@ -64,6 +64,7 @@ const localError = ref<string | null>(null);
 
 const isWebCrawl = computed(() => sourceType.value === "web_crawl");
 
+/** source create */
 function handleCreate(): void {
   const name = sourceName.value.trim();
 
@@ -73,7 +74,7 @@ function handleCreate(): void {
   }
 
   localError.value = null;
-  // 触发创建 source 信号
+  // 触发创建 source 信号; source view 调用真正的 source create API
   emit("createSource", {
     sourceName: name,
     sourceType: sourceType.value,
