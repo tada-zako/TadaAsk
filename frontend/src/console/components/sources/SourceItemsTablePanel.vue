@@ -83,6 +83,7 @@ const deleteTargetUids = ref<string[]>([]);
 const isWebCrawl = computed(() => props.sourceType === "web-crawl");
 const entityLabel = computed(() => (isWebCrawl.value ? "pages" : "files"));
 const selectedUidSet = computed(() => new Set(props.selectedItemUids));
+const rowUidSet = computed(() => new Set(props.rows.map((row) => row.uid)));
 const selectedRows = computed(() =>
   props.rows.filter((row) => selectedUidSet.value.has(row.uid)),
 );
@@ -91,11 +92,11 @@ const selectedLabel = computed(
 );
 // 表头复选框三态：全选 true / 部分 indeterminate / 全不选 false
 const headerChecked = computed<CheckboxValue>(() => {
-  if (!props.rows.length || !props.selectedItemUids.length) {
+  if (!props.rows.length || !selectedRows.value.length) {
     return false;
   }
 
-  if (props.selectedItemUids.length === props.rows.length) {
+  if (selectedRows.value.length === props.rows.length) {
     return true;
   }
 
@@ -117,22 +118,43 @@ const canBulkDelete = computed(() =>
 );
 
 function toggleAll(value: CheckboxValue): void {
-  emit(
-    "updateSelection",
-    value === true ? props.rows.map((row) => row.uid) : [],
-  );
+  const next = new Set(props.selectedItemUids);
+
+  if (normalizeChecked(value)) {
+    for (const row of props.rows) {
+      next.add(row.uid);
+    }
+  } else {
+    for (const rowUid of rowUidSet.value) {
+      next.delete(rowUid);
+    }
+  }
+
+  emit("updateSelection", Array.from(next));
 }
 
 function toggleRow(row: SourceItemRow, value: CheckboxValue): void {
   const next = new Set(props.selectedItemUids);
 
-  if (value === true) {
+  if (normalizeChecked(value)) {
     next.add(row.uid);
   } else {
     next.delete(row.uid);
   }
 
   emit("updateSelection", Array.from(next));
+}
+
+function handleToggleAll(value: CheckboxValue): void {
+  toggleAll(value);
+}
+
+function handleToggleRow(row: SourceItemRow, value: CheckboxValue): void {
+  toggleRow(row, value);
+}
+
+function normalizeChecked(value: CheckboxValue): boolean {
+  return value === true;
 }
 
 // 对已选行中满足条件的子项执行批量操作，避免重复 emit
@@ -232,7 +254,7 @@ function badgeClass(tone: SourceTone): string {
             <CirclePlay class="size-4" />
             Index
           </Button>
-          <Button
+          <!-- <Button
             type="button"
             :aria-label="`Pause selected ${entityLabel}`"
             variant="outline"
@@ -253,7 +275,7 @@ function badgeClass(tone: SourceTone): string {
           >
             <CirclePlay class="size-4" />
             Resume
-          </Button>
+          </Button> -->
           <Button
             type="button"
             :aria-label="`Delete selected ${entityLabel}`"
@@ -290,11 +312,11 @@ function badgeClass(tone: SourceTone): string {
           <TableRow>
             <TableHead class="text-center">
               <Checkbox
-                :checked="headerChecked"
+                :model-value="headerChecked"
                 :aria-label="`Select all ${entityLabel}`"
                 class="mx-auto"
                 :disabled="isLoading || rows.length === 0"
-                @update:checked="toggleAll"
+                @update:model-value="handleToggleAll"
               />
             </TableHead>
             <TableHead>{{ isWebCrawl ? "Page" : "File" }}</TableHead>
@@ -322,10 +344,10 @@ function badgeClass(tone: SourceTone): string {
           <TableRow v-for="row in rows" v-else :key="row.uid">
             <TableCell class="text-center">
               <Checkbox
-                :checked="selectedUidSet.has(row.uid)"
+                :model-value="selectedUidSet.has(row.uid)"
                 :aria-label="`Select ${row.title}`"
                 class="mx-auto"
-                @update:checked="toggleRow(row, $event)"
+                @update:model-value="handleToggleRow(row, $event)"
               />
             </TableCell>
             <TableCell>

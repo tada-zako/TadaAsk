@@ -165,7 +165,7 @@ function normalizePositiveNumber(value: number, fallback: number): number {
       </Button>
     </SheetTrigger>
     <SheetContent
-      class="w-[min(520px,100vw)] gap-0 border-(--line) bg-[#0d0e10] p-0 sm:max-w-none"
+      class="!right-0 !w-[min(520px,100dvw)] !max-w-[100dvw] min-w-0 gap-0 overflow-x-hidden border-(--line) bg-[#0d0e10] p-0 sm:max-w-none"
     >
       <!-- 抽屉头部 -->
       <SheetHeader class="border-b border-(--line-soft) px-4.5 py-4">
@@ -174,7 +174,7 @@ function normalizePositiveNumber(value: number, fallback: number): number {
 
       <!-- 表单内容滚动区域 -->
       <div
-        class="console-scrollbar grid min-h-0 flex-1 content-start gap-4 overflow-auto px-4.5 py-4"
+        class="console-scrollbar grid min-h-0 min-w-0 flex-1 content-start gap-4 overflow-x-hidden overflow-y-auto px-4.5 py-4"
       >
         <!-- 数据源类型选择 -->
         <section class="grid gap-2">
@@ -257,8 +257,9 @@ function normalizePositiveNumber(value: number, fallback: number): number {
               </span>
             </div>
             <Switch
-              v-model:checked="isPublic"
+              :model-value="isPublic"
               aria-label="Public for visitor RAG"
+              @update:model-value="isPublic = Boolean($event)"
             />
           </div>
           <p class="text-xs leading-5 text-(--text-faint)">
@@ -390,8 +391,9 @@ function normalizePositiveNumber(value: number, fallback: number): number {
             </div>
             <div class="pt-6">
               <Switch
-                v-model:checked="respectRobotsTxt"
+                :model-value="respectRobotsTxt"
                 aria-label="Respect robots txt"
+                @update:model-value="respectRobotsTxt = Boolean($event)"
               />
             </div>
           </div>

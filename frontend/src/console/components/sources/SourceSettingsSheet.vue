@@ -91,6 +91,12 @@ watch(
   { immediate: true },
 );
 
+watch(open, (nextOpen) => {
+  if (nextOpen) {
+    resetForm();
+  }
+});
+
 // 更新 source settings 触发函数
 function handleSave(): void {
   const name = sourceName.value.trim();
@@ -218,14 +224,14 @@ function normalizePositiveNumber(value: number, fallback: number): number {
       </Button>
     </SheetTrigger>
     <SheetContent
-      class="w-[min(520px,100vw)] gap-0 border-(--line) bg-[#0d0e10] p-0 sm:max-w-none"
+      class="!right-0 !w-[min(520px,100dvw)] !max-w-[100dvw] min-w-0 gap-0 overflow-x-hidden border-(--line) bg-[#0d0e10] p-0 sm:max-w-none"
     >
       <SheetHeader class="border-b border-(--line-soft) px-4.5 py-4">
         <SheetTitle class="text-[15px]">{{ sheetTitle }}</SheetTitle>
       </SheetHeader>
 
       <div
-        class="console-scrollbar grid min-h-0 flex-1 content-start gap-5 overflow-auto px-4.5 py-4.5"
+        class="console-scrollbar grid min-h-0 min-w-0 flex-1 content-start gap-5 overflow-x-hidden overflow-y-auto px-4.5 py-4.5"
       >
         <section class="grid gap-4">
           <div>
@@ -267,7 +273,11 @@ function normalizePositiveNumber(value: number, fallback: number): number {
                 {{ visibilityHelp }}
               </p>
             </div>
-            <Switch v-model:checked="isPublic" aria-label="Source visibility" />
+            <Switch
+              :model-value="isPublic"
+              aria-label="Source visibility"
+              @update:model-value="isPublic = Boolean($event)"
+            />
           </div>
         </section>
 
@@ -391,8 +401,9 @@ function normalizePositiveNumber(value: number, fallback: number): number {
             </div>
             <div class="pt-6">
               <Switch
-                v-model:checked="respectRobotsTxt"
+                :model-value="respectRobotsTxt"
                 aria-label="Respect robots txt"
+                @update:model-value="respectRobotsTxt = Boolean($event)"
               />
             </div>
           </div>

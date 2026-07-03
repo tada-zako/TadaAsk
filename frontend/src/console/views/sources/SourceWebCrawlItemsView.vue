@@ -41,6 +41,10 @@ const selectedItemUids = computed(
 const activeJobs = computed(
   () => activeJobsBySourceUid.value[sourceUid.value] ?? [],
 );
+const syncJob = computed(
+  () =>
+    activeJobs.value.find((job) => job.jobType === "web_crawl_sync") ?? null,
+);
 const jobProgress = computed(
   () => jobProgressBySourceUid.value[sourceUid.value] ?? null,
 );
@@ -71,12 +75,10 @@ const filteredRows = computed(() => {
 });
 // 同步状态徽标：优先展示活跃 job 状态，其次 source 状态，兜底 Idle
 const syncBadgeLabel = computed(
-  () =>
-    activeJobs.value[0]?.statusLabel ?? sourceRow.value?.statusLabel ?? "Idle",
+  () => syncJob.value?.statusLabel ?? sourceRow.value?.statusLabel ?? "Idle",
 );
 const syncBadgeTone = computed<SourceTone>(
-  () =>
-    activeJobs.value[0]?.statusTone ?? sourceRow.value?.statusTone ?? "muted",
+  () => syncJob.value?.statusTone ?? sourceRow.value?.statusTone ?? "muted",
 );
 
 // 监听路由参数变化，切换知识库时断开旧连接并加载新数据
@@ -228,6 +230,7 @@ function badgeClass(tone: SourceTone): string {
 
     <!-- 爬取同步状态流（展示后端 SSE 实时事件） -->
     <section
+      v-if="syncJob"
       class="grid gap-3 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) p-4"
     >
       <div class="flex items-center justify-between gap-4 max-[760px]:grid">
