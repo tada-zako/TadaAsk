@@ -45,6 +45,8 @@ export const zhCN: typeof en = {
       project: "项目",
       chat: "对话",
       sources: "数据源",
+      localFileItems: "本地文件条目",
+      webCrawlItems: "网页爬取条目",
       ask: "问答",
       settings: "设置",
       open: "打开 {label}",
@@ -344,6 +346,9 @@ export const zhCN: typeof en = {
       },
       items: {
         originUnknown: "无来源",
+      },
+      jobs: {
+        syncStarted: "同步任务已启动。",
       },
       dates: {
         unknown: "未知",

@@ -43,6 +43,8 @@ export const en = {
       project: "Project",
       chat: "Chat",
       sources: "Sources",
+      localFileItems: "Local file items",
+      webCrawlItems: "Web crawl items",
       ask: "Ask",
       settings: "Settings",
       open: "Open {label}",
@@ -355,6 +357,9 @@ export const en = {
       },
       items: {
         originUnknown: "No origin",
+      },
+      jobs: {
+        syncStarted: "Sync job started.",
       },
       dates: {
         unknown: "Unknown",
