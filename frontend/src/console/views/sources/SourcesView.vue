@@ -21,11 +21,13 @@ onMounted(() => {
   void sourceStore.loadSources();
 });
 
+/** source 创建事件 */
 async function handleCreateSource(input: CreateSourceInput): Promise<void> {
   await sourceStore.createSource(input);
   await sourceStore.refreshSources();
 }
 
+/** source settings 更新 */
 async function handleUpdateSource(
   sourceUid: string,
   input: SourceUpdatePayload,
@@ -34,11 +36,13 @@ async function handleUpdateSource(
   await sourceStore.refreshSources();
 }
 
+/** source 删除 */
 async function handleDeleteSource(sourceUid: string): Promise<void> {
   await sourceStore.deleteSource(sourceUid);
   await sourceStore.refreshSources();
 }
 
+/** 请求访问 source item 内容 */
 async function handleOpenItems(source: SourceRow): Promise<void> {
   if (!source.itemsRouteName) {
     return;
@@ -54,6 +58,7 @@ async function handleOpenItems(source: SourceRow): Promise<void> {
 <template>
   <!-- 全局数据源管理视图 -->
   <section class="console-page">
+    <!-- source view header -->
     <header
       class="flex items-end justify-between gap-5 max-[760px]:grid max-[760px]:gap-4"
     >
@@ -66,6 +71,7 @@ async function handleOpenItems(source: SourceRow): Promise<void> {
         </p>
       </div>
 
+      <!-- source create sheet -->
       <div class="flex shrink-0 items-center gap-2 pb-0.5">
         <SourceCreateSheet
           :is-mutating="isMutating"
@@ -74,6 +80,7 @@ async function handleOpenItems(source: SourceRow): Promise<void> {
       </div>
     </header>
 
+    <!-- 错误提示 -->
     <p
       v-if="errorMessage"
       class="rounded-(--console-radius-md) border border-red-400/25 bg-red-400/10 px-3 py-2 text-sm text-red-100"
@@ -81,6 +88,7 @@ async function handleOpenItems(source: SourceRow): Promise<void> {
       {{ errorMessage }}
     </p>
 
+    <!-- source list table -->
     <SourceListPanel
       :is-loading="isLoading"
       :is-mutating="isMutating"

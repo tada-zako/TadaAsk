@@ -1,7 +1,5 @@
 <script setup lang="ts">
-// 导入 Vue 核心 API
-import { computed } from "vue";
-// 导入 Lucide 图标
+import { computed, ref } from "vue";
 import {
   CirclePlay,
   Download,
@@ -12,10 +10,33 @@ import {
   XCircle,
 } from "@lucide/vue";
 
-// 导入 UI 组件
+import type {
+  SourceItemRow,
+  SourceTone,
+} from "@/console/services/source-workspace";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Checkbox } from "@/shared/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/shared/components/ui/dialog";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
+import { Progress } from "@/shared/components/ui/progress";
 import {
   Table,
   TableBody,
@@ -24,426 +45,480 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 
-// 定义组件属性
+// 复选框三态值：全选 / 部分选中 / 全不选
+type CheckboxValue = boolean | "indeterminate";
+
 const props = defineProps<{
-  sourceType: "local-file" | "web-crawl"; // source item 类型
+  sourceType: "local-file" | "web-crawl";
+  rows: SourceItemRow[];
+  selectedItemUids: string[];
+  isLoading?: boolean;
+  isMutating?: boolean;
 }>();
 
-// 辅助计算属性：判断是否为网页爬取类型
+const emit = defineEmits<{
+  (event: "updateSelection", itemUids: string[]): void;
+  (event: "indexItems", itemUids: string[]): void;
+  (event: "pauseItems", itemUids: string[]): void;
+  (event: "resumeItems", itemUids: string[]): void;
+  (event: "downloadItem", itemUid: string): void;
+  (event: "renameItem", itemUid: string, title: string): void;
+  (event: "deleteItems", itemUids: string[]): void;
+}>();
+
+// 弹窗状态
+const renameOpen = ref(false);
+const renameTarget = ref<SourceItemRow | null>(null);
+const renameTitle = ref("");
+const deleteOpen = ref(false);
+const deleteTargetUids = ref<string[]>([]);
+
 const isWebCrawl = computed(() => props.sourceType === "web-crawl");
-// 批量操作实体文案
 const entityLabel = computed(() => (isWebCrawl.value ? "pages" : "files"));
-// 已选中状态文案
-const selectedLabel = computed(() =>
-  isWebCrawl.value ? "Selected: 3 pages" : "Selected: 2 files",
+const selectedUidSet = computed(() => new Set(props.selectedItemUids));
+const selectedRows = computed(() =>
+  props.rows.filter((row) => selectedUidSet.value.has(row.uid)),
 );
+const selectedLabel = computed(
+  () => `Selected: ${selectedRows.value.length} ${entityLabel.value}`,
+);
+// 表头复选框三态：全选 true / 部分 indeterminate / 全不选 false
+const headerChecked = computed<CheckboxValue>(() => {
+  if (!props.rows.length || !props.selectedItemUids.length) {
+    return false;
+  }
+
+  if (props.selectedItemUids.length === props.rows.length) {
+    return true;
+  }
+
+  return "indeterminate";
+});
+
+// 批量操作按钮启用判定：已选行中只要有一条可操作即启用
+const canBulkIndex = computed(() =>
+  selectedRows.value.some((row) => row.canIndex),
+);
+const canBulkPause = computed(() =>
+  selectedRows.value.some((row) => row.canPause),
+);
+const canBulkResume = computed(() =>
+  selectedRows.value.some((row) => row.canResume),
+);
+const canBulkDelete = computed(() =>
+  selectedRows.value.some((row) => row.canDelete),
+);
+
+function toggleAll(value: CheckboxValue): void {
+  emit(
+    "updateSelection",
+    value === true ? props.rows.map((row) => row.uid) : [],
+  );
+}
+
+function toggleRow(row: SourceItemRow, value: CheckboxValue): void {
+  const next = new Set(props.selectedItemUids);
+
+  if (value === true) {
+    next.add(row.uid);
+  } else {
+    next.delete(row.uid);
+  }
+
+  emit("updateSelection", Array.from(next));
+}
+
+// 对已选行中满足条件的子项执行批量操作，避免重复 emit
+function emitForSelected(
+  eventName: "indexItems" | "pauseItems" | "resumeItems",
+  predicate: (row: SourceItemRow) => boolean,
+): void {
+  const itemUids = selectedRows.value.filter(predicate).map((row) => row.uid);
+
+  if (!itemUids.length) {
+    return;
+  }
+
+  if (eventName === "indexItems") {
+    emit("indexItems", itemUids);
+  } else if (eventName === "pauseItems") {
+    emit("pauseItems", itemUids);
+  } else {
+    emit("resumeItems", itemUids);
+  }
+}
+
+function openRename(row: SourceItemRow): void {
+  renameTarget.value = row;
+  renameTitle.value = row.title;
+  renameOpen.value = true;
+}
+
+function submitRename(): void {
+  const title = renameTitle.value.trim();
+
+  if (renameTarget.value && title) {
+    emit("renameItem", renameTarget.value.uid, title);
+  }
+
+  renameOpen.value = false;
+}
+
+function openDelete(itemUids: string[]): void {
+  deleteTargetUids.value = itemUids;
+  deleteOpen.value = itemUids.length > 0;
+}
+
+function submitDelete(): void {
+  if (deleteTargetUids.value.length) {
+    emit("deleteItems", deleteTargetUids.value);
+  }
+
+  deleteOpen.value = false;
+  deleteTargetUids.value = [];
+}
+
+// 状态徽标色调映射
+function badgeClass(tone: SourceTone): string {
+  if (tone === "success") {
+    return "border-emerald-400/25 bg-emerald-400/10 text-emerald-200";
+  }
+
+  if (tone === "warning") {
+    return "border-yellow-300/25 bg-yellow-300/10 text-yellow-100";
+  }
+
+  if (tone === "danger") {
+    return "border-red-400/25 bg-red-400/10 text-red-100";
+  }
+
+  return "border-(--line-soft) bg-(--surface-panel-soft) text-(--text-muted)";
+}
 </script>
 
 <template>
-  <!-- Source item 统一列表面板：本地文件与网页项共享表格结构和列宽 -->
-  <section class="console-table-panel">
-    <!-- 批量操作工具栏 -->
-    <div
-      class="flex min-h-13 items-center justify-between gap-4 border-b border-(--line-soft) bg-[#111215] px-4 max-[760px]:grid max-[760px]:py-3"
-    >
-      <div class="flex items-center gap-3">
-        <strong class="text-[13px] text-(--text-strong)">
-          {{ selectedLabel }}
-        </strong>
-        <span class="h-5 w-px bg-(--line)"></span>
-        <span class="text-xs text-(--text-faint)">
-          Batch operations apply to checked rows.
-        </span>
+  <TooltipProvider>
+    <!-- source item table 主体 -->
+    <section class="console-table-panel">
+      <!-- 批操作栏 -->
+      <div
+        class="flex min-h-13 items-center justify-between gap-4 border-b border-(--line-soft) bg-[#111215] px-4 max-[760px]:grid max-[760px]:py-3"
+      >
+        <div class="flex items-center gap-3">
+          <strong class="text-[13px] text-(--text-strong)">
+            {{ selectedLabel }}
+          </strong>
+          <span class="h-5 w-px bg-(--line)"></span>
+          <span class="text-xs text-(--text-faint)">
+            Batch operations apply to checked rows.
+          </span>
+        </div>
+        <div class="flex flex-wrap justify-end gap-2 max-[760px]:justify-start">
+          <Button
+            type="button"
+            :aria-label="`Index selected ${entityLabel}`"
+            variant="outline"
+            size="sm"
+            :disabled="isMutating || !canBulkIndex"
+            @click="emitForSelected('indexItems', (row) => row.canIndex)"
+          >
+            <CirclePlay class="size-4" />
+            Index
+          </Button>
+          <Button
+            type="button"
+            :aria-label="`Pause selected ${entityLabel}`"
+            variant="outline"
+            size="sm"
+            :disabled="isMutating || !canBulkPause"
+            @click="emitForSelected('pauseItems', (row) => row.canPause)"
+          >
+            <XCircle class="size-4" />
+            Pause
+          </Button>
+          <Button
+            type="button"
+            :aria-label="`Resume selected ${entityLabel}`"
+            variant="outline"
+            size="sm"
+            :disabled="isMutating || !canBulkResume"
+            @click="emitForSelected('resumeItems', (row) => row.canResume)"
+          >
+            <CirclePlay class="size-4" />
+            Resume
+          </Button>
+          <Button
+            type="button"
+            :aria-label="`Delete selected ${entityLabel}`"
+            variant="outline"
+            size="sm"
+            class="border-red-400/35 text-red-100 hover:bg-red-400/10"
+            :disabled="isMutating || !canBulkDelete"
+            @click="
+              openDelete(
+                selectedRows
+                  .filter((row) => row.canDelete)
+                  .map((row) => row.uid),
+              )
+            "
+          >
+            <Trash2 class="size-4" />
+            Delete
+          </Button>
+        </div>
       </div>
-      <div class="flex flex-wrap justify-end gap-2 max-[760px]:justify-start">
-        <Button
-          type="button"
-          :aria-label="`Index selected ${entityLabel}`"
-          variant="outline"
-          size="sm"
-        >
-          <CirclePlay class="size-4" />
-          Index
-        </Button>
-        <Button
-          type="button"
-          :aria-label="`Pause selected ${entityLabel} indexing`"
-          variant="outline"
-          size="sm"
-        >
-          <XCircle class="size-4" />
-          Pause
-        </Button>
-        <Button
-          type="button"
-          :aria-label="`Download selected ${entityLabel}`"
-          variant="outline"
-          size="sm"
-        >
-          <Download class="size-4" />
-          Download
-        </Button>
-        <Button
-          type="button"
-          :aria-label="`Delete selected ${entityLabel}`"
-          variant="outline"
-          size="sm"
-          class="border-red-400/35 text-red-100 hover:bg-red-400/10"
-        >
-          <Trash2 class="size-4" />
-          Delete
-        </Button>
-      </div>
-    </div>
 
-    <!-- Source item 表格 -->
-    <Table class="console-scrollbar min-w-[58rem] table-fixed">
-      <colgroup>
-        <col class="w-12" />
-        <col class="w-[34%]" />
-        <col class="w-[10.5rem]" />
-        <col class="w-[8rem]" />
-        <col class="w-[12rem]" />
-        <col class="w-[11.5rem]" />
-      </colgroup>
-      <TableHeader>
-        <TableRow>
-          <TableHead class="text-center">
-            <Checkbox
-              :aria-label="`Select all ${entityLabel}`"
-              class="mx-auto"
-            />
-          </TableHead>
-          <TableHead>{{ isWebCrawl ? "Page" : "File" }}</TableHead>
-          <TableHead>Updated</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Indexing</TableHead>
-          <TableHead class="text-center">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        <!-- 示例行 1：待处理 item -->
-        <TableRow>
-          <TableCell class="text-center">
-            <Checkbox
-              checked
-              :aria-label="
-                isWebCrawl
-                  ? 'Select Getting Started page'
-                  : 'Select getting started PDF'
-              "
-              class="mx-auto"
-            />
-          </TableCell>
-          <TableCell>
-            <div class="grid min-w-0 gap-1">
-              <div class="flex min-w-0 items-center gap-2">
-                <Globe2
-                  v-if="isWebCrawl"
-                  class="size-4 shrink-0 text-blue-300"
-                />
-                <FileText v-else class="size-4 shrink-0 text-blue-300" />
-                <strong class="truncate">
-                  {{ isWebCrawl ? "Getting Started" : "getting-started.pdf" }}
-                </strong>
-              </div>
-              <span
-                v-if="isWebCrawl"
-                class="truncate text-xs text-(--text-faint)"
-              >
-                https://docs.example.com/docs/intro
-              </span>
-            </div>
-          </TableCell>
-          <TableCell>03/06/2026 18:51</TableCell>
-          <TableCell>
-            <Badge
-              class="border-(--line-soft) bg-(--surface-panel-soft) text-(--text-muted)"
-            >
-              Pending
-            </Badge>
-          </TableCell>
-          <TableCell>
-            <span class="text-xs text-(--text-faint)">Not indexed</span>
-          </TableCell>
-          <TableCell>
-            <div class="flex items-center justify-center gap-1">
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Index Getting Started page'
-                    : 'Index getting started PDF'
-                "
-                title="Index"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <CirclePlay class="text-primary size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Download Getting Started page'
-                    : 'Download getting started PDF'
-                "
-                title="Download"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <Download class="size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Rename Getting Started page'
-                    : 'Rename getting started PDF'
-                "
-                title="Rename"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <Pencil class="size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Delete Getting Started page'
-                    : 'Delete getting started PDF'
-                "
-                title="Delete"
-                variant="ghost"
-                size="icon-sm"
-                class="text-red-100 hover:bg-red-400/10 hover:text-red-100"
-              >
-                <Trash2 class="size-4" />
-              </Button>
-            </div>
-          </TableCell>
-        </TableRow>
+      <Table class="console-scrollbar min-w-[58rem] table-fixed">
+        <colgroup>
+          <col class="w-12" />
+          <col class="w-[34%]" />
+          <col class="w-[10.5rem]" />
+          <col class="w-[8rem]" />
+          <col class="w-[12rem]" />
+          <col class="w-[11.5rem]" />
+        </colgroup>
 
-        <!-- 示例行 2：已完成索引 item -->
-        <TableRow>
-          <TableCell class="text-center">
-            <Checkbox
-              checked
-              :aria-label="
-                isWebCrawl
-                  ? 'Select Install TadaAsk page'
-                  : 'Select API reference PDF'
-              "
-              class="mx-auto"
-            />
-          </TableCell>
-          <TableCell>
-            <div class="grid min-w-0 gap-1">
-              <div class="flex min-w-0 items-center gap-2">
-                <Globe2
-                  v-if="isWebCrawl"
-                  class="size-4 shrink-0 text-blue-300"
-                />
-                <FileText v-else class="size-4 shrink-0 text-blue-300" />
-                <strong class="truncate">
-                  {{ isWebCrawl ? "Install TadaAsk" : "api-reference.pdf" }}
-                </strong>
-              </div>
-              <span
-                v-if="isWebCrawl"
-                class="truncate text-xs text-(--text-faint)"
-              >
-                https://docs.example.com/docs/install
-              </span>
-            </div>
-          </TableCell>
-          <TableCell>03/06/2026 18:50</TableCell>
-          <TableCell>
-            <Badge
-              class="border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-            >
-              Completed
-            </Badge>
-          </TableCell>
-          <TableCell>
-            <span class="text-xs text-emerald-200">Ready</span>
-          </TableCell>
-          <TableCell>
-            <div class="flex items-center justify-center gap-1">
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Re-index Install TadaAsk page'
-                    : 'Re-index API reference PDF'
-                "
-                title="Re-index"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <CirclePlay class="text-primary size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Download Install TadaAsk page'
-                    : 'Download API reference PDF'
-                "
-                title="Download"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <Download class="size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Rename Install TadaAsk page'
-                    : 'Rename API reference PDF'
-                "
-                title="Rename"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <Pencil class="size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Delete Install TadaAsk page'
-                    : 'Delete API reference PDF'
-                "
-                title="Delete"
-                variant="ghost"
-                size="icon-sm"
-                class="text-red-100 hover:bg-red-400/10 hover:text-red-100"
-              >
-                <Trash2 class="size-4" />
-              </Button>
-            </div>
-          </TableCell>
-        </TableRow>
+        <!-- table header -->
+        <TableHeader>
+          <TableRow>
+            <TableHead class="text-center">
+              <Checkbox
+                :checked="headerChecked"
+                :aria-label="`Select all ${entityLabel}`"
+                class="mx-auto"
+                :disabled="isLoading || rows.length === 0"
+                @update:checked="toggleAll"
+              />
+            </TableHead>
+            <TableHead>{{ isWebCrawl ? "Page" : "File" }}</TableHead>
+            <TableHead>Updated</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Indexing</TableHead>
+            <TableHead class="text-center">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
 
-        <!-- 示例行 3：正在索引 item -->
-        <TableRow>
-          <TableCell class="text-center">
-            <Checkbox
-              :aria-label="
-                isWebCrawl
-                  ? 'Select API Reference page'
-                  : 'Select release notes Markdown'
-              "
-              class="mx-auto"
-            />
-          </TableCell>
-          <TableCell>
-            <div class="grid min-w-0 gap-1">
-              <div class="flex min-w-0 items-center gap-2">
-                <Globe2
-                  v-if="isWebCrawl"
-                  class="size-4 shrink-0 text-blue-300"
-                />
-                <FileText v-else class="size-4 shrink-0 text-emerald-300" />
-                <strong class="truncate">
-                  {{ isWebCrawl ? "API Reference" : "release-notes.md" }}
-                </strong>
-              </div>
-              <span
-                v-if="isWebCrawl"
-                class="truncate text-xs text-(--text-faint)"
-              >
-                https://docs.example.com/api
-              </span>
-            </div>
-          </TableCell>
-          <TableCell>{{
-            isWebCrawl ? "02/06/2026 15:30" : "20/04/2026 15:24"
-          }}</TableCell>
-          <TableCell>
-            <Badge
-              class="border-yellow-300/25 bg-yellow-300/10 text-yellow-100"
-            >
-              Indexing
-            </Badge>
-          </TableCell>
-          <TableCell>
-            <div class="flex w-40 items-center gap-2">
-              <div
-                class="h-1.5 flex-1 overflow-hidden rounded-full bg-(--surface-panel-soft)"
-              >
+        <TableBody>
+          <!-- 加载进度条 -->
+          <TableRow v-if="isLoading">
+            <TableCell colspan="6" class="h-24 text-center text-(--text-muted)">
+              Loading source items...
+            </TableCell>
+          </TableRow>
+
+          <TableRow v-else-if="rows.length === 0">
+            <TableCell colspan="6" class="h-24 text-center text-(--text-muted)">
+              No source items found.
+            </TableCell>
+          </TableRow>
+
+          <TableRow v-for="row in rows" v-else :key="row.uid">
+            <TableCell class="text-center">
+              <Checkbox
+                :checked="selectedUidSet.has(row.uid)"
+                :aria-label="`Select ${row.title}`"
+                class="mx-auto"
+                @update:checked="toggleRow(row, $event)"
+              />
+            </TableCell>
+            <TableCell>
+              <div class="grid min-w-0 gap-1">
+                <div class="flex min-w-0 items-center gap-2">
+                  <Globe2
+                    v-if="isWebCrawl"
+                    class="size-4 shrink-0 text-blue-300"
+                  />
+                  <FileText v-else class="size-4 shrink-0 text-blue-300" />
+                  <strong class="truncate">{{ row.title }}</strong>
+                </div>
                 <span
-                  class="bg-primary block h-full w-[48%] rounded-full"
-                ></span>
+                  v-if="isWebCrawl"
+                  class="truncate text-xs text-(--text-faint)"
+                >
+                  {{ row.displayOrigin }}
+                </span>
               </div>
-              <span class="w-8 text-right text-[11px] text-(--text-faint)">
-                48%
+            </TableCell>
+            <TableCell>{{ row.updatedLabel }}</TableCell>
+            <TableCell>
+              <Badge :class="badgeClass(row.statusTone)">
+                {{ row.statusLabel }}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <div v-if="row.showProgress" class="flex w-40 items-center gap-2">
+                <Progress
+                  class="h-1.5 bg-(--surface-panel-soft)"
+                  :model-value="row.progress ?? 0"
+                />
+                <span class="w-8 text-right text-[11px] text-(--text-faint)">
+                  {{ row.progress ?? 0 }}%
+                </span>
+              </div>
+              <span
+                v-else-if="row.status === 'completed'"
+                class="text-xs text-emerald-200"
+              >
+                Ready
               </span>
-            </div>
-          </TableCell>
-          <TableCell>
-            <div class="flex items-center justify-center gap-1">
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Pause API Reference page indexing'
-                    : 'Pause release notes indexing'
-                "
-                title="Pause indexing"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <XCircle class="size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Download API Reference page'
-                    : 'Download release notes Markdown'
-                "
-                title="Download"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <Download class="size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Rename API Reference page'
-                    : 'Rename release notes Markdown'
-                "
-                title="Rename"
-                variant="ghost"
-                size="icon-sm"
-              >
-                <Pencil class="size-4" />
-              </Button>
-              <Button
-                type="button"
-                :aria-label="
-                  isWebCrawl
-                    ? 'Delete API Reference page'
-                    : 'Delete release notes Markdown'
-                "
-                title="Delete"
-                variant="ghost"
-                size="icon-sm"
-                class="text-red-100 hover:bg-red-400/10 hover:text-red-100"
-              >
-                <Trash2 class="size-4" />
-              </Button>
-            </div>
-          </TableCell>
-        </TableRow>
-      </TableBody>
-    </Table>
-  </section>
+              <span v-else class="text-xs text-(--text-faint)">
+                Not indexed
+              </span>
+            </TableCell>
+            <TableCell>
+              <!-- Action 栏 -->
+              <div class="flex items-center justify-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      type="button"
+                      :aria-label="`${row.canPause ? 'Pause' : row.canResume ? 'Resume' : 'Index'} ${row.title}`"
+                      variant="ghost"
+                      size="icon-sm"
+                      :disabled="
+                        isMutating ||
+                        (!row.canIndex && !row.canPause && !row.canResume)
+                      "
+                      @click="
+                        row.canPause
+                          ? emit('pauseItems', [row.uid])
+                          : row.canResume
+                            ? emit('resumeItems', [row.uid])
+                            : emit('indexItems', [row.uid])
+                      "
+                    >
+                      <XCircle v-if="row.canPause" class="size-4" />
+                      <CirclePlay v-else class="text-primary size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {{
+                      row.canPause
+                        ? "Pause"
+                        : row.canResume
+                          ? "Resume"
+                          : "Index"
+                    }}
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip v-if="row.canDownload">
+                  <TooltipTrigger as-child>
+                    <Button
+                      type="button"
+                      :aria-label="`Download ${row.title}`"
+                      variant="ghost"
+                      size="icon-sm"
+                      :disabled="isMutating"
+                      @click="emit('downloadItem', row.uid)"
+                    >
+                      <Download class="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Download</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      type="button"
+                      :aria-label="`Rename ${row.title}`"
+                      variant="ghost"
+                      size="icon-sm"
+                      :disabled="isMutating || !row.canRename"
+                      @click="openRename(row)"
+                    >
+                      <Pencil class="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Rename</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      type="button"
+                      :aria-label="`Delete ${row.title}`"
+                      variant="ghost"
+                      size="icon-sm"
+                      class="text-red-100 hover:bg-red-400/10 hover:text-red-100"
+                      :disabled="isMutating || !row.canDelete"
+                      @click="openDelete([row.uid])"
+                    >
+                      <Trash2 class="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete</TooltipContent>
+                </Tooltip>
+              </div>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </section>
+  </TooltipProvider>
+
+  <!-- 重命名弹窗 -->
+  <Dialog v-model:open="renameOpen">
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Rename source item</DialogTitle>
+      </DialogHeader>
+      <div class="grid gap-2 py-2">
+        <Label for="source-item-title">Title</Label>
+        <Input
+          id="source-item-title"
+          v-model="renameTitle"
+          @keyup.enter="submitRename"
+        />
+      </div>
+      <DialogFooter>
+        <Button
+          type="button"
+          aria-label="Cancel rename source item"
+          variant="outline"
+          @click="renameOpen = false"
+        >
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          aria-label="Confirm rename source item"
+          :disabled="isMutating || !renameTitle.trim()"
+          @click="submitRename"
+        >
+          Rename
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  <!-- 删除确认弹窗 -->
+  <AlertDialog v-model:open="deleteOpen">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete selected item?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This removes the source item and cleans up related file/vector data
+          when supported by the backend.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          class="bg-red-500 text-white hover:bg-red-500/90"
+          @click="submitDelete"
+        >
+          Delete
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>
