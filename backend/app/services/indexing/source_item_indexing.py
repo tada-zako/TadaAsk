@@ -289,6 +289,8 @@ class SourceItemIndexingService:
                     source=source,
                     source_item=source_item,
                 )
+                # 解析内容落库后先提交，避免分块/向量化期间长期持有 SQLite 写锁。
+                await session.commit()
 
                 # 1.2 暂停请求检查
                 await self._pause_checkpoint(source_item_id=source_item.id)

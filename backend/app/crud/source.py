@@ -340,7 +340,7 @@ class SourceCRUD:
                 SourceItem.status == SourceItemProcessStatus.PROCESSING,
             )
             .values(status=SourceItemProcessStatus.PAUSE_REQUESTED)
-            .execution_options(synchronize_session="fetch")
+            .execution_options(synchronize_session=False)
         )
         await self.session.execute(stmt)
 
