@@ -176,6 +176,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body,
+  #app {
+    /* 强制限制页面不允许横向滚动 */
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family:

@@ -7,10 +7,12 @@ import ConsoleSidebar from "./ConsoleSidebar.vue";
 
 <template>
   <!-- 控制台外壳容器 -->
-  <div class="dark bg-background text-foreground min-h-screen scheme-dark">
+  <div
+    class="dark bg-background text-foreground min-h-screen overflow-x-hidden scheme-dark"
+  >
     <!-- 渐变背景容器 -->
     <div
-      class="min-h-screen bg-[radial-gradient(circle_at_74%_-12%,rgba(36,211,196,0.14),transparent_30rem),linear-gradient(180deg,#09090a_0%,#050505_48rem)]"
+      class="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_74%_-12%,rgba(36,211,196,0.14),transparent_30rem),linear-gradient(180deg,#09090a_0%,#050505_48rem)]"
     >
       <!-- 网格布局：侧边栏 + 主内容区 -->
       <div
