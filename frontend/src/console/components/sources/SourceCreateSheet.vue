@@ -2,10 +2,8 @@
 import { computed, ref } from "vue";
 import { FileText, Globe2, Plus } from "@lucide/vue";
 
-import type {
-  CreateSourceInput,
-  WebCrawlConfigInput,
-} from "@/console/services/source-workspace";
+import { useWebCrawlConfigForm } from "./useWebCrawlConfigForm";
+import type { CreateSourceInput } from "@/console/services/source-workspace";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
@@ -28,7 +26,6 @@ import { Switch } from "@/shared/components/ui/switch";
 import { Textarea } from "@/shared/components/ui/textarea";
 
 type SourceCreateType = "local_file" | "web_crawl";
-type CrawlEntryType = WebCrawlConfigInput["entry_type"];
 
 defineProps<{
   isMutating?: boolean;
@@ -44,22 +41,28 @@ const sourceType = ref<SourceCreateType>("local_file");
 const sourceName = ref("");
 const isPublic = ref(true);
 
-// web crawl 爬取策略
-const entryType = ref<CrawlEntryType>("url_list");
-const urlsText = ref("");
-const siteRootUrl = ref("");
-const sitemapUrl = ref("");
-
-// crawl config
-const allowedDomainsText = ref("");
-const includePathsText = ref("");
-const excludePathsText = ref("");
-const contentSelectorsText = ref("main, article");
-const excludeSelectorsText = ref("nav, footer, .toc");
-const maxPages = ref(20);
-const maxDepth = ref(3);
-const requestDelayMs = ref(5000);
-const respectRobotsTxt = ref(true);
+// web crawl 表单字段、构建与重置逻辑抽离至 composable
+const {
+  allowedDomainsText,
+  buildWebCrawlConfig,
+  contentSelectorsText,
+  entryType,
+  excludePathsText,
+  excludeSelectorsText,
+  includePathsText,
+  maxDepth,
+  maxPages,
+  requestDelayMs,
+  resetToDefaults: resetWebCrawlConfigForm,
+  respectRobotsTxt,
+  sitemapUrl,
+  siteRootUrl,
+  urlsText,
+} = useWebCrawlConfigForm({
+  contentSelectorsText: "main, article",
+  entryType: "url_list",
+  excludeSelectorsText: "nav, footer, .toc",
+});
 const localError = ref<string | null>(null);
 
 const isWebCrawl = computed(() => sourceType.value === "web_crawl");
@@ -93,65 +96,8 @@ function resetForm(): void {
   sourceType.value = "local_file";
   sourceName.value = "";
   isPublic.value = true;
-  entryType.value = "site_root";
-  siteRootUrl.value = "";
-  urlsText.value = "";
-  sitemapUrl.value = "";
-  allowedDomainsText.value = "";
-  includePathsText.value = "";
-  excludePathsText.value = "";
-  contentSelectorsText.value = "main, article";
-  excludeSelectorsText.value = "nav, footer, .toc";
-  maxPages.value = 20;
-  maxDepth.value = 3;
-  requestDelayMs.value = 5000;
-  respectRobotsTxt.value = true;
+  resetWebCrawlConfigForm({ entryType: "site_root" });
   localError.value = null;
-}
-
-/**
- * form 中传递的 web crawl config 调整为适配后端需要的格式
- */
-function buildWebCrawlConfig(): WebCrawlConfigInput {
-  return {
-    entry_type: entryType.value,
-    urls: entryType.value === "url_list" ? splitList(urlsText.value) : null,
-    sitemap_url:
-      entryType.value === "sitemap_url"
-        ? normalizeOptionalText(sitemapUrl.value)
-        : null,
-    site_root_url:
-      entryType.value === "site_root"
-        ? normalizeOptionalText(siteRootUrl.value)
-        : null,
-    allowed_domains: splitList(allowedDomainsText.value),
-    include_paths: splitList(includePathsText.value),
-    exclude_paths: splitList(excludePathsText.value),
-    content_selectors: splitList(contentSelectorsText.value),
-    exclude_selectors: splitList(excludeSelectorsText.value),
-    extraction_rules: [],
-    max_pages: normalizePositiveNumber(maxPages.value, 20),
-    max_depth: normalizePositiveNumber(maxDepth.value, 3),
-    request_delay_ms: normalizePositiveNumber(requestDelayMs.value, 5000),
-    respect_robots_txt: respectRobotsTxt.value,
-  };
-}
-
-function splitList(value: string): string[] {
-  return value
-    .split(/[\n,]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function normalizeOptionalText(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function normalizePositiveNumber(value: number, fallback: number): number {
-  const normalized = Number(value);
-  return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
 }
 </script>
 

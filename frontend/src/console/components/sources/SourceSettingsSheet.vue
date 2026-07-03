@@ -2,10 +2,8 @@
 import { computed, ref, watch } from "vue";
 import { FileText, Globe2, Settings, Trash2 } from "@lucide/vue";
 
-import {
-  toSourceRow,
-  type WebCrawlConfigInput,
-} from "@/console/services/source-workspace";
+import { useWebCrawlConfigForm } from "./useWebCrawlConfigForm";
+import { toSourceRow } from "@/console/services/source-workspace";
 import type { SourceRead, SourceUpdatePayload } from "@/console/api/sources";
 import {
   AlertDialog,
@@ -55,22 +53,24 @@ const open = ref(false);
 const sourceName = ref("");
 const isPublic = ref(false);
 
-// web crawl 类型变量
-const entryType = ref<WebCrawlConfigInput["entry_type"]>("site_root");
-const siteRootUrl = ref("");
-const urlsText = ref("");
-const sitemapUrl = ref("");
-
-// crawl config
-const allowedDomainsText = ref("");
-const includePathsText = ref("");
-const excludePathsText = ref("");
-const contentSelectorsText = ref("");
-const excludeSelectorsText = ref("");
-const maxPages = ref(20);
-const maxDepth = ref(3);
-const requestDelayMs = ref(5000);
-const respectRobotsTxt = ref(true);
+// web crawl 表单字段、构建与重置逻辑抽离至 composable
+const {
+  allowedDomainsText,
+  buildWebCrawlConfig,
+  contentSelectorsText,
+  entryType,
+  excludePathsText,
+  excludeSelectorsText,
+  includePathsText,
+  maxDepth,
+  maxPages,
+  requestDelayMs,
+  resetFromConfig: resetWebCrawlConfigForm,
+  respectRobotsTxt,
+  sitemapUrl,
+  siteRootUrl,
+  urlsText,
+} = useWebCrawlConfigForm();
 const localError = ref<string | null>(null);
 
 const sourceRow = computed(() => toSourceRow(props.source));
@@ -113,7 +113,10 @@ function handleSave(): void {
   };
 
   if (isWebCrawl.value) {
-    payload.webCrawlConfig = buildWebCrawlConfig();
+    // extraction_rules 不在 settings 表单中编辑，从现有配置透传保留
+    payload.webCrawlConfig = buildWebCrawlConfig({
+      extractionRules: props.source.webCrawlConfig?.extraction_rules ?? [],
+    });
   }
 
   emit("updateSource", payload);
@@ -126,49 +129,10 @@ function handleDelete(): void {
 }
 
 function resetForm(): void {
-  const config = props.source.webCrawlConfig;
-
   sourceName.value = props.source.sourceName;
   isPublic.value = props.source.isPublic;
-  entryType.value = config?.entry_type ?? "site_root";
-  siteRootUrl.value = config?.site_root_url ?? "";
-  urlsText.value = joinList(config?.urls ?? []);
-  sitemapUrl.value = config?.sitemap_url ?? "";
-  allowedDomainsText.value = joinList(config?.allowed_domains ?? []);
-  includePathsText.value = joinList(config?.include_paths ?? []);
-  excludePathsText.value = joinList(config?.exclude_paths ?? []);
-  contentSelectorsText.value = joinList(config?.content_selectors ?? []);
-  excludeSelectorsText.value = joinList(config?.exclude_selectors ?? []);
-  maxPages.value = config?.max_pages ?? 20;
-  maxDepth.value = config?.max_depth ?? 3;
-  requestDelayMs.value = config?.request_delay_ms ?? 5000;
-  respectRobotsTxt.value = config?.respect_robots_txt ?? true;
+  resetWebCrawlConfigForm(props.source.webCrawlConfig);
   localError.value = null;
-}
-
-function buildWebCrawlConfig(): WebCrawlConfigInput {
-  return {
-    entry_type: entryType.value,
-    urls: entryType.value === "url_list" ? splitList(urlsText.value) : null,
-    sitemap_url:
-      entryType.value === "sitemap_url"
-        ? normalizeOptionalText(sitemapUrl.value)
-        : null,
-    site_root_url:
-      entryType.value === "site_root"
-        ? normalizeOptionalText(siteRootUrl.value)
-        : null,
-    allowed_domains: splitList(allowedDomainsText.value),
-    include_paths: splitList(includePathsText.value),
-    exclude_paths: splitList(excludePathsText.value),
-    content_selectors: splitList(contentSelectorsText.value),
-    exclude_selectors: splitList(excludeSelectorsText.value),
-    extraction_rules: props.source.webCrawlConfig?.extraction_rules ?? [],
-    max_pages: normalizePositiveNumber(maxPages.value, 20),
-    max_depth: normalizePositiveNumber(maxDepth.value, 3),
-    request_delay_ms: normalizePositiveNumber(requestDelayMs.value, 5000),
-    respect_robots_txt: respectRobotsTxt.value,
-  };
 }
 
 function badgeClass(tone: typeof sourceRow.value.statusTone) {
@@ -185,27 +149,6 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
   }
 
   return "border-(--line-soft) bg-(--surface-panel-soft) text-(--text-muted)";
-}
-
-function splitList(value: string): string[] {
-  return value
-    .split(/[\n,]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function joinList(value: string[]): string {
-  return value.join(", ");
-}
-
-function normalizeOptionalText(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function normalizePositiveNumber(value: number, fallback: number): number {
-  const normalized = Number(value);
-  return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
 }
 </script>
 
