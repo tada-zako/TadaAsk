@@ -17,6 +17,7 @@ import {
   type ProjectWorkspaceViewModel,
 } from "@/console/services/project-workspace";
 import { useProjectStore } from "@/console/stores/project";
+import { getErrorMessage } from "@/console/lib/api-result";
 
 import ProjectLandingState from "./ProjectLandingState.vue";
 import ProjectOverviewState from "./ProjectOverviewState.vue";
@@ -254,10 +255,6 @@ function getProjectUidFromRoute(): string | null {
   }
 
   return typeof value === "string" && value ? value : null;
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 </script>
 

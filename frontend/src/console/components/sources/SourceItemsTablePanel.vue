@@ -110,9 +110,6 @@ const canBulkIndex = computed(() =>
 const canBulkPause = computed(() =>
   selectedRows.value.some((row) => row.canPause),
 );
-const canBulkResume = computed(() =>
-  selectedRows.value.some((row) => row.canResume),
-);
 const canBulkDelete = computed(() =>
   selectedRows.value.some((row) => row.canDelete),
 );
