@@ -434,10 +434,7 @@ export function toSourceItemRow(
 ): SourceItemRow {
   const progress = normalizeProgress(itemProgressByUid[sourceItem.uid]);
   const status = sourceItem.status;
-  const showProgress =
-    progress !== null ||
-    status === "processing" ||
-    status === "pause_requested";
+  const showProgress = status === "processing" || status === "pause_requested";
 
   return {
     uid: sourceItem.uid,

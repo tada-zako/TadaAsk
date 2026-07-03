@@ -93,6 +93,17 @@ export interface RAGJobEvent {
   error?: string | null;
 }
 
+type RAGJobEventWirePayload = Partial<RAGJobEvent> & {
+  source_uid?: string;
+  source_status?: SourceProcessStatus | null;
+  source_item_uid?: string | null;
+  source_item_status?: SourceItemProcessStatus | null;
+  source_item?: SourceItemRead | null;
+  ingest_stage?: RAGJobIngestStage | null;
+  item_progress?: number | null;
+  sync_progress?: number | null;
+};
+
 export type StreamRAGJobEventsOptions = {
   lastEventId?: string;
   signal?: AbortSignal;
@@ -250,6 +261,30 @@ export const sourceApi = {
 };
 
 /** 将 RAG job SSE ReadableStream 解析为业务事件。 */
-export function parseRAGJobEventStream(stream: ReadableStream<Uint8Array>) {
-  return parseSseStream<RAGJobEvent>(stream);
+export async function* parseRAGJobEventStream(
+  stream: ReadableStream<Uint8Array>,
+): AsyncGenerator<RAGJobEvent, void, unknown> {
+  for await (const event of parseSseStream<RAGJobEventWirePayload>(stream)) {
+    yield normalizeRagJobEvent(event);
+  }
+}
+
+// 后端当前按 camelCase 发送 SSE；这里同时兼容 snake_case，降低前后端字段微调的影响。
+function normalizeRagJobEvent(event: RAGJobEventWirePayload): RAGJobEvent {
+  return {
+    sseId: event.sseId,
+    event: event.event ?? "sync_progress",
+    sourceUid: event.sourceUid ?? event.source_uid ?? "",
+    sourceStatus: event.sourceStatus ?? event.source_status ?? null,
+    sourceItemUid: event.sourceItemUid ?? event.source_item_uid ?? null,
+    sourceItemStatus:
+      event.sourceItemStatus ?? event.source_item_status ?? null,
+    sourceItem: event.sourceItem ?? event.source_item ?? null,
+    ingestStage: event.ingestStage ?? event.ingest_stage ?? null,
+    itemProgress: event.itemProgress ?? event.item_progress ?? null,
+    syncProgress: event.syncProgress ?? event.sync_progress ?? null,
+    counters: event.counters ?? null,
+    message: event.message ?? null,
+    error: event.error ?? null,
+  };
 }

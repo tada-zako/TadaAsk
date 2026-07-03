@@ -263,6 +263,12 @@ export const useSourceStore = defineStore("console-source", () => {
     try {
       const job = await syncWebCrawlSource(sourceUid);
       const jobView = toSourceJobViewModel(job);
+      patchSourceStatus(sourceUid, "processing");
+      setSourceJobProgress(sourceUid, 0);
+      jobMessageBySourceUid.value = {
+        ...jobMessageBySourceUid.value,
+        [sourceUid]: t("sources.service.jobs.syncStarted"),
+      };
       upsertActiveJob(jobView);
       void connectJobStream(jobView);
       return job;
@@ -288,6 +294,8 @@ export const useSourceStore = defineStore("console-source", () => {
     try {
       const job = await indexSourceItemsRequest(sourceUid, sourceItemUids);
       const jobView = toSourceJobViewModel(job);
+      markSourceItemsStatus(sourceUid, sourceItemUids, "processing", 0);
+      patchSourceStatus(sourceUid, "processing");
       upsertActiveJob(jobView);
       void connectJobStream(jobView);
       return job;
@@ -311,6 +319,7 @@ export const useSourceStore = defineStore("console-source", () => {
     errorMessage.value = null;
 
     try {
+      markSourceItemsStatus(sourceUid, sourceItemUids, "pause_requested");
       const pausedItems = await pauseSourceItemsRequest(
         sourceUid,
         sourceItemUids,
@@ -345,6 +354,8 @@ export const useSourceStore = defineStore("console-source", () => {
     try {
       const job = await resumeSourceItemsRequest(sourceUid, sourceItemUids);
       const jobView = toSourceJobViewModel(job);
+      markSourceItemsStatus(sourceUid, sourceItemUids, "processing", 0);
+      patchSourceStatus(sourceUid, "processing");
       upsertActiveJob(jobView);
       void connectJobStream(jobView);
       return job;
@@ -545,51 +556,58 @@ export const useSourceStore = defineStore("console-source", () => {
 
   // 应用 RAG 任务增量 SSE 事件，局部更新知识库及子项的状态、进度、消息等
   function applyRagJobEvent(event: RAGJobEvent): void {
+    const sourceUid = event.sourceUid;
+    const sourceItemUid = event.sourceItemUid ?? event.sourceItem?.uid ?? null;
+    const sourceItemStatus =
+      event.sourceItemStatus ?? event.sourceItem?.status ?? null;
+
+    if (!sourceUid) {
+      return;
+    }
+
     if (event.sourceStatus) {
-      patchSourceStatus(event.sourceUid, event.sourceStatus);
+      patchSourceStatus(sourceUid, event.sourceStatus);
     }
 
     if (event.message) {
       jobMessageBySourceUid.value = {
         ...jobMessageBySourceUid.value,
-        [event.sourceUid]: event.message,
+        [sourceUid]: event.message,
       };
     }
 
     if (event.error) {
       jobErrorBySourceUid.value = {
         ...jobErrorBySourceUid.value,
-        [event.sourceUid]: event.error,
+        [sourceUid]: event.error,
       };
     }
 
     if (event.counters) {
       jobCountersBySourceUid.value = {
         ...jobCountersBySourceUid.value,
-        [event.sourceUid]: event.counters,
+        [sourceUid]: event.counters,
       };
     }
 
     if (event.sourceItem) {
-      patchSourceItem(event.sourceUid, event.sourceItem);
-    } else if (event.sourceItemUid && event.sourceItemStatus) {
-      patchSourceItemStatus(
-        event.sourceUid,
-        event.sourceItemUid,
-        event.sourceItemStatus,
-      );
+      patchSourceItem(sourceUid, event.sourceItem);
+    }
+
+    if (sourceItemUid && sourceItemStatus) {
+      patchSourceItemStatus(sourceUid, sourceItemUid, sourceItemStatus);
     }
 
     if (
-      event.sourceItemUid &&
+      sourceItemUid &&
       event.itemProgress !== null &&
       event.itemProgress !== undefined
     ) {
-      setSourceItemProgress(event.sourceItemUid, event.itemProgress);
+      setSourceItemProgress(sourceItemUid, event.itemProgress);
     }
 
     if (event.syncProgress !== null && event.syncProgress !== undefined) {
-      setSourceJobProgress(event.sourceUid, event.syncProgress);
+      setSourceJobProgress(sourceUid, event.syncProgress);
     }
   }
 
@@ -778,6 +796,21 @@ export const useSourceStore = defineStore("console-source", () => {
         item.uid === sourceItemUid ? { ...item, status } : item,
       ),
     );
+  }
+
+  function markSourceItemsStatus(
+    sourceUid: string,
+    sourceItemUids: string[],
+    status: SourceItemProcessStatus,
+    progress?: number,
+  ): void {
+    for (const sourceItemUid of sourceItemUids) {
+      patchSourceItemStatus(sourceUid, sourceItemUid, status);
+
+      if (progress !== undefined) {
+        setSourceItemProgress(sourceItemUid, progress);
+      }
+    }
   }
 
   // 从本地状态移除子项，并清理其进度
