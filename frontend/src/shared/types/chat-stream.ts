@@ -1,8 +1,6 @@
 import type { components } from "@/shared/api/generated/schema";
 
 /** OpenAPI 生成类型别名 */
-export type AdminRagChatRequest = components["schemas"]["AdminRAGChatRequest"];
-export type VisitorChatRequest = components["schemas"]["VisitorChatRequest"];
 export type ChatMessageRead = components["schemas"]["ChatMessageRead"];
 export type ChatSessionRead = components["schemas"]["ChatSessionRead"];
 

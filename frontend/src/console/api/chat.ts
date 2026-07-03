@@ -1,5 +1,8 @@
 import { client } from "./client";
-import type { AdminRagChatRequest } from "@/shared/types/chat-stream";
+import type { components } from "@/shared/api/generated/schema";
+
+/** OpenAPI 生成类型别名 */
+export type AdminRagChatRequest = components["schemas"]["AdminRAGChatRequest"];
 
 /** Admin Console 中的聊天流接口。 */
 export const adminChatApi = {
