@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 
 import router from "@/console/router";
 import { translate as t } from "@/console/i18n";
+import { getErrorMessage } from "@/console/lib/api-result";
 import {
   createProject as createProjectRequest,
   listProjectOptions,
@@ -142,8 +143,3 @@ export const useProjectStore = defineStore("console-project", () => {
     selectedProjectUid,
   };
 });
-
-// 提取错误信息
-function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
-}

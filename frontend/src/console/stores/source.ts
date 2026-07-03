@@ -2,6 +2,8 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import { translate as t } from "@/console/i18n";
+import { getErrorMessage } from "@/console/lib/api-result";
+import { normalizeProgress } from "@/console/lib/normalize";
 import {
   createSource as createSourceRequest,
   createSourceWorkspaceViewModel,
@@ -904,20 +906,4 @@ function mergeSourceItems(
   const appended = updates.filter((item) => !currentUidSet.has(item.uid));
 
   return [...merged, ...appended];
-}
-
-// 规范化进度值（0-100 整数），非法值返回 null
-// 后端可能返回 0-1 小数或 0-100 整数，统一按 ≤1 判别并放大
-function normalizeProgress(value: number | null | undefined): number | null {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return null;
-  }
-
-  const normalized = value <= 1 ? value * 100 : value;
-  return Math.min(100, Math.max(0, Math.round(normalized)));
-}
-
-// 从 unknown 错误中提取可读消息
-function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
