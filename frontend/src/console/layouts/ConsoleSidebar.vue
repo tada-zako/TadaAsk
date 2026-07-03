@@ -47,6 +47,8 @@ const { projects, selectedProject } = storeToRefs(projectStore);
 const projectInitial = computed(
   () => selectedProject.value?.name.charAt(0) ?? "+",
 );
+const isProjectNavActive = computed(() => route.path.startsWith("/project"));
+const isSourcesActive = computed(() => route.path.startsWith("/sources"));
 
 onMounted(async () => {
   if (!getProjectUidFromRoute()) {
@@ -115,6 +117,10 @@ async function openProjectChild(child: "ask" | "settings") {
     name: child === "ask" ? "project-ask" : "project-settings",
     params: { projectUid: selectedProject.value.uid },
   });
+}
+
+async function openSources() {
+  await router.push({ name: "sources" });
 }
 
 // 退出登录
@@ -248,7 +254,8 @@ function getProjectUidFromRoute(): string | null {
         </p>
         <!-- 项目管理模块 -->
         <a
-          class="console-nav-link console-nav-link-active max-[1180px]:justify-center max-[1180px]:px-0"
+          class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
+          :class="isProjectNavActive ? 'console-nav-link-active' : ''"
           href="#"
           @click.prevent="openProjectRoot"
         >
@@ -346,7 +353,9 @@ function getProjectUidFromRoute(): string | null {
         </p>
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
+          :class="isSourcesActive ? 'console-nav-link-active' : ''"
           href="#"
+          @click.prevent="openSources"
         >
           <Database class="size-4" />
           <span class="max-[1180px]:hidden">

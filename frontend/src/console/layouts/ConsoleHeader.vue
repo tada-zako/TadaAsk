@@ -52,13 +52,35 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
     return items;
   }
 
-  // 全局 Sources 页面
-  if (route.name === "sources") {
+  // 全局 Sources 页面与 SourceItem 工作区
+  if (
+    route.name === "sources" ||
+    route.name === "source-local-file-items" ||
+    route.name === "source-web-crawl-items"
+  ) {
     items.push({
-      active: true,
+      active: route.name === "sources",
       key: "sources",
       label: t("shell.breadcrumb.sources"),
+      navigate: route.name === "sources" ? undefined : goSources,
     });
+
+    if (route.name === "source-local-file-items") {
+      items.push({
+        active: true,
+        key: "source-local-file-items",
+        label: t("shell.breadcrumb.localFileItems"),
+      });
+    }
+
+    if (route.name === "source-web-crawl-items") {
+      items.push({
+        active: true,
+        key: "source-web-crawl-items",
+        label: t("shell.breadcrumb.webCrawlItems"),
+      });
+    }
+
     return items;
   }
 
@@ -100,6 +122,10 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
 // 跳转至项目 Landing 页
 async function goProjectLanding() {
   await router.push({ name: "project-landing" });
+}
+
+async function goSources() {
+  await router.push({ name: "sources" });
 }
 
 // 跳转至项目概览页
