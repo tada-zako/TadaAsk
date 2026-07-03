@@ -2,11 +2,19 @@ import { client } from "./client";
 import { parseSseStream } from "@/shared/api/sse";
 import type { components } from "@/shared/api/generated/schema";
 
+/** OpenAPI 生成类型别名 */
 export type SourceCreatePayload = components["schemas"]["SourceCreate"];
+export type SourceUpdatePayload = components["schemas"]["SourceUpdate"];
 export type SourceRead = components["schemas"]["SourceRead"];
 export type SourceItemRead = components["schemas"]["SourceItemRead"];
+export type SourceDeleteResponse =
+  components["schemas"]["SourceDeleteResponse"];
 export type SourceItemDeleteResponse =
   components["schemas"]["SourceItemDeleteResponse"];
+export type SourceItemRenamePayload =
+  components["schemas"]["SourceItemRenameRequest"];
+export type SourceItemDownloadResponse =
+  components["schemas"]["SourceItemDownloadResponse"];
 export type SourceItemProcessStatus =
   components["schemas"]["SourceItemProcessStatus"];
 export type SourceProcessStatus = components["schemas"]["SourceProcessStatus"];
@@ -17,24 +25,11 @@ export type RAGJobRead = components["schemas"]["RAGJobRead"];
 export type ActiveRAGJobsResponse =
   components["schemas"]["ActiveRAGJobsResponse"];
 
-export type SourceListQuery = {
-  limit?: number;
-  offset?: number;
-};
-
-export type SourceItemListQuery = {
-  limit?: number;
-  offset?: number;
-};
-
-export type SourceItemUidPayload = {
-  itemUids: string[];
-};
-
 export type SourceUploadPayload = {
   files: File[];
 };
 
+/** RAG Job 事件类型定义 */
 export type RAGJobEventType =
   | "sync_start"
   | "sync_progress"
@@ -51,6 +46,7 @@ export type RAGJobEventType =
   | "item_paused"
   | "item_failed";
 
+/** RAG Job 执行状态类型定义 */
 export type RAGJobIngestStage =
   | "loading"
   | "discovering"
@@ -81,8 +77,8 @@ export interface RAGJobCounters {
 }
 
 export interface RAGJobEvent {
-  /** SSE id，用于 Last-Event-ID 续接。 */
-  sseId?: string;
+  /** SSE Source 观察 API 接口响应 event 类型定义 */
+  sseId?: string; // SSE id，用于 Last-Event-ID 续接
   event: RAGJobEventType;
   sourceUid: string;
   sourceStatus?: SourceProcessStatus | null;
@@ -111,9 +107,28 @@ export const sourceApi = {
     }),
 
   /** 获取全局 sources 列表 */
-  list: (query: SourceListQuery = {}) =>
+  list: (query: { limit?: number; offset?: number } = {}) =>
     client.GET("/admin/source/list", {
       params: { query },
+    }),
+
+  /** 获取 source 详情 */
+  get: (sourceUid: string) =>
+    client.GET("/admin/source/{source_uid}", {
+      params: { path: { source_uid: sourceUid } },
+    }),
+
+  /** 更新 source 基础信息或 web crawl 配置 */
+  update: (sourceUid: string, body: SourceUpdatePayload) =>
+    client.PATCH("/admin/source/{source_uid}", {
+      params: { path: { source_uid: sourceUid } },
+      body,
+    }),
+
+  /** 删除 source，并触发关联 item / 文件 / 向量清理 */
+  remove: (sourceUid: string) =>
+    client.DELETE("/admin/source/{source_uid}", {
+      params: { path: { source_uid: sourceUid } },
     }),
 
   /** 上传 local_file source 下的文件，后端会创建 SourceItem */
@@ -130,13 +145,17 @@ export const sourceApi = {
     return client.POST("/admin/source/{source_uid}/items/upload", {
       params: { path: { source_uid: sourceUid } },
       body: formData as never,
+      // 避免 formData 被错误序列化为 JSON
       bodySerializer: (body) => body as unknown as FormData,
       signal,
     });
   },
 
   /** 获取 source 下的数据项 */
-  listItems: (sourceUid: string, query: SourceItemListQuery = {}) =>
+  listItems: (
+    sourceUid: string,
+    query: { limit?: number; offset?: number } = {},
+  ) =>
     client.GET("/admin/source/{source_uid}/items", {
       params: { path: { source_uid: sourceUid }, query },
     }),
@@ -144,6 +163,33 @@ export const sourceApi = {
   /** 删除 source item，并触发向量/文件清理 */
   deleteItem: (sourceUid: string, sourceItemUid: string) =>
     client.DELETE("/admin/source/{source_uid}/items/{source_item_uid}", {
+      params: {
+        path: {
+          source_uid: sourceUid,
+          source_item_uid: sourceItemUid,
+        },
+      },
+    }),
+
+  /** 重命名 source item；local_file 会同步更新 filename */
+  renameItem: (
+    sourceUid: string,
+    sourceItemUid: string,
+    body: SourceItemRenamePayload,
+  ) =>
+    client.PATCH("/admin/source/{source_uid}/items/{source_item_uid}", {
+      params: {
+        path: {
+          source_uid: sourceUid,
+          source_item_uid: sourceItemUid,
+        },
+      },
+      body,
+    }),
+
+  /** 获取 local_file source item 的静态下载地址 */
+  getItemDownload: (sourceUid: string, sourceItemUid: string) =>
+    client.GET("/admin/source/{source_uid}/items/{source_item_uid}/download", {
       params: {
         path: {
           source_uid: sourceUid,
