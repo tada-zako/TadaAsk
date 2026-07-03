@@ -1,6 +1,19 @@
 import { projectApi } from "@/console/api/projects";
 import { sourceApi } from "@/console/api/sources";
 import { translate as t } from "@/console/i18n";
+import { unwrapApiData } from "@/console/lib/api-result";
+import {
+  formatDate,
+  formatRelativeDate,
+  type RelativeDateMessages,
+} from "@/console/lib/date-format";
+import { normalizeOptionalText } from "@/console/lib/normalize";
+import {
+  sourceStatusLabel,
+  sourceStatusTone,
+  sourceTypeLabel,
+  sourceVisibilityLabel,
+} from "@/console/services/sources/source-display";
 import type { components } from "@/shared/api/generated/schema";
 
 export type ProjectRead = components["schemas"]["ProjectRead"];
@@ -71,57 +84,6 @@ export interface ProjectWorkspaceViewModel {
 export interface CreateProjectInput {
   name: string;
   description: string | null;
-}
-
-/**
- * 统一 API 响应解包处理，
- * 当存在 error 或 data 不存在时抛出异常
- * @param data
- * @param error
- * @param fallbackMessage
- * @returns
- */
-function unwrapApiData<T>(
-  data: T | undefined,
-  error: unknown,
-  fallbackMessage: string,
-): T {
-  // openapi-fetch 的 error 可能是 validation detail，也可能是普通对象。
-  if (error) {
-    throw new Error(getApiErrorMessage(error, fallbackMessage));
-  }
-
-  if (data === undefined) {
-    throw new Error(fallbackMessage);
-  }
-
-  return data;
-}
-
-function getApiErrorMessage(error: unknown, fallbackMessage: string): string {
-  if (!error || typeof error !== "object") {
-    return fallbackMessage;
-  }
-
-  if ("detail" in error) {
-    const detail = error.detail;
-
-    if (typeof detail === "string") {
-      return detail;
-    }
-
-    if (Array.isArray(detail)) {
-      return detail
-        .map((item) =>
-          typeof item === "object" && item && "msg" in item
-            ? String(item.msg)
-            : String(item),
-        )
-        .join(", ");
-    }
-  }
-
-  return fallbackMessage;
 }
 
 function toProjectOption(project: ProjectRead): ProjectOption {
@@ -458,14 +420,15 @@ function toSourceRow(source: SourceRead): ProjectSourceRow {
   return {
     uid: source.uid,
     name: source.sourceName,
-    typeLabel: sourceTypeLabel(source.sourceType),
-    visibilityLabel: source.isPublic
-      ? t("project.service.visibility.public")
-      : t("project.service.visibility.private"),
+    typeLabel: sourceTypeLabel(source.sourceType, "project"),
+    visibilityLabel: sourceVisibilityLabel(source.isPublic, "project"),
     visibilityTone: source.isPublic ? "success" : "muted",
-    statusLabel: sourceStatusLabel(source.status),
+    statusLabel: sourceStatusLabel(source.status, "project"),
     statusTone: sourceStatusTone(source.status),
-    lastUpdatedLabel: formatRelativeDate(source.updatedAt),
+    lastUpdatedLabel: formatRelativeDate(
+      source.updatedAt,
+      projectRelativeDateMessages(),
+    ),
     isPublic: source.isPublic,
   };
 }
@@ -482,105 +445,24 @@ function toWidgetRow(widget: ProjectWidgetRead): ProjectWidgetRow {
     enabledActionLabel: widget.isEnabled
       ? t("project.service.widgets.disable")
       : t("project.service.widgets.enable"),
-    createdLabel: formatDate(widget.createdAt),
-    updatedLabel: formatDate(widget.updatedAt),
+    createdLabel: formatDate(
+      widget.createdAt,
+      t("project.service.dates.unknown"),
+    ),
+    updatedLabel: formatDate(
+      widget.updatedAt,
+      t("project.service.dates.unknown"),
+    ),
   };
 }
 
-function sourceTypeLabel(sourceType: SourceRead["sourceType"]): string {
-  const labels: Record<SourceRead["sourceType"], string> = {
-    custom_content: t("project.service.sourceType.custom_content"),
-    github_repo: t("project.service.sourceType.github_repo"),
-    local_file: t("project.service.sourceType.local_file"),
-    web_crawl: t("project.service.sourceType.web_crawl"),
+function projectRelativeDateMessages(): RelativeDateMessages {
+  return {
+    unknown: t("project.service.dates.notUpdated"),
+    justNow: t("project.service.dates.justNow"),
+    minutesAgo: (count: number) =>
+      t("project.service.dates.minutesAgo", { count }),
+    hoursAgo: (count: number) => t("project.service.dates.hoursAgo", { count }),
+    daysAgo: (count: number) => t("project.service.dates.daysAgo", { count }),
   };
-
-  return labels[sourceType];
-}
-
-function sourceStatusLabel(status: SourceRead["status"]): string {
-  const labels: Record<SourceRead["status"], string> = {
-    completed: t("project.service.sourceStatus.completed"),
-    failed: t("project.service.sourceStatus.failed"),
-    pause_requested: t("project.service.sourceStatus.pause_requested"),
-    paused: t("project.service.sourceStatus.paused"),
-    pending: t("project.service.sourceStatus.pending"),
-    processing: t("project.service.sourceStatus.processing"),
-  };
-
-  return labels[status];
-}
-
-function sourceStatusTone(
-  status: SourceRead["status"],
-): ProjectSourceRow["statusTone"] {
-  if (status === "completed") {
-    return "success";
-  }
-
-  if (status === "failed") {
-    return "danger";
-  }
-
-  if (status === "processing" || status === "pause_requested") {
-    return "warning";
-  }
-
-  return "muted";
-}
-
-function normalizeOptionalText(
-  value: string | null | undefined,
-): string | null {
-  if (value === undefined) {
-    return null;
-  }
-
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return t("project.service.dates.unknown");
-  }
-
-  return date.toLocaleDateString(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function formatRelativeDate(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return t("project.service.dates.notUpdated");
-  }
-
-  const diffMs = Date.now() - date.getTime();
-  const diffMinutes = Math.max(0, Math.round(diffMs / 60_000));
-
-  if (diffMinutes < 1) {
-    return t("project.service.dates.justNow");
-  }
-
-  if (diffMinutes < 60) {
-    return t("project.service.dates.minutesAgo", { count: diffMinutes });
-  }
-
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) {
-    return t("project.service.dates.hoursAgo", { count: diffHours });
-  }
-
-  const diffDays = Math.round(diffHours / 24);
-  if (diffDays < 8) {
-    return t("project.service.dates.daysAgo", { count: diffDays });
-  }
-
-  return formatDate(value);
 }
