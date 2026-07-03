@@ -55,13 +55,15 @@ const router = createRouter({
           component: () => import("./views/sources/SourcesView.vue"),
         },
         {
-          path: "sources/local-file-items",
+          // TODO: 对于 source type 展示的不同 source item 页面，
+          // router 逻辑需要优化
+          path: "sources/:sourceUid/local-file-items",
           name: "source-local-file-items",
           component: () =>
             import("./views/sources/SourceLocalFileItemsView.vue"),
         },
         {
-          path: "sources/web-crawl-items",
+          path: "sources/:sourceUid/web-crawl-items",
           name: "source-web-crawl-items",
           component: () =>
             import("./views/sources/SourceWebCrawlItemsView.vue"),
