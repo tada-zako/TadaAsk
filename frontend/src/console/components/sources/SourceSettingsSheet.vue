@@ -1,10 +1,23 @@
 <script setup lang="ts">
-// 导入 Vue 核心 API
-import { computed } from "vue";
-// 导入 Lucide 图标
+import { computed, ref, watch } from "vue";
 import { FileText, Globe2, Settings, Trash2 } from "@lucide/vue";
 
-// 导入 UI 组件
+import {
+  toSourceRow,
+  type WebCrawlConfigInput,
+} from "@/console/services/source-workspace";
+import type { SourceRead, SourceUpdatePayload } from "@/console/api/sources";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/shared/components/ui/alert-dialog";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -25,44 +38,177 @@ import {
   SheetTrigger,
 } from "@/shared/components/ui/sheet";
 import { Switch } from "@/shared/components/ui/switch";
+import { Textarea } from "@/shared/components/ui/textarea";
 
-// 定义组件属性
 const props = defineProps<{
-  sourceType: "local-file" | "web-crawl";
+  source: SourceRead;
+  isMutating?: boolean;
 }>();
 
-// 辅助计算属性：判断是否为网页爬取类型
-const isWebCrawl = computed(() => props.sourceType === "web-crawl");
-// 抽屉标题
+const emit = defineEmits<{
+  (event: "updateSource", input: SourceUpdatePayload): void;
+  (event: "deleteSource"): void;
+}>();
+
+// 响应式变量
+const open = ref(false);
+const sourceName = ref("");
+const isPublic = ref(false);
+
+// web crawl 类型变量
+const entryType = ref<WebCrawlConfigInput["entry_type"]>("site_root");
+const siteRootUrl = ref("");
+const urlsText = ref("");
+const sitemapUrl = ref("");
+
+// crawl config
+const allowedDomainsText = ref("");
+const includePathsText = ref("");
+const excludePathsText = ref("");
+const contentSelectorsText = ref("");
+const excludeSelectorsText = ref("");
+const maxPages = ref(20);
+const maxDepth = ref(3);
+const requestDelayMs = ref(5000);
+const respectRobotsTxt = ref(true);
+const localError = ref<string | null>(null);
+
+const sourceRow = computed(() => toSourceRow(props.source));
+const isWebCrawl = computed(() => props.source.sourceType === "web_crawl");
 const sheetTitle = computed(() =>
   isWebCrawl.value ? "Web crawl settings" : "Local file settings",
 );
-// 默认数据源名称
-const sourceName = computed(() =>
-  isWebCrawl.value ? "Main website pages" : "Product docs PDF",
-);
-// 数据源类型标签
-const sourceTypeLabel = computed(() =>
-  isWebCrawl.value ? "WEB CRAWL" : "LOCAL FILE",
-);
-// 状态标签
-const statusLabel = computed(() =>
-  isWebCrawl.value ? "Processing" : "Indexed",
-);
-// 可见性提示文本
+
 const visibilityHelp = computed(() =>
   isWebCrawl.value
     ? "Keep enabled only after crawl results are reviewed."
     : "Disable while uploading or reviewing imported files.",
 );
+
+watch(
+  () => props.source,
+  () => resetForm(),
+  { immediate: true },
+);
+
+// 更新 source settings 触发函数
+function handleSave(): void {
+  const name = sourceName.value.trim();
+
+  if (!name) {
+    localError.value = "Source name is required.";
+    return;
+  }
+
+  localError.value = null;
+  const payload: SourceUpdatePayload = {
+    sourceName: name,
+    isPublic: isPublic.value,
+  };
+
+  if (isWebCrawl.value) {
+    payload.webCrawlConfig = buildWebCrawlConfig();
+  }
+
+  emit("updateSource", payload);
+  open.value = false;
+}
+
+function handleDelete(): void {
+  emit("deleteSource");
+  open.value = false;
+}
+
+function resetForm(): void {
+  const config = props.source.webCrawlConfig;
+
+  sourceName.value = props.source.sourceName;
+  isPublic.value = props.source.isPublic;
+  entryType.value = config?.entry_type ?? "site_root";
+  siteRootUrl.value = config?.site_root_url ?? "";
+  urlsText.value = joinList(config?.urls ?? []);
+  sitemapUrl.value = config?.sitemap_url ?? "";
+  allowedDomainsText.value = joinList(config?.allowed_domains ?? []);
+  includePathsText.value = joinList(config?.include_paths ?? []);
+  excludePathsText.value = joinList(config?.exclude_paths ?? []);
+  contentSelectorsText.value = joinList(config?.content_selectors ?? []);
+  excludeSelectorsText.value = joinList(config?.exclude_selectors ?? []);
+  maxPages.value = config?.max_pages ?? 20;
+  maxDepth.value = config?.max_depth ?? 3;
+  requestDelayMs.value = config?.request_delay_ms ?? 5000;
+  respectRobotsTxt.value = config?.respect_robots_txt ?? true;
+  localError.value = null;
+}
+
+function buildWebCrawlConfig(): WebCrawlConfigInput {
+  return {
+    entry_type: entryType.value,
+    urls: entryType.value === "url_list" ? splitList(urlsText.value) : null,
+    sitemap_url:
+      entryType.value === "sitemap_url"
+        ? normalizeOptionalText(sitemapUrl.value)
+        : null,
+    site_root_url:
+      entryType.value === "site_root"
+        ? normalizeOptionalText(siteRootUrl.value)
+        : null,
+    allowed_domains: splitList(allowedDomainsText.value),
+    include_paths: splitList(includePathsText.value),
+    exclude_paths: splitList(excludePathsText.value),
+    content_selectors: splitList(contentSelectorsText.value),
+    exclude_selectors: splitList(excludeSelectorsText.value),
+    extraction_rules: props.source.webCrawlConfig?.extraction_rules ?? [],
+    max_pages: normalizePositiveNumber(maxPages.value, 20),
+    max_depth: normalizePositiveNumber(maxDepth.value, 3),
+    request_delay_ms: normalizePositiveNumber(requestDelayMs.value, 5000),
+    respect_robots_txt: respectRobotsTxt.value,
+  };
+}
+
+function badgeClass(tone: typeof sourceRow.value.statusTone) {
+  if (tone === "success") {
+    return "border-emerald-400/25 bg-emerald-400/10 text-emerald-200";
+  }
+
+  if (tone === "warning") {
+    return "border-yellow-300/25 bg-yellow-300/10 text-yellow-100";
+  }
+
+  if (tone === "danger") {
+    return "border-red-400/25 bg-red-400/10 text-red-100";
+  }
+
+  return "border-(--line-soft) bg-(--surface-panel-soft) text-(--text-muted)";
+}
+
+function splitList(value: string): string[] {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function joinList(value: string[]): string {
+  return value.join(", ");
+}
+
+function normalizeOptionalText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizePositiveNumber(value: number, fallback: number): number {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : fallback;
+}
 </script>
 
 <template>
-  <Sheet>
+  <Sheet v-model:open="open">
     <SheetTrigger as-child>
       <Button
         type="button"
-        :aria-label="`Open ${sourceTypeLabel.toLowerCase()} source settings`"
+        :aria-label="`Open ${sourceRow.name} source settings`"
         variant="outline"
         size="sm"
         class="w-24 overflow-hidden"
@@ -91,7 +237,7 @@ const visibilityHelp = computed(() =>
 
           <div class="grid gap-2">
             <Label for="source-settings-name">Name</Label>
-            <Input id="source-settings-name" :value="sourceName" />
+            <Input id="source-settings-name" v-model="sourceName" />
           </div>
 
           <div class="grid gap-2">
@@ -104,16 +250,10 @@ const visibilityHelp = computed(() =>
               >
                 <Globe2 v-if="isWebCrawl" class="text-primary size-4" />
                 <FileText v-else class="text-primary size-4" />
-                {{ sourceTypeLabel }}
+                {{ sourceRow.typeLabel }}
               </span>
-              <Badge
-                :class="
-                  isWebCrawl
-                    ? 'border-yellow-300/25 bg-yellow-300/10 text-yellow-100'
-                    : 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
-                "
-              >
-                {{ statusLabel }}
+              <Badge :class="badgeClass(sourceRow.statusTone)">
+                {{ sourceRow.statusLabel }}
               </Badge>
             </div>
           </div>
@@ -127,7 +267,7 @@ const visibilityHelp = computed(() =>
                 {{ visibilityHelp }}
               </p>
             </div>
-            <Switch checked aria-label="Source visibility" />
+            <Switch v-model:checked="isPublic" aria-label="Source visibility" />
           </div>
         </section>
 
@@ -138,13 +278,13 @@ const visibilityHelp = computed(() =>
           <div>
             <h2 class="console-panel-title">Web crawl config</h2>
             <p class="console-panel-note">
-              Static edit fields mirror the future update surface.
+              Updating crawl rules resets the source to pending when accepted.
             </p>
           </div>
 
           <div class="grid gap-2">
             <Label>Entry type</Label>
-            <Select default-value="site_root">
+            <Select v-model="entryType">
               <SelectTrigger class="w-full bg-(--surface-base)">
                 <SelectValue placeholder="Entry type" />
               </SelectTrigger>
@@ -156,56 +296,155 @@ const visibilityHelp = computed(() =>
             </Select>
           </div>
 
-          <div class="grid gap-2">
+          <div v-if="entryType === 'site_root'" class="grid gap-2">
             <Label for="web-root-url">Root URL</Label>
-            <Input id="web-root-url" value="https://docs.example.com/" />
+            <Input
+              id="web-root-url"
+              v-model="siteRootUrl"
+              placeholder="https://docs.example.com/"
+            />
+          </div>
+
+          <div v-else-if="entryType === 'sitemap_url'" class="grid gap-2">
+            <Label for="web-sitemap-url">Sitemap URL</Label>
+            <Input
+              id="web-sitemap-url"
+              v-model="sitemapUrl"
+              placeholder="https://docs.example.com/sitemap.xml"
+            />
+          </div>
+
+          <div v-else class="grid gap-2">
+            <Label for="web-url-list">URLs</Label>
+            <Textarea
+              id="web-url-list"
+              v-model="urlsText"
+              class="min-h-24 bg-(--surface-base)"
+              placeholder="https://example.com/docs/intro&#10;https://example.com/docs/install"
+            />
           </div>
 
           <div class="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
             <div class="grid gap-2">
               <Label for="web-max-pages">Max pages</Label>
-              <Input id="web-max-pages" value="20" />
+              <Input id="web-max-pages" v-model="maxPages" type="number" />
             </div>
             <div class="grid gap-2">
               <Label for="web-max-depth">Max depth</Label>
-              <Input id="web-max-depth" value="3" />
+              <Input id="web-max-depth" v-model="maxDepth" type="number" />
             </div>
+          </div>
+
+          <div class="grid gap-2">
+            <Label for="web-allowed-domains">Allowed domains</Label>
+            <Input
+              id="web-allowed-domains"
+              v-model="allowedDomainsText"
+              placeholder="docs.example.com, example.com"
+            />
           </div>
 
           <div class="grid gap-2">
             <Label for="web-include-paths">Include paths</Label>
-            <Input id="web-include-paths" value="/docs/, /api/" />
+            <Input
+              id="web-include-paths"
+              v-model="includePathsText"
+              placeholder="/docs/, /api/"
+            />
           </div>
 
           <div class="grid gap-2">
             <Label for="web-exclude-paths">Exclude paths</Label>
-            <Input id="web-exclude-paths" value="/blog/, /changelog/drafts/" />
+            <Input
+              id="web-exclude-paths"
+              v-model="excludePathsText"
+              placeholder="/blog/, /changelog/drafts/"
+            />
           </div>
 
           <div class="grid gap-2">
             <Label for="web-content-selectors">Content selectors</Label>
             <Input
               id="web-content-selectors"
-              value="main, article, .docs-content"
+              v-model="contentSelectorsText"
+              placeholder="main, article, .docs-content"
             />
           </div>
+
+          <div class="grid gap-2">
+            <Label for="web-exclude-selectors">Exclude selectors</Label>
+            <Input
+              id="web-exclude-selectors"
+              v-model="excludeSelectorsText"
+              placeholder="nav, footer, .toc"
+            />
+          </div>
+
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+            <div class="grid gap-2">
+              <Label for="web-request-delay">Request delay ms</Label>
+              <Input
+                id="web-request-delay"
+                v-model="requestDelayMs"
+                type="number"
+              />
+            </div>
+            <div class="pt-6">
+              <Switch
+                v-model:checked="respectRobotsTxt"
+                aria-label="Respect robots txt"
+              />
+            </div>
+          </div>
         </section>
+
+        <p v-if="localError" class="text-sm text-red-100">
+          {{ localError }}
+        </p>
       </div>
 
       <SheetFooter
         class="mt-0 flex-row justify-between border-t border-(--line-soft) p-4.5"
       >
-        <Button
-          type="button"
-          aria-label="Delete source"
-          variant="outline"
-          class="border-red-400/35 text-red-100 hover:bg-red-400/10 hover:text-red-100"
-        >
-          <Trash2 class="size-4" />
-          Delete
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger as-child>
+            <Button
+              type="button"
+              aria-label="Delete source"
+              variant="outline"
+              class="border-red-400/35 text-red-100 hover:bg-red-400/10 hover:text-red-100"
+              :disabled="isMutating"
+            >
+              <Trash2 class="size-4" />
+              Delete
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this source?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes the source container and its related source items.
+                Processing sources may be rejected by the backend.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                class="bg-red-500 text-white hover:bg-red-500/90"
+                @click="handleDelete"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div class="flex justify-end">
-          <Button type="button" aria-label="Save source settings" disabled>
+          <Button
+            type="button"
+            aria-label="Save source settings"
+            :disabled="isMutating"
+            @click="handleSave"
+          >
             Save changes
           </Button>
         </div>
