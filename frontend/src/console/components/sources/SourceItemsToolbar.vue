@@ -2,8 +2,9 @@
 // 导入 Vue 核心 API
 import { computed } from "vue";
 // 导入 Lucide 图标
-import { RefreshCw, Upload } from "@lucide/vue";
+import { RefreshCw, Settings, Upload } from "@lucide/vue";
 
+import type { SourceRead, SourceUpdatePayload } from "@/console/api/sources";
 // 导入 UI 组件
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -14,6 +15,13 @@ import SourceSettingsSheet from "./SourceSettingsSheet.vue";
 // 定义组件属性
 const props = defineProps<{
   sourceType: "local-file" | "web-crawl";
+  source?: SourceRead | null;
+  isMutating?: boolean;
+}>();
+
+const emit = defineEmits<{
+  (event: "updateSource", input: SourceUpdatePayload): void;
+  (event: "deleteSource"): void;
 }>();
 
 // 辅助计算属性：判断是否为网页爬取类型
@@ -40,6 +48,24 @@ const primaryActionAriaLabel = computed(() =>
       <Upload v-else class="size-4" />
       {{ primaryActionLabel }}
     </Button>
-    <SourceSettingsSheet :source-type="sourceType" />
+    <SourceSettingsSheet
+      v-if="source"
+      :is-mutating="isMutating"
+      :source="source"
+      @delete-source="emit('deleteSource')"
+      @update-source="emit('updateSource', $event)"
+    />
+    <Button
+      v-else
+      type="button"
+      aria-label="Open source settings"
+      variant="outline"
+      size="sm"
+      class="w-24 overflow-hidden"
+      disabled
+    >
+      <Settings class="size-3.5" />
+      Settings
+    </Button>
   </div>
 </template>
