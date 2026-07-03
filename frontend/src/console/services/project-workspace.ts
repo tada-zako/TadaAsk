@@ -42,7 +42,7 @@ export interface ProjectSourceRow {
   visibilityTone: "success" | "muted";
   statusLabel: string;
   statusTone: "success" | "warning" | "danger" | "muted";
-  lastSyncedLabel: string;
+  lastUpdatedLabel: string;
   isPublic: boolean;
 }
 
@@ -465,7 +465,7 @@ function toSourceRow(source: SourceRead): ProjectSourceRow {
     visibilityTone: source.isPublic ? "success" : "muted",
     statusLabel: sourceStatusLabel(source.status),
     statusTone: sourceStatusTone(source.status),
-    lastSyncedLabel: formatRelativeDate(source.syncedAt),
+    lastUpdatedLabel: formatRelativeDate(source.updatedAt),
     isPublic: source.isPublic,
   };
 }
@@ -558,7 +558,7 @@ function formatRelativeDate(value: string): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return t("project.service.dates.notSynced");
+    return t("project.service.dates.notUpdated");
   }
 
   const diffMs = Date.now() - date.getTime();

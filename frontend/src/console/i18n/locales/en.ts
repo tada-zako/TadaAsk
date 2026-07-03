@@ -140,7 +140,7 @@ export const en = {
         type: "Type",
         visibility: "Visibility",
         status: "Status",
-        lastSynced: "Last synced",
+        lastUpdated: "Last updated",
         actions: "Actions",
       },
       sourceActions: "{name} source actions",
@@ -272,7 +272,7 @@ export const en = {
       },
       dates: {
         unknown: "Unknown",
-        notSynced: "Not synced",
+        notUpdated: "Not updated",
         justNow: "just now",
         minutesAgo: "{count} minutes ago",
         hoursAgo: "{count} hours ago",
@@ -358,7 +358,7 @@ export const en = {
       },
       dates: {
         unknown: "Unknown",
-        notSynced: "Not synced",
+        notUpdated: "Not updated",
         notStarted: "Not started",
         notFinished: "Not finished",
         justNow: "just now",

@@ -45,7 +45,7 @@ export interface SourceRow {
   status: SourceProcessStatus;
   statusLabel: string;
   statusTone: SourceTone;
-  lastSyncedLabel: string;
+  lastUpdatedLabel: string;
   createdLabel: string;
   itemsRouteName: SourceItemsRouteName | null;
   source: SourceRead;
@@ -415,10 +415,7 @@ export function toSourceRow(source: SourceRead): SourceRow {
     status: source.status,
     statusLabel: sourceStatusLabel(source.status),
     statusTone: sourceStatusTone(source.status),
-    lastSyncedLabel:
-      source.status === "pending"
-        ? t("sources.service.dates.notSynced")
-        : formatRelativeDate(source.syncedAt),
+    lastUpdatedLabel: formatRelativeDate(source.updatedAt),
     createdLabel: formatDate(source.createdAt),
     itemsRouteName: getSourceItemsRouteName(source.sourceType),
     source,

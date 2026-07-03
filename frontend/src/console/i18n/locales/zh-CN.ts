@@ -136,7 +136,7 @@ export const zhCN: typeof en = {
         type: "类型",
         visibility: "可见性",
         status: "状态",
-        lastSynced: "最近同步",
+        lastUpdated: "最近更新",
         actions: "操作",
       },
       sourceActions: "{name} 数据源操作",
@@ -262,7 +262,7 @@ export const zhCN: typeof en = {
       },
       dates: {
         unknown: "未知",
-        notSynced: "未同步",
+        notUpdated: "未更新",
         justNow: "刚刚",
         minutesAgo: "{count} 分钟前",
         hoursAgo: "{count} 小时前",
@@ -347,7 +347,7 @@ export const zhCN: typeof en = {
       },
       dates: {
         unknown: "未知",
-        notSynced: "未同步",
+        notUpdated: "未更新",
         notStarted: "未开始",
         notFinished: "未结束",
         justNow: "刚刚",

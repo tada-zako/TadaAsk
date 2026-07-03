@@ -196,7 +196,7 @@ function badgeClass(
           <TableHead>{{ t("project.sources.table.type") }}</TableHead>
           <TableHead>{{ t("project.sources.table.visibility") }}</TableHead>
           <TableHead>{{ t("project.sources.table.status") }}</TableHead>
-          <TableHead>{{ t("project.sources.table.lastSynced") }}</TableHead>
+          <TableHead>{{ t("project.sources.table.lastUpdated") }}</TableHead>
           <TableHead class="w-16 text-right">
             {{ t("project.sources.table.actions") }}
           </TableHead>
@@ -218,7 +218,7 @@ function badgeClass(
               {{ source.statusLabel }}
             </Badge>
           </TableCell>
-          <TableCell>{{ source.lastSyncedLabel }}</TableCell>
+          <TableCell>{{ source.lastUpdatedLabel }}</TableCell>
           <TableCell class="text-right">
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
