@@ -204,9 +204,11 @@ class SourceCRUD:
         new_items = []
         for item_data in items_data:
             new_item = SourceItem(
+                source_id=source.id,
                 **item_data.model_dump(),
             )
-            source.source_items.append(new_item)
+            # 避免访问 source.source_items 触发 async ORM 关系懒加载。
+            self.session.add(new_item)
             new_items.append(new_item)
 
         await self.session.flush()  # 获取新数据项的完整字段

@@ -205,7 +205,9 @@ class ModelProfileCRUD:
         existing_models = await self.session.execute(
             select(ModelProfile).where(ModelProfile.provider_id == provider.id)
         )
-        existing_model_by_name = {profile.model: profile for profile in existing_models}
+        existing_model_by_name = {
+            profile.model: profile for profile in existing_models.scalars().all()
+        }
         for model_profile_data in profile_data_list:
             existing_model_profile = existing_model_by_name.get(
                 model_profile_data.model
@@ -220,8 +222,9 @@ class ModelProfileCRUD:
                 continue
 
             # 创建关联 model_profile
-            provider.model_profiles.append(
+            self.session.add(
                 ModelProfile(
+                    provider_id=provider.id,
                     **model_profile_data.model_dump(),
                 )
             )
