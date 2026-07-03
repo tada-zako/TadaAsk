@@ -107,9 +107,6 @@ const headerChecked = computed<CheckboxValue>(() => {
 const canBulkIndex = computed(() =>
   selectedRows.value.some((row) => row.canIndex),
 );
-const canBulkPause = computed(() =>
-  selectedRows.value.some((row) => row.canPause),
-);
 const canBulkDelete = computed(() =>
   selectedRows.value.some((row) => row.canDelete),
 );
@@ -251,28 +248,6 @@ function badgeClass(tone: SourceTone): string {
             <CirclePlay class="size-4" />
             Index
           </Button>
-          <!-- <Button
-            type="button"
-            :aria-label="`Pause selected ${entityLabel}`"
-            variant="outline"
-            size="sm"
-            :disabled="isMutating || !canBulkPause"
-            @click="emitForSelected('pauseItems', (row) => row.canPause)"
-          >
-            <XCircle class="size-4" />
-            Pause
-          </Button>
-          <Button
-            type="button"
-            :aria-label="`Resume selected ${entityLabel}`"
-            variant="outline"
-            size="sm"
-            :disabled="isMutating || !canBulkResume"
-            @click="emitForSelected('resumeItems', (row) => row.canResume)"
-          >
-            <CirclePlay class="size-4" />
-            Resume
-          </Button> -->
           <Button
             type="button"
             :aria-label="`Delete selected ${entityLabel}`"
