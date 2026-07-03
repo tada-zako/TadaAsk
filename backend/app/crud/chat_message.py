@@ -349,6 +349,8 @@ class ChatMessageCRUD:
             assistant_message.rag_snapshot = new_rag_snapshot.model_dump()
 
         await self.session.flush()
+        # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 Pydantic 触发 async lazy load。
+        await self.session.refresh(assistant_message, attribute_names=["updated_at"])
         return assistant_message
 
     async def delete_messages_after_sequence(

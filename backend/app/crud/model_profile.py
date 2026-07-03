@@ -131,6 +131,8 @@ class ModelProfileCRUD:
         provider.encrypted_api_key = encrypted_api_key
 
         await self.session.flush()
+        # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 Pydantic 触发 async lazy load。
+        await self.session.refresh(provider, attribute_names=["updated_at"])
         return provider
 
     async def delete_provider_by_id(self, provider_id: int) -> bool:
@@ -281,6 +283,8 @@ class ModelProfileCRUD:
             setattr(model_profile, key, value)
 
         await self.session.flush()
+        # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 Pydantic 触发 async lazy load。
+        await self.session.refresh(model_profile, attribute_names=["updated_at"])
         return model_profile
 
     async def delete_model_profile_by_id(self, model_profile_id: int) -> bool:

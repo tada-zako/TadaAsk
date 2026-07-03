@@ -124,6 +124,8 @@ class SourceCRUD:
             source.status = reset_status
 
         await self.session.flush()
+        # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 Pydantic 触发 async lazy load。
+        await self.session.refresh(source, attribute_names=["updated_at"])
         return source
 
     async def update_source_status(
@@ -322,6 +324,8 @@ class SourceCRUD:
             source_item.filename = filename
 
         await self.session.flush()
+        # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 Pydantic 触发 async lazy load。
+        await self.session.refresh(source_item, attribute_names=["updated_at"])
         return source_item
 
     async def bulk_update_source_items_status(

@@ -230,7 +230,13 @@ class ModelProfileService:
                 profile_data_list=provider_data.model_profiles,
             )
 
-        return provider
+        # ProviderWithModelProfilesRead 会读取 model_profiles，返回前显式预加载关系。
+        provider_with_models = (
+            await self.model_profile_crud.get_provider_with_model_profiles_by_uid(
+                provider.uid
+            )
+        )
+        return provider_with_models or provider
 
     async def _fetch_model_catalog(self, *, models_url: str) -> TargetCatalog:
         """拉取并解析目标模型目录。"""

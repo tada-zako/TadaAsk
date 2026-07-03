@@ -167,6 +167,7 @@ class ChatSessionCRUD:
         """更新聊天会话的标题"""
         chat_session.title = new_title
         await self.session.flush()  # 刷新以获取更新后的数据
+        await self.session.refresh(chat_session, attribute_names=["updated_at"])
         return chat_session
 
     async def update_chat_session_provider_and_model(
@@ -176,6 +177,7 @@ class ChatSessionCRUD:
         chat_session.provider = provider
         chat_session.model = model
         await self.session.flush()  # 刷新以获取更新后的数据
+        await self.session.refresh(chat_session, attribute_names=["updated_at"])
         return chat_session
 
     async def accumulate_tokens_usage(
@@ -189,12 +191,14 @@ class ChatSessionCRUD:
         chat_session.tokens_output += output_tokens
         chat_session.tokens_total += input_tokens + output_tokens
         await self.session.flush()  # 刷新以获取更新后的数据
+        await self.session.refresh(chat_session, attribute_names=["updated_at"])
         return chat_session
 
     async def archive_chat_session(self, chat_session: ChatSession) -> ChatSession:
         """将聊天会话标记为已归档（软删除）"""
         chat_session.is_archived = True
         await self.session.flush()  # 刷新以获取更新后的数据
+        await self.session.refresh(chat_session, attribute_names=["updated_at"])
         return chat_session
 
     async def delete_chat_session_by_id(self, chat_session_id: int) -> bool:

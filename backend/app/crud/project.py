@@ -45,6 +45,8 @@ class ProjectCRUD:
             setattr(project, key, value)
 
         await self.session.flush()
+        # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 async lazy load。
+        await self.session.refresh(project, attribute_names=["updated_at"])
         return project
 
     async def list_projects(
@@ -123,6 +125,8 @@ class ProjectCRUD:
             )
 
         await self.session.flush()
+        # 只刷新 updated_at，避免误清理已加载/已赋值的 provider/model 关系。
+        await self.session.refresh(project_settings, attribute_names=["updated_at"])
         return project_settings
 
     async def get_project_with_settings_by_uid(
@@ -188,6 +192,8 @@ class ProjectCRUD:
             setattr(widget, key, value)
 
         await self.session.flush()
+        # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 async lazy load。
+        await self.session.refresh(widget, attribute_names=["updated_at"])
         return widget
 
     async def delete_project_widget_by_id(self, *, widget_id: int) -> bool:
