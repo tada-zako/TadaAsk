@@ -294,18 +294,21 @@ class Source(Base):
         JSON, nullable=True
     )  # Web_Crawl 抓取规则配置
 
-    sync_interval: Mapped[
-        int
-    ]  # 同步周期，单位为小时，后期添加自动监听同步和定时同步功能时会用到
+    sync_interval: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )  # NOTE: 预留字段；同步周期，单位为小时，后期添加自动监听同步和定时同步功能时会用到
     status: Mapped[SourceProcessStatus] = mapped_column(
         Enum(SourceProcessStatus), default=SourceProcessStatus.PENDING
     )  # 数据来源状态，如 "pending", "processing", "completed", "failed" 等，后期添加自动监听同步和定时同步功能时会用到
-    synced_at: Mapped[datetime] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )  # 上次同步时间，后期添加自动监听同步和定时同步功能时会用到
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    next_sync_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )  # NOTE: 预留字段；后续添加定时同步再启用
 
     # ---- 关系字段 ----
     source_items: Mapped[list["SourceItem"]] = relationship(

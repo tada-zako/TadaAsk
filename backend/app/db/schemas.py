@@ -270,7 +270,7 @@ class SourceInternal(SourceBase):
 
 class SourceRead(SourceBase):
     uid: str
-    synced_at: datetime
+    updated_at: datetime
     created_at: datetime
 
     model_config = ConfigDict(
