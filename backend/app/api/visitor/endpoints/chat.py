@@ -275,9 +275,10 @@ async def stream_chat(
     ):
         yield ServerSentEvent(
             event=event.event,
-            data=event.model_dump_json(
+            data=event.model_dump(
                 exclude={"event"},
                 by_alias=True,
+                mode="json",
             ),
         )
 

@@ -715,7 +715,11 @@ async def stream_rag_job_events(
         yield ServerSentEvent(
             id=str(stored.sequence),
             event=stored.event.event,
-            data=stored.event.model_dump_json(exclude={"event"}, by_alias=True),
+            data=stored.event.model_dump(
+                exclude={"event"},
+                by_alias=True,
+                mode="json",
+            ),
         )
 
 
