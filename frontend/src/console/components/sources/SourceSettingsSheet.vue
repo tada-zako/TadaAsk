@@ -128,6 +128,9 @@ function handleDelete(): void {
   open.value = false;
 }
 
+/**
+ * 重新刷新 settings Form 数据
+ */
 function resetForm(): void {
   sourceName.value = props.source.sourceName;
   isPublic.value = props.source.isPublic;
