@@ -1,0 +1,1534 @@
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TadaAsk Provider Model UI Preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #050505;
+        --shell: #080809;
+        --surface: rgba(16, 17, 19, 0.74);
+        --surface-soft: rgba(15, 16, 18, 0.5);
+        --raised: #14161a;
+        --hover: #1b1e23;
+        --line: #24262b;
+        --line-soft: rgba(255, 255, 255, 0.06);
+        --line-strong: #343741;
+        --text: #f5f5f4;
+        --body: #d4d4d8;
+        --muted: #a1a1aa;
+        --faint: #71717a;
+        --disabled: #52525b;
+        --primary: #24d3c4;
+        --primary-fg: #031110;
+        --green: #52d273;
+        --yellow: #e7c85a;
+        --red: #ff6b6b;
+        --r-sm: 6px;
+        --r-md: 8px;
+        --r-lg: 10px;
+        --r-pill: 999px;
+        --sidebar: 196px;
+        --font:
+          "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        overflow-x: hidden;
+        background:
+          radial-gradient(
+            circle at 76% -12%,
+            rgba(36, 211, 196, 0.12),
+            transparent 30rem
+          ),
+          linear-gradient(180deg, #09090a 0%, #050505 48rem);
+        color: var(--text);
+        font-family: var(--font);
+        letter-spacing: 0;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        cursor: default;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .design-wrap {
+        display: grid;
+        gap: 34px;
+        padding: 24px;
+      }
+
+      .state-title {
+        display: flex;
+        width: min(1280px, 100%);
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 0 auto;
+      }
+
+      .state-title h1 {
+        color: var(--text);
+        font-size: 20px;
+        font-weight: 720;
+      }
+
+      .state-title span {
+        color: var(--faint);
+        font-size: 13px;
+      }
+
+      .frame {
+        position: relative;
+        overflow: hidden;
+        width: min(1280px, 100%);
+        margin: 0 auto;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--bg);
+        box-shadow: 0 24px 90px rgba(0, 0, 0, 0.28);
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: var(--sidebar) minmax(0, 1fr);
+        min-height: 760px;
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--line-soft);
+        background: rgba(8, 8, 9, 0.95);
+        padding: 16px 14px;
+      }
+
+      .brand,
+      .topbar,
+      .nav-item,
+      .section-head,
+      .provider-row,
+      .provider-main,
+      .provider-icon,
+      .provider-meta,
+      .badge,
+      .button,
+      .tabs,
+      .setting-row,
+      .model-row,
+      .dialog-head,
+      .dialog-footer,
+      .switch,
+      .option-line {
+        display: flex;
+        align-items: center;
+      }
+
+      .brand {
+        gap: 10px;
+        height: 40px;
+        margin-bottom: 28px;
+        padding: 0 4px;
+      }
+
+      .mark,
+      .provider-icon {
+        display: grid;
+        place-items: center;
+        font-weight: 760;
+      }
+
+      .mark {
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-md);
+        background: var(--surface);
+        color: var(--primary);
+      }
+
+      .brand strong {
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav-title {
+        margin: 0 0 6px;
+        padding: 0 4px;
+        color: var(--disabled);
+        font-size: 10px;
+        font-weight: 760;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .nav-item {
+        min-height: 36px;
+        gap: 9px;
+        border-radius: var(--r-md);
+        color: var(--muted);
+        font-size: 13px;
+        padding: 0 10px;
+      }
+
+      .nav-item.active {
+        border: 1px solid rgba(36, 211, 196, 0.26);
+        background: rgba(36, 211, 196, 0.11);
+        color: var(--text);
+      }
+
+      .nav-dot {
+        width: 18px;
+        color: var(--primary);
+        text-align: center;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        min-height: 54px;
+        justify-content: center;
+        border-bottom: 1px solid var(--line-soft);
+        background: rgba(5, 5, 5, 0.75);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .topbar strong {
+        color: var(--text);
+      }
+
+      .content {
+        display: grid;
+        gap: 28px;
+        max-width: 900px;
+        padding: 44px 54px 64px;
+      }
+
+      .page-head {
+        display: grid;
+        gap: 10px;
+        max-width: 680px;
+      }
+
+      .kicker {
+        color: var(--faint);
+        font-size: 12px;
+        font-weight: 720;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .page-head h1 {
+        color: var(--text);
+        font-size: 36px;
+        font-weight: 740;
+        line-height: 1.08;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .tabs {
+        width: fit-content;
+        gap: 4px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-md);
+        background: var(--surface-soft);
+        padding: 4px;
+      }
+
+      .tab {
+        min-height: 32px;
+        border: 0;
+        border-radius: var(--r-sm);
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 0 12px;
+      }
+
+      .tab.active {
+        background: var(--raised);
+        color: var(--text);
+      }
+
+      .section {
+        display: grid;
+        gap: 12px;
+      }
+
+      .section-head {
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 2px;
+      }
+
+      .section-copy {
+        display: grid;
+        gap: 4px;
+      }
+
+      .section h2 {
+        color: var(--text);
+        font-size: 17px;
+        font-weight: 680;
+      }
+
+      .section-note {
+        color: var(--faint);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .provider-list,
+      .model-group,
+      .settings-card {
+        overflow: hidden;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-lg);
+        background: var(--surface);
+      }
+
+      .provider-row {
+        min-height: 86px;
+        justify-content: space-between;
+        gap: 20px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 0 20px;
+      }
+
+      .provider-row:last-child {
+        border-bottom: 0;
+      }
+
+      .provider-row.add-entry {
+        min-height: 78px;
+        border-top: 1px solid var(--line-soft);
+        background: rgba(255, 255, 255, 0.015);
+      }
+
+      .provider-main {
+        min-width: 0;
+        gap: 14px;
+      }
+
+      .provider-icon {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-md);
+        background: var(--surface-soft);
+        color: var(--text);
+        font-size: 17px;
+      }
+
+      .provider-icon.custom {
+        color: var(--text);
+      }
+
+      .provider-meta {
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .provider-name {
+        min-width: 0;
+        color: var(--text);
+        font-size: 16px;
+        font-weight: 680;
+      }
+
+      .provider-desc {
+        width: 100%;
+        color: var(--faint);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .badge {
+        min-height: 22px;
+        gap: 5px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-sm);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 620;
+        line-height: 1;
+        padding: 0 7px;
+      }
+
+      .badge.success {
+        border-color: rgba(82, 210, 115, 0.25);
+        background: rgba(82, 210, 115, 0.09);
+        color: #bff2cc;
+      }
+
+      .badge.primary {
+        border-color: var(--line-soft);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+      }
+
+      .badge.warning {
+        border-color: rgba(231, 200, 90, 0.25);
+        background: rgba(231, 200, 90, 0.1);
+        color: #f6e7a6;
+      }
+
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: var(--r-pill);
+        background: var(--faint);
+      }
+
+      .dot.green {
+        background: var(--green);
+      }
+
+      .dot.yellow {
+        background: var(--yellow);
+      }
+
+      .button {
+        min-height: 36px;
+        justify-content: center;
+        gap: 7px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-md);
+        background: var(--raised);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 620;
+        padding: 0 13px;
+      }
+
+      .button.primary {
+        border-color: rgba(36, 211, 196, 0.35);
+        background: var(--primary);
+        color: var(--primary-fg);
+      }
+
+      .button.ghost {
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .button.danger {
+        border-color: rgba(255, 107, 107, 0.3);
+        background: rgba(255, 107, 107, 0.08);
+        color: #ffc1c1;
+      }
+
+      .setting-row {
+        min-height: 74px;
+        justify-content: space-between;
+        gap: 18px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 0 18px;
+      }
+
+      .setting-row:last-child {
+        border-bottom: 0;
+      }
+
+      .setting-copy {
+        display: grid;
+        gap: 5px;
+      }
+
+      .setting-copy strong {
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 660;
+      }
+
+      .setting-copy span {
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .model-stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .model-provider-card {
+        overflow: hidden;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-lg);
+        background:
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.035),
+            rgba(255, 255, 255, 0.012)
+          ),
+          var(--surface);
+      }
+
+      .model-provider-card.custom {
+        border-color: var(--line-soft);
+        background:
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.035),
+            rgba(255, 255, 255, 0.012)
+          ),
+          var(--surface);
+      }
+
+      .model-group-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 88px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 0 20px;
+      }
+
+      .model-provider {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .model-provider strong {
+        color: var(--text);
+        font-size: 18px;
+        font-weight: 720;
+      }
+
+      .model-provider span {
+        display: block;
+        margin-top: 3px;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .model-list {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .model-row {
+        min-height: 56px;
+        justify-content: space-between;
+        gap: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.045);
+        border-radius: var(--r-md);
+        background: rgba(5, 5, 5, 0.34);
+        padding: 0 12px 0 14px;
+      }
+
+      .model-row.add-model-row {
+        justify-content: center;
+        min-height: 52px;
+        border-style: dashed;
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.018);
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .model-name {
+        display: grid;
+        gap: 3px;
+      }
+
+      .model-title-line {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .model-name strong {
+        color: var(--body);
+        font-size: 14px;
+        font-weight: 620;
+      }
+
+      .model-name span {
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .model-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .inline-edit {
+        opacity: 0;
+        transform: translateX(-2px);
+        transition:
+          opacity 0.12s ease,
+          transform 0.12s ease;
+      }
+
+      .model-row:hover .inline-edit {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .danger-zone {
+        display: grid;
+        gap: 10px;
+        border: 1px solid rgba(255, 107, 107, 0.18);
+        border-radius: var(--r-md);
+        background: rgba(255, 107, 107, 0.055);
+        padding: 12px;
+      }
+
+      .danger-zone strong {
+        color: #ffc1c1;
+        font-size: 13px;
+        font-weight: 660;
+      }
+
+      .danger-zone span {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .model-input-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .model-input-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 34px;
+        gap: 10px;
+      }
+
+      .remove-button {
+        display: grid;
+        min-height: 40px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: var(--r-md);
+        background: #0c0d0f;
+        color: var(--faint);
+        font-size: 16px;
+      }
+
+      .switch {
+        position: relative;
+        width: 34px;
+        height: 20px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-pill);
+        background: #111214;
+      }
+
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #5b606b;
+      }
+
+      .switch.on {
+        border-color: rgba(36, 211, 196, 0.35);
+        background: rgba(36, 211, 196, 0.18);
+      }
+
+      .switch.on::after {
+        left: 17px;
+        background: var(--primary);
+      }
+
+      .link-button {
+        border: 0;
+        background: transparent;
+        color: var(--primary);
+        font-size: 13px;
+        font-weight: 650;
+        padding: 0;
+      }
+
+      .scrim {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.62);
+        backdrop-filter: blur(4px);
+      }
+
+      .dialog {
+        width: min(520px, calc(100% - 48px));
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--r-lg);
+        background: #101113;
+        box-shadow: 0 28px 90px rgba(0, 0, 0, 0.54);
+      }
+
+      .dialog.wide {
+        width: min(620px, calc(100% - 48px));
+      }
+
+      .dialog.compact {
+        width: min(580px, calc(100% - 48px));
+      }
+
+      .dialog-provider-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .dialog-provider-title .provider-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 15px;
+      }
+
+      .official-connect {
+        gap: 22px;
+        padding-top: 22px;
+        padding-bottom: 22px;
+      }
+
+      .dialog-head {
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 18px 20px;
+      }
+
+      .dialog-title {
+        display: grid;
+        gap: 5px;
+      }
+
+      .dialog-title h2 {
+        color: var(--text);
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .dialog-title p {
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .close {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-md);
+        background: var(--surface-soft);
+        color: var(--muted);
+      }
+
+      .dialog-body {
+        display: grid;
+        gap: 16px;
+        padding: 20px;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .field label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .field input {
+        width: 100%;
+        min-height: 40px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-md);
+        background: #0c0d0f;
+        color: var(--text);
+        outline: none;
+        padding: 0 12px;
+      }
+
+      .field input::placeholder {
+        color: var(--disabled);
+      }
+
+      .field-help {
+        color: var(--faint);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .read-only {
+        display: flex;
+        min-height: 40px;
+        align-items: center;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-md);
+        background: rgba(255, 255, 255, 0.025);
+        color: var(--muted);
+        font-size: 13px;
+        padding: 0 12px;
+      }
+
+      .option-line {
+        justify-content: space-between;
+        gap: 18px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--r-md);
+        background: rgba(255, 255, 255, 0.025);
+        padding: 12px;
+      }
+
+      .option-line strong {
+        display: block;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .option-line span {
+        display: block;
+        margin-top: 4px;
+        color: var(--faint);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .callout {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        border: 1px solid rgba(36, 211, 196, 0.14);
+        border-radius: var(--r-md);
+        background: rgba(36, 211, 196, 0.055);
+        padding: 12px;
+      }
+
+      .callout strong {
+        color: #ddfffb;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .callout span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .dialog-footer {
+        justify-content: flex-end;
+        gap: 10px;
+        border-top: 1px solid var(--line-soft);
+        padding: 16px 20px;
+      }
+
+      .ghost-page {
+        opacity: 0.42;
+      }
+
+      @media (max-width: 860px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .content {
+          padding: 32px 22px 48px;
+        }
+
+        .provider-row,
+        .model-group-head,
+        .model-row {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 18px;
+        }
+
+        .model-row {
+          padding-left: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="design-wrap">
+      <div class="state-title">
+        <h1>State A: Provider settings</h1>
+        <span>low-density global configuration page</span>
+      </div>
+
+      <section class="frame" aria-label="Provider settings page">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+            <nav class="nav" aria-label="Preview navigation">
+              <p class="nav-title">Configuration</p>
+              <div class="nav-item"><span class="nav-dot">D</span>Sources</div>
+              <div class="nav-item active">
+                <span class="nav-dot">M</span>Model providers
+              </div>
+              <div class="nav-item"><span class="nav-dot">G</span>Global settings</div>
+            </nav>
+          </aside>
+
+          <main class="main">
+            <header class="topbar">
+              <span>Console / Configuration / <strong>Model providers</strong></span>
+            </header>
+
+            <section class="content">
+              <header class="page-head">
+                <p class="kicker">Global configuration</p>
+                <h1>Model providers</h1>
+                <p class="subtitle">
+                  Connect providers and keep model availability simple. Project
+                  settings and chat will only use enabled providers and models.
+                </p>
+              </header>
+
+              <div class="tabs" aria-label="Provider model sections">
+                <button class="tab active" type="button">Providers</button>
+                <button class="tab" type="button">Models</button>
+              </div>
+
+              <section class="section">
+                <div class="section-head">
+                  <div class="section-copy">
+                    <h2>Saved providers</h2>
+                    <p class="section-note">
+                      Providers with saved runtime credentials or custom
+                      connection details.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="provider-list">
+                  <div class="provider-row">
+                    <div class="provider-main">
+                      <div class="provider-icon">G</div>
+                      <div class="provider-meta">
+                        <strong class="provider-name">Google AI</strong>
+                        <span class="badge">Official</span>
+                        <span class="badge">API key saved</span>
+                        <span class="provider-desc">API key is saved. Models can be enabled separately.</span>
+                      </div>
+                    </div>
+                    <button class="button" type="button">Manage</button>
+                  </div>
+
+                  <div class="provider-row">
+                    <div class="provider-main">
+                      <div class="provider-icon">O</div>
+                      <div class="provider-meta">
+                        <strong class="provider-name">OpenAI</strong>
+                        <span class="badge">Official</span>
+                        <span class="badge">API key saved</span>
+                        <span class="provider-desc">Ready for project defaults and admin chat.</span>
+                      </div>
+                    </div>
+                    <button class="button" type="button">Manage</button>
+                  </div>
+
+                  <div class="provider-row">
+                    <div class="provider-main">
+                      <div class="provider-icon custom">✦</div>
+                      <div class="provider-meta">
+                        <strong class="provider-name">9router-qoder</strong>
+                        <span class="badge">Custom</span>
+                        <span class="provider-desc">OpenAI-compatible endpoint managed by the admin.</span>
+                      </div>
+                    </div>
+                    <button class="button" type="button">Manage</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="section">
+                <div class="section-head">
+                  <div class="section-copy">
+                    <h2>Available providers</h2>
+                    <p class="section-note">
+                      Official providers synced from the catalog and waiting for
+                      credentials.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="provider-list">
+                  <div class="provider-row">
+                    <div class="provider-main">
+                      <div class="provider-icon">A</div>
+                      <div class="provider-meta">
+                        <strong class="provider-name">Anthropic</strong>
+                        <span class="badge">Official</span>
+                        <span class="provider-desc">Add an API key to make Claude models available.</span>
+                      </div>
+                    </div>
+                    <button class="button primary" type="button">Connect</button>
+                  </div>
+
+                  <div class="provider-row">
+                    <div class="provider-main">
+                      <div class="provider-icon">R</div>
+                      <div class="provider-meta">
+                        <strong class="provider-name">OpenRouter</strong>
+                        <span class="badge">Official</span>
+                        <span class="provider-desc">Use OpenRouter account credentials for catalog models.</span>
+                      </div>
+                    </div>
+                    <button class="button primary" type="button">Connect</button>
+                  </div>
+
+                  <div class="provider-row add-entry">
+                    <div class="provider-main">
+                      <div class="provider-icon custom">+</div>
+                      <div class="provider-meta">
+                        <strong class="provider-name">Custom provider</strong>
+                        <span class="badge">OpenAI compatible</span>
+                        <span class="provider-desc">Connect a private gateway or any compatible base URL.</span>
+                      </div>
+                    </div>
+                    <button class="button primary" type="button">Connect</button>
+                  </div>
+                </div>
+              </section>
+            </section>
+          </main>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State B: Connect official provider dialog</h1>
+        <span>single API key field, provider is enabled on submit</span>
+      </div>
+
+      <section class="frame" aria-label="Connect official provider dialog">
+        <div class="shell ghost-page">
+          <aside class="sidebar">
+            <div class="brand"><div class="mark">T</div><strong>TadaAsk</strong></div>
+          </aside>
+          <main class="main">
+            <header class="topbar">
+              <span>Console / Configuration / <strong>Model providers</strong></span>
+            </header>
+            <section class="content">
+              <header class="page-head">
+                <p class="kicker">Global configuration</p>
+                <h1>Model providers</h1>
+                <p class="subtitle">Connect providers and keep model availability simple.</p>
+              </header>
+              <div class="provider-list">
+                <div class="provider-row">
+                  <div class="provider-main">
+                    <div class="provider-icon">A</div>
+                    <div class="provider-meta">
+                      <strong class="provider-name">Anthropic</strong>
+                      <span class="badge">Official</span>
+                      <span class="provider-desc">Add an API key to make Claude models available.</span>
+                    </div>
+                  </div>
+                  <button class="button primary" type="button">Connect</button>
+                </div>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <div class="scrim">
+          <article class="dialog compact" role="dialog" aria-label="Connect Anthropic">
+            <div class="dialog-head">
+              <div class="dialog-title">
+                <div class="dialog-provider-title">
+                  <div class="provider-icon">A</div>
+                  <h2>Connect Anthropic</h2>
+                </div>
+                <p>Enter your Anthropic API key to connect the account and enable this provider.</p>
+              </div>
+              <button class="close" type="button" aria-label="Close">×</button>
+            </div>
+            <div class="dialog-body official-connect">
+              <div class="field">
+                <label for="anthropic-key">API key</label>
+                <input id="anthropic-key" value="" placeholder="sk-ant-..." />
+                <p class="field-help">
+                  The key is saved securely and will not be shown again.
+                </p>
+              </div>
+            </div>
+            <div class="dialog-footer">
+              <button class="button ghost" type="button">Cancel</button>
+              <button class="button primary" type="button">Submit</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State C: Create custom provider dialog</h1>
+        <span>custom provider owns name, base URL, key, and models</span>
+      </div>
+
+      <section class="frame" aria-label="Create custom provider dialog">
+        <div class="shell ghost-page">
+          <aside class="sidebar">
+            <div class="brand"><div class="mark">T</div><strong>TadaAsk</strong></div>
+          </aside>
+          <main class="main">
+            <header class="topbar">
+              <span>Console / Configuration / <strong>Model providers</strong></span>
+            </header>
+            <section class="content">
+              <header class="page-head">
+                <p class="kicker">Global configuration</p>
+                <h1>Model providers</h1>
+                <p class="subtitle">Add an OpenAI-compatible provider when the catalog does not cover it.</p>
+              </header>
+              <div class="provider-list">
+                <div class="provider-row add-entry">
+                  <div class="provider-main">
+                    <div class="provider-icon custom">+</div>
+                    <div class="provider-meta">
+                      <strong class="provider-name">Custom provider</strong>
+                      <span class="badge">OpenAI compatible</span>
+                      <span class="provider-desc">Connect a private gateway or any compatible base URL.</span>
+                    </div>
+                  </div>
+                  <button class="button primary" type="button">Connect</button>
+                </div>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <div class="scrim">
+          <article class="dialog" role="dialog" aria-label="Create custom provider">
+            <div class="dialog-head">
+              <div class="dialog-title">
+                <h2>Create custom provider</h2>
+                <p>Use this for OpenAI-compatible endpoints or private gateways.</p>
+              </div>
+              <button class="close" type="button" aria-label="Close">×</button>
+            </div>
+            <div class="dialog-body">
+              <div class="field">
+                <label for="custom-provider-name">Provider name</label>
+                <input id="custom-provider-name" value="9router-qoder" />
+              </div>
+
+              <div class="field">
+                <label for="custom-provider-url">Base URL</label>
+                <input id="custom-provider-url" value="https://api.9router.dev/v1" />
+              </div>
+
+              <div class="field">
+                <label for="custom-provider-key">API key</label>
+                <input id="custom-provider-key" placeholder="API key" />
+                <p class="field-help">
+                  Optional when authentication is handled by a gateway.
+                </p>
+              </div>
+
+              <div class="field">
+                <label>Models</label>
+                <div class="model-input-list">
+                  <div class="model-input-row">
+                    <input value="qoder-coder" aria-label="Model ID" />
+                    <button class="remove-button" type="button" aria-label="Remove model">×</button>
+                  </div>
+                  <div class="model-input-row">
+                    <input value="qoder-lite" aria-label="Model ID" />
+                    <button class="remove-button" type="button" aria-label="Remove model">×</button>
+                  </div>
+                </div>
+                <button class="link-button" type="button" style="width: fit-content">+ Add model</button>
+              </div>
+            </div>
+            <div class="dialog-footer">
+              <button class="button ghost" type="button">Cancel</button>
+              <button class="button primary" type="button">Create provider</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State D: Model availability</h1>
+        <span>provider-grouped model switches, no data table</span>
+      </div>
+
+      <section class="frame" aria-label="Model availability page">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+            <nav class="nav" aria-label="Preview navigation">
+              <p class="nav-title">Configuration</p>
+              <div class="nav-item"><span class="nav-dot">D</span>Sources</div>
+              <div class="nav-item active">
+                <span class="nav-dot">M</span>Model providers
+              </div>
+              <div class="nav-item"><span class="nav-dot">G</span>Global settings</div>
+            </nav>
+          </aside>
+
+          <main class="main">
+            <header class="topbar">
+              <span>Console / Configuration / <strong>Models</strong></span>
+            </header>
+
+            <section class="content">
+              <header class="page-head">
+                <p class="kicker">Global configuration</p>
+                <h1>Models</h1>
+                <p class="subtitle">
+                  Choose which saved provider models can be selected by project
+                  settings and admin chat.
+                </p>
+              </header>
+
+              <div class="tabs" aria-label="Provider model sections">
+                <button class="tab" type="button">Providers</button>
+                <button class="tab active" type="button">Models</button>
+              </div>
+
+              <section class="section">
+                <div class="section-head">
+                  <div class="section-copy">
+                    <h2>Official provider models</h2>
+                    <p class="section-note">
+                      Catalog models are read-only except for availability.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="model-stack">
+                  <div class="model-provider-card">
+                    <div class="model-group-head">
+                      <div class="model-provider">
+                        <div class="provider-icon">G</div>
+                      <div>
+                        <strong>Google AI</strong>
+                        <span>Official provider · API key saved</span>
+                      </div>
+                    </div>
+                      <span class="badge">Official</span>
+                    </div>
+                    <div class="model-list">
+                      <div class="model-row">
+                        <div class="model-name">
+                          <strong>gemini-2.5-flash</strong>
+                          <span>Stream and structured output supported</span>
+                        </div>
+                        <span class="switch on" aria-hidden="true"></span>
+                      </div>
+                      <div class="model-row">
+                        <div class="model-name">
+                          <strong>gemini-2.5-pro</strong>
+                          <span>Available for higher quality responses</span>
+                        </div>
+                        <span class="switch" aria-hidden="true"></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="model-provider-card">
+                    <div class="model-group-head">
+                      <div class="model-provider">
+                        <div class="provider-icon">O</div>
+                      <div>
+                        <strong>OpenAI</strong>
+                        <span>Official provider · API key saved</span>
+                      </div>
+                    </div>
+                      <span class="badge">Official</span>
+                    </div>
+                    <div class="model-list">
+                      <div class="model-row">
+                        <div class="model-name">
+                          <strong>gpt-4.1-mini</strong>
+                          <span>Enabled for everyday project RAG testing</span>
+                        </div>
+                        <span class="switch on" aria-hidden="true"></span>
+                      </div>
+                      <div class="model-row">
+                        <div class="model-name">
+                          <strong>gpt-4.1</strong>
+                          <span>Keep disabled until needed by a project</span>
+                        </div>
+                        <span class="switch" aria-hidden="true"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="section">
+                <div class="section-head">
+                  <div class="section-copy">
+                    <h2>Custom provider models</h2>
+                    <p class="section-note">
+                      Custom providers can add and edit model profiles.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="model-provider-card custom">
+                  <div class="model-group-head">
+                    <div class="model-provider">
+                      <div class="provider-icon custom">✦</div>
+                      <div>
+                        <strong>9router-qoder</strong>
+                        <span>Custom provider · OpenAI-compatible endpoint</span>
+                      </div>
+                    </div>
+                    <span class="badge">Custom</span>
+                  </div>
+                  <div class="model-list">
+                    <div class="model-row">
+                      <div class="model-name">
+                        <div class="model-title-line">
+                          <strong>qoder-coder</strong>
+                          <button class="link-button inline-edit" type="button">Edit</button>
+                        </div>
+                        <span>Context 128k · Max output 8192</span>
+                      </div>
+                      <div class="model-actions">
+                        <span class="switch on" aria-hidden="true"></span>
+                      </div>
+                    </div>
+                    <div class="model-row">
+                      <div class="model-name">
+                        <div class="model-title-line">
+                          <strong>qoder-lite</strong>
+                          <button class="link-button inline-edit" type="button">Edit</button>
+                        </div>
+                        <span>Context uses provider defaults</span>
+                      </div>
+                      <div class="model-actions">
+                        <span class="switch" aria-hidden="true"></span>
+                      </div>
+                    </div>
+                    <div class="model-row add-model-row">
+                      + Add model
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </section>
+          </main>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State E: Custom model dialog</h1>
+        <span>only custom provider models expose editable runtime fields</span>
+      </div>
+
+      <section class="frame" aria-label="Custom model dialog">
+        <div class="shell ghost-page">
+          <aside class="sidebar">
+            <div class="brand"><div class="mark">T</div><strong>TadaAsk</strong></div>
+          </aside>
+          <main class="main">
+            <header class="topbar">
+              <span>Console / Configuration / <strong>Models</strong></span>
+            </header>
+            <section class="content">
+              <header class="page-head">
+                <p class="kicker">Global configuration</p>
+                <h1>Models</h1>
+                <p class="subtitle">Custom provider models can be added and edited.</p>
+              </header>
+            </section>
+          </main>
+        </div>
+
+        <div class="scrim">
+          <article class="dialog wide" role="dialog" aria-label="Add custom model">
+            <div class="dialog-head">
+              <div class="dialog-title">
+                <h2>Add model</h2>
+                <p>Model names must be unique inside 9router-qoder.</p>
+              </div>
+              <button class="close" type="button" aria-label="Close">×</button>
+            </div>
+            <div class="dialog-body">
+              <div class="field">
+                <label for="model-id">Model ID</label>
+                <input id="model-id" value="qoder-coder" />
+              </div>
+
+              <div class="field">
+                <label for="context-window">Context window tokens</label>
+                <input id="context-window" value="128000" />
+              </div>
+
+              <div class="field">
+                <label for="max-output">Max output tokens</label>
+                <input id="max-output" value="8192" />
+              </div>
+
+              <div class="settings-card">
+                <div class="setting-row">
+                  <div class="setting-copy">
+                    <strong>Enable model</strong>
+                    <span>Enabled models can be used by project settings and chat.</span>
+                  </div>
+                  <span class="switch on" aria-hidden="true"></span>
+                </div>
+              </div>
+            </div>
+            <div class="dialog-footer">
+              <button class="button danger" type="button">Delete</button>
+              <button class="button ghost" type="button">Cancel</button>
+              <button class="button primary" type="button">Save model</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State F: Manage provider dialog</h1>
+        <span>custom provider can be disabled or deleted; official provider has no delete action</span>
+      </div>
+
+      <section class="frame" aria-label="Manage provider dialog">
+        <div class="shell ghost-page">
+          <aside class="sidebar">
+            <div class="brand"><div class="mark">T</div><strong>TadaAsk</strong></div>
+          </aside>
+          <main class="main">
+            <header class="topbar">
+              <span>Console / Configuration / <strong>Model providers</strong></span>
+            </header>
+            <section class="content">
+              <header class="page-head">
+                <p class="kicker">Global configuration</p>
+                <h1>Model providers</h1>
+                <p class="subtitle">Manage saved provider configuration.</p>
+              </header>
+              <div class="provider-list">
+                <div class="provider-row">
+                  <div class="provider-main">
+                    <div class="provider-icon custom">✦</div>
+                    <div class="provider-meta">
+                      <strong class="provider-name">9router-qoder</strong>
+                      <span class="badge">Custom</span>
+                      <span class="provider-desc">OpenAI-compatible endpoint managed by the admin.</span>
+                    </div>
+                  </div>
+                  <button class="button" type="button">Manage</button>
+                </div>
+              </div>
+            </section>
+          </main>
+        </div>
+
+        <div class="scrim">
+          <article class="dialog" role="dialog" aria-label="Manage provider">
+            <div class="dialog-head">
+              <div class="dialog-title">
+                <h2>Manage provider</h2>
+                <p>Official providers use the same form without the delete action.</p>
+              </div>
+              <button class="close" type="button" aria-label="Close">×</button>
+            </div>
+            <div class="dialog-body">
+              <div class="field">
+                <label for="manage-provider-name">Provider name</label>
+                <input id="manage-provider-name" value="9router-qoder" />
+              </div>
+
+              <div class="field">
+                <label for="manage-provider-url">Base URL</label>
+                <input id="manage-provider-url" value="https://api.9router.dev/v1" />
+              </div>
+
+              <div class="field">
+                <label for="manage-provider-key">API key</label>
+                <input id="manage-provider-key" placeholder="Leave blank to keep existing key" />
+                <p class="field-help">
+                  Saving a new key replaces the existing provider credential.
+                </p>
+              </div>
+
+              <div class="option-line">
+                <div>
+                  <strong>Enable provider</strong>
+                  <span>Disabled providers are hidden from project settings and chat selection.</span>
+                </div>
+                <span class="switch on" aria-hidden="true"></span>
+              </div>
+
+              <div class="danger-zone">
+                <strong>Delete custom provider</strong>
+                <span>This removes the custom provider and its model profiles. Official providers do not show this action.</span>
+                <button class="button danger" type="button" style="width: fit-content">Delete provider</button>
+              </div>
+            </div>
+            <div class="dialog-footer">
+              <button class="button ghost" type="button">Cancel</button>
+              <button class="button primary" type="button">Save provider</button>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

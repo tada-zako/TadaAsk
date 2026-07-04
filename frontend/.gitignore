@@ -25,5 +25,5 @@ dist-ssr
 *.sw?
 
 # custom
-docs/*.png
-docs/*.jpg
+docs/**/*.png
+docs/**/*.jpg
