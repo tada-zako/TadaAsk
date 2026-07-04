@@ -101,6 +101,19 @@ async def list_providers_with_models(
     ]
 
 
+@router.get(
+    "/provider/list/models/enabled", response_model=list[ProviderWithModelProfilesRead]
+)
+async def list_enabled_providers_with_models(
+    model_profile_crud: ModelProfileCRUDeps,
+):
+    """获取可用的提供商列表及其模型配置列表。"""
+    providers = await model_profile_crud.list_available_providers_with_model_profiles()
+    return [
+        ProviderWithModelProfilesRead.model_validate(provider) for provider in providers
+    ]
+
+
 @router.patch("/provider/{provider_uid}", response_model=ProviderRead)
 async def update_provider(
     provider: ValidProviderDeps,

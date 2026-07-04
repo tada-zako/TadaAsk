@@ -589,6 +589,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/model-profile/provider/list/models/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Enabled Providers With Models
+         * @description 获取可用的提供商列表及其模型配置列表。
+         */
+        get: operations["list_enabled_providers_with_models_admin_model_profile_provider_list_models_enabled_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/model-profile/provider/{provider_uid}": {
         parameters: {
             query?: never;
@@ -3356,6 +3376,26 @@ export interface operations {
         };
     };
     list_providers_with_models_admin_model_profile_provider_list_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderWithModelProfilesRead"][];
+                };
+            };
+        };
+    };
+    list_enabled_providers_with_models_admin_model_profile_provider_list_models_enabled_get: {
         parameters: {
             query?: never;
             header?: never;
