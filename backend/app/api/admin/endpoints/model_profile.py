@@ -8,7 +8,6 @@ from ...deps import APIKeyCipherDeps, ModelProfileCRUDeps, ModelProfileServiceDe
 from app.db.models import ModelProfile, Provider
 from app.db.schemas import (
     ModelProfileCreate,
-    ModelProfileInternal,
     ModelProfileRead,
     ModelProfileUpdate,
     ProviderCreateWithModels,
@@ -61,13 +60,12 @@ async def create_provider(
     api_key_cipher: APIKeyCipherDeps,
 ):
     """
-    创建或启用模型提供商。
+    创建自定义模型提供商，可同时提交 model_profile。
 
-    已由模型目录缓存的 provider 会更新 API key 并启用；
-    custom provider 可同时提交 model_profile。
+    目录 provider 由启动同步自动创建，通过 PATCH 接口维护 API key 与启用状态。
     """
     try:
-        provider = await model_profile_service.create_or_enable_provider(
+        provider = await model_profile_service.create_custom_provider(
             provider_data=payload,
             api_key_cipher=api_key_cipher,
         )
@@ -84,20 +82,20 @@ async def create_provider(
 
 
 @router.get("/provider/list", response_model=list[ProviderRead])
-async def list_enabled_providers(
+async def list_providers(
     model_profile_crud: ModelProfileCRUDeps,
 ):
     """获取提供商列表"""
-    providers = await model_profile_crud.list_enabled_providers()
+    providers = await model_profile_crud.list_providers()
     return [ProviderRead.model_validate(provider) for provider in providers]
 
 
 @router.get("/provider/list/models", response_model=list[ProviderWithModelProfilesRead])
-async def list_enabled_providers_with_models(
+async def list_providers_with_models(
     model_profile_crud: ModelProfileCRUDeps,
 ):
     """获取提供商列表及其模型配置列表。"""
-    providers = await model_profile_crud.list_enabled_providers_with_model_profiles()
+    providers = await model_profile_crud.list_providers_with_model_profiles()
     return [
         ProviderWithModelProfilesRead.model_validate(provider) for provider in providers
     ]
@@ -107,36 +105,18 @@ async def list_enabled_providers_with_models(
 async def update_provider(
     provider: ValidProviderDeps,
     payload: Annotated[ProviderUpdate, Body(..., description="Provider 更新数据")],
-    model_profile_crud: ModelProfileCRUDeps,
+    model_profile_service: ModelProfileServiceDeps,
     api_key_cipher: APIKeyCipherDeps,
 ):
-    """更新模型提供商配置。"""
-    if payload.name is not None:
-        provider_name = payload.name.strip().lower()
-        # 检查是否存在同名 provider
-        existing_provider = await model_profile_crud.get_provider_by_name(
-            name=provider_name
-        )
-        if existing_provider and existing_provider.id != provider.id:
-            raise HTTPException(
-                status_code=400,
-                detail="provider with the same name already exists",
-            )
-        payload = payload.model_copy(update={"name": provider_name})
-
-    # 检查是否提供 API_Key，禁止清空 API_Key
-    if payload.api_key is None:
-        raise HTTPException(
-            status_code=400,
-            detail="API key cannot be empty; provide a valid API key to update",
-        )
-
+    """更新模型提供商配置；目录 provider 只允许更新 API key 与启用状态。"""
     try:
-        updated_provider = await model_profile_crud.update_provider(
+        updated_provider = await model_profile_service.update_provider(
             provider=provider,
             provider_data=payload,
             api_key_cipher=api_key_cipher,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:
         logger.warning(f"更新 provider 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
@@ -150,12 +130,14 @@ async def update_provider(
 @router.delete("/provider/{provider_uid}")
 async def delete_provider(
     provider: ValidProviderDeps,
-    model_profile_crud: ModelProfileCRUDeps,
+    model_profile_service: ModelProfileServiceDeps,
 ):
-    """删除模型提供商及其模型配置
-    NOTE: 暂时不要使用
-    """
-    success = await model_profile_crud.delete_provider_by_id(provider_id=provider.id)
+    """删除自定义模型提供商及其模型配置。"""
+    try:
+        success = await model_profile_service.delete_provider(provider=provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     if success:
         return {"uid": provider.uid, "status": "deleted"}
     raise HTTPException(status_code=500, detail="Failed to delete provider")
@@ -168,25 +150,16 @@ async def delete_provider(
 async def create_model_profile(
     provider: ValidProviderDeps,
     payload: Annotated[ModelProfileCreate, Body(..., description="Model 创建数据")],
-    model_profile_crud: ModelProfileCRUDeps,
+    model_profile_service: ModelProfileServiceDeps,
 ):
-    """在指定 provider 下创建模型配置。"""
-    existing_model = await model_profile_crud.get_model_profile_by_model_for_provider(
-        provider_id=provider.id,
-        model=payload.model,
-    )
-    if existing_model:
-        raise HTTPException(
-            status_code=400,
-            detail="model profile with the same model already exists for this provider",
-        )
-
-    profile_data = ModelProfileInternal(
-        **payload.model_dump(),
-        provider_id=provider.id,
-    )
+    """在自定义 provider 下创建模型配置。"""
     try:
-        model_profile = await model_profile_crud.create_model_profile(profile_data)
+        model_profile = await model_profile_service.create_model_profile(
+            provider=provider,
+            profile_data=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:
         logger.warning(f"创建 model profile 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
@@ -206,9 +179,6 @@ async def get_model_profile(
     model_profile: ValidModelProfileDeps,
 ):
     """获取模型配置详情。"""
-    if provider.is_enabled is False:
-        raise HTTPException(status_code=404, detail="Provider not found")
-
     return ModelProfileRead.model_validate(model_profile)
 
 
@@ -220,28 +190,17 @@ async def update_model_profile(
     provider: ValidProviderDeps,
     model_profile: ValidModelProfileDeps,
     payload: Annotated[ModelProfileUpdate, Body(..., description="Model 配置更新数据")],
-    model_profile_crud: ModelProfileCRUDeps,
+    model_profile_service: ModelProfileServiceDeps,
 ):
-    """更新模型配置；前端可通过 is_enabled 控制模型是否启用。"""
-    if payload.model is not None:
-        # 模型名称不允许与同一 provider 下的其他模型配置重复
-        existing_model = (
-            await model_profile_crud.get_model_profile_by_model_for_provider(
-                provider_id=provider.id,
-                model=payload.model,
-            )
-        )
-        if existing_model and existing_model.id != model_profile.id:
-            raise HTTPException(
-                status_code=400,
-                detail="model profile with the same model already exists for this provider",
-            )
-
+    """更新模型配置；目录模型只允许切换 is_enabled。"""
     try:
-        updated_profile = await model_profile_crud.update_model_profile(
+        updated_profile = await model_profile_service.update_model_profile(
+            provider=provider,
             model_profile=model_profile,
             profile_data=payload,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:
         logger.warning(f"更新 model profile 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
@@ -254,15 +213,19 @@ async def update_model_profile(
 
 @router.delete("/provider/{provider_uid}/models/{model_uid}")
 async def delete_model_profile(
+    provider: ValidProviderDeps,
     model_profile: ValidModelProfileDeps,
-    model_profile_crud: ModelProfileCRUDeps,
+    model_profile_service: ModelProfileServiceDeps,
 ):
-    """删除模型配置
-    NOTE: 暂时不要使用
-    """
-    success = await model_profile_crud.delete_model_profile_by_id(
-        model_profile_id=model_profile.id
-    )
+    """删除自定义 provider 下的模型配置。"""
+    try:
+        success = await model_profile_service.delete_model_profile(
+            provider=provider,
+            model_profile=model_profile,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     if success:
         return {"uid": model_profile.uid, "status": "deleted"}
     raise HTTPException(status_code=500, detail="Failed to delete model profile")

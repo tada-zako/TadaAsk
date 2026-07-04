@@ -119,16 +119,10 @@ class ModelProfileCRUD:
         for key, value in data.items():
             setattr(provider, key, value)
 
-        # NOTE: api_key 不允许设置为 None
-        if not provider_data.api_key:
-            raise ValueError(
-                "API key cannot be empty; provide a valid API key to update"
+        if provider_data.api_key is not None:
+            provider.encrypted_api_key = api_key_cipher.encrypt(
+                provider_data.api_key.get_secret_value()
             )
-
-        encrypted_api_key = api_key_cipher.encrypt(
-            provider_data.api_key.get_secret_value()
-        )
-        provider.encrypted_api_key = encrypted_api_key
 
         await self.session.flush()
         # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 Pydantic 触发 async lazy load。
@@ -154,7 +148,7 @@ class ModelProfileCRUD:
         """
         清理旧模型目录缓存。
 
-        删除未启用、未配置 API key、且不在当前白名单中的 provider
+        删除未启用、未配置 API key、非自定义、且不在当前白名单中的 provider
         """
         if not provider_names:
             return 0
@@ -162,6 +156,7 @@ class ModelProfileCRUD:
         # 查询需要删除的 provider ID 列表
         stmt = select(Provider.id).where(
             not_(Provider.is_enabled),
+            Provider.is_custom.is_(False),
             Provider.encrypted_api_key.is_(None),
             Provider.name.not_in(provider_names),
         )
@@ -409,6 +404,10 @@ class ModelProfileCRUD:
             existing_provider = existing_providers_by_name.get(provider_data.name)
 
             if existing_provider:
+                if existing_provider.is_custom:
+                    # 同名自定义 provider 由用户维护，目录同步不覆盖。
+                    continue
+
                 # 更新逻辑
                 # 更新 provider 字段
                 existing_provider.base_url = provider_data.base_url
@@ -447,7 +446,8 @@ class ModelProfileCRUD:
             )
             provider.model_profiles = [
                 ModelProfile(
-                    **model_data.model_dump(),
+                    **model_data.model_dump(exclude={"is_enabled"}),
+                    is_enabled=False,
                 )
                 for model_data in model_data_list
             ]

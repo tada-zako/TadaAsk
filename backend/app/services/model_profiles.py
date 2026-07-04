@@ -3,12 +3,14 @@ from typing import cast
 
 import httpx
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from app.crud import ModelProfileCRUD
-from app.db.models import Provider
+from app.db.models import ModelProfile, Provider
 from app.db.schemas import (
     ModelProfileCreate,
+    ModelProfileInternal,
+    ModelProfileUpdate,
     ProviderCreate,
     ProviderCreateWithModels,
     ProviderUpdate,
@@ -145,6 +147,7 @@ class ModelProfileService:
                         if model_data.tool_call is not None
                         else True
                     ),
+                    is_enabled=False,
                 )
                 for model_id, model_data in self._select_recent_chat_models(
                     provider_catalog.models
@@ -174,57 +177,41 @@ class ModelProfileService:
             f"cleaned_providers={deleted_count}"
         )
 
-    async def create_or_enable_provider(
+    async def create_custom_provider(
         self,
         *,
         provider_data: ProviderCreateWithModels,
         api_key_cipher: ProviderAPIKeyCipher,
     ) -> Provider:
-        """
-        创建 custom provider，或启用已由模型目录缓存的 provider
-        """
-        # 处理数据
-        provider_name = provider_data.name.strip().lower()
-        if not provider_data.api_key:
-            # 没有提供 API key，无法启用 provider
-            raise ValueError(
-                f"Provider '{provider_name}' no API key provided to enable it"
-            )
+        """创建用户自定义 provider，可同时创建其下模型配置。"""
+        provider_name = self._normalize_provider_name(provider_data.name)
 
         existing_provider = await self.model_profile_crud.get_provider_by_name(
             name=provider_name
         )
         if existing_provider:
-            provider_update_data = ProviderUpdate(
-                name=provider_name,
+            raise ValueError("provider with the same name already exists")
+
+        if provider_data.is_enabled:
+            self._validate_custom_provider_can_be_enabled(
+                api_key=self._has_api_key_value(provider_data.api_key),
                 base_url=provider_data.base_url,
-                # 启用 provider，配置 api key
-                is_enabled=True,
-                api_key=provider_data.api_key,
-            )
-            provider = await self.model_profile_crud.update_provider(
-                provider=existing_provider,
-                provider_data=provider_update_data,
-                api_key_cipher=api_key_cipher,
             )
 
-        else:
-            # 创建用户自定义的 provider
-            provider_create_data = provider_data.model_copy(
-                update={
-                    "name": provider_name,
-                    "is_enabled": True,
-                    # NOTE: custom provider 一定要设置 is_custom=True
-                    "is_custom": True,
-                },
-            )
-            provider = await self.model_profile_crud.create_provider(
-                provider_data=provider_create_data,
-                api_key_cipher=api_key_cipher,
-            )
+        provider_create_data = ProviderCreate(
+            name=provider_name,
+            base_url=provider_data.base_url,
+            api_key=provider_data.api_key,
+            is_enabled=provider_data.is_enabled,
+            is_custom=True,
+        )
+        provider = await self.model_profile_crud.create_provider(
+            provider_data=provider_create_data,
+            api_key_cipher=api_key_cipher,
+        )
 
         if provider_data.model_profiles:
-            # 批量 upsert model_profile
+            # 自定义 provider 才允许用户维护 model_profile。
             await self.model_profile_crud.bulk_upsert_model_profiles(
                 provider=provider,
                 profile_data_list=provider_data.model_profiles,
@@ -237,6 +224,111 @@ class ModelProfileService:
             )
         )
         return provider_with_models or provider
+
+    async def update_provider(
+        self,
+        *,
+        provider: Provider,
+        provider_data: ProviderUpdate,
+        api_key_cipher: ProviderAPIKeyCipher,
+    ) -> Provider:
+        """按 provider 来源更新配置。"""
+        self._validate_provider_update_nulls(provider_data)
+        if provider.is_custom:
+            # 更新自定义 provider 配置
+            return await self._update_custom_provider(
+                provider=provider,
+                provider_data=provider_data,
+                api_key_cipher=api_key_cipher,
+            )
+        return await self._update_catalog_provider(
+            provider=provider,
+            provider_data=provider_data,
+            api_key_cipher=api_key_cipher,
+        )
+
+    async def delete_provider(self, *, provider: Provider) -> bool:
+        """仅允许删除用户自定义 provider。"""
+        if not provider.is_custom:
+            raise ValueError("catalog provider cannot be deleted; disable it instead")
+        return await self.model_profile_crud.delete_provider_by_id(
+            provider_id=provider.id
+        )
+
+    async def create_model_profile(
+        self,
+        *,
+        provider: Provider,
+        profile_data: ModelProfileCreate,
+    ) -> ModelProfile:
+        """仅允许在自定义 provider 下创建模型配置。"""
+        if not provider.is_custom:
+            raise ValueError("catalog provider models cannot be created manually")
+
+        existing_model = (
+            await self.model_profile_crud.get_model_profile_by_model_for_provider(
+                provider_id=provider.id,
+                model=profile_data.model,
+            )
+        )
+        # 存在同名 model
+        if existing_model:
+            raise ValueError(
+                "model profile with the same model already exists for this provider"
+            )
+
+        internal_data = ModelProfileInternal(
+            **profile_data.model_dump(),
+            provider_id=provider.id,
+        )
+        return await self.model_profile_crud.create_model_profile(internal_data)
+
+    async def update_model_profile(
+        self,
+        *,
+        provider: Provider,
+        model_profile: ModelProfile,
+        profile_data: ModelProfileUpdate,
+    ) -> ModelProfile:
+        """按 provider 来源更新模型配置。"""
+        self._validate_model_profile_update_nulls(profile_data)
+        if not provider.is_custom:
+            # 后端初始化模型更新
+            return await self._update_catalog_model_profile(
+                model_profile=model_profile,
+                profile_data=profile_data,
+            )
+
+        if profile_data.model is not None:
+            existing_model = (
+                await self.model_profile_crud.get_model_profile_by_model_for_provider(
+                    provider_id=provider.id,
+                    model=profile_data.model,
+                )
+            )
+            if existing_model and existing_model.id != model_profile.id:
+                # 重复创建同名 model 记录
+                raise ValueError(
+                    "model profile with the same model already exists for this provider"
+                )
+
+        return await self.model_profile_crud.update_model_profile(
+            model_profile=model_profile,
+            profile_data=profile_data,
+        )
+
+    async def delete_model_profile(
+        self,
+        *,
+        provider: Provider,
+        model_profile: ModelProfile,
+    ) -> bool:
+        """仅允许删除用户自定义 provider 下的模型配置。"""
+        if not provider.is_custom:
+            raise ValueError("catalog provider models cannot be deleted")
+        return await self.model_profile_crud.delete_model_profile_by_id(
+            model_profile_id=model_profile.id
+        )
 
     async def _fetch_model_catalog(self, *, models_url: str) -> TargetCatalog:
         """拉取并解析目标模型目录。"""
@@ -296,3 +388,143 @@ class ModelProfileService:
         if value is None or value <= 0:
             return None
         return value
+
+    async def _update_catalog_provider(
+        self,
+        *,
+        provider: Provider,
+        provider_data: ProviderUpdate,
+        api_key_cipher: ProviderAPIKeyCipher,
+    ) -> Provider:
+        """目录 provider 只允许维护启用状态和 API key。"""
+        forbidden_fields = provider_data.model_fields_set & {"name", "base_url"}
+        if forbidden_fields:
+            # 不允许设置 name, base_url 字段
+            raise ValueError("catalog provider only allows api_key and is_enabled")
+
+        self._validate_catalog_provider_can_be_enabled(
+            provider=provider,
+            provider_data=provider_data,
+        )
+        # 执行写库
+        return await self.model_profile_crud.update_provider(
+            provider=provider,
+            provider_data=provider_data,
+            api_key_cipher=api_key_cipher,
+        )
+
+    async def _update_custom_provider(
+        self,
+        *,
+        provider: Provider,
+        provider_data: ProviderUpdate,
+        api_key_cipher: ProviderAPIKeyCipher,
+    ) -> Provider:
+        """自定义 provider 允许维护基础配置。"""
+        if provider_data.name is not None:
+            provider_name = self._normalize_provider_name(provider_data.name)
+            existing_provider = await self.model_profile_crud.get_provider_by_name(
+                name=provider_name
+            )
+            if existing_provider and existing_provider.id != provider.id:
+                raise ValueError("provider with the same name already exists")
+            provider_data = provider_data.model_copy(update={"name": provider_name})
+
+        self._validate_custom_provider_can_be_enabled(
+            # 如果前端没有传递，则使用更新前的已有记录
+            api_key=((provider_data.api_key or provider.encrypted_api_key) is not None),
+            base_url=(provider_data.base_url or provider.base_url),
+            is_enabled=(provider_data.is_enabled or provider.is_enabled),
+        )
+        # 执行写库
+        return await self.model_profile_crud.update_provider(
+            provider=provider,
+            provider_data=provider_data,
+            api_key_cipher=api_key_cipher,
+        )
+
+    async def _update_catalog_model_profile(
+        self,
+        *,
+        model_profile: ModelProfile,
+        profile_data: ModelProfileUpdate,
+    ) -> ModelProfile:
+        """目录模型只允许切换启用状态。"""
+        if profile_data.model_fields_set - {"is_enabled"}:
+            # 不允许设置除了 is_enabled 之外的字段
+            raise ValueError("catalog model only allows is_enabled")
+
+        if "is_enabled" not in profile_data.model_fields_set:
+            # 无意义
+            return model_profile
+        return await self.model_profile_crud.update_model_profile(
+            model_profile=model_profile,
+            profile_data=ModelProfileUpdate(is_enabled=profile_data.is_enabled),
+        )
+
+    def _normalize_provider_name(self, name: str) -> str:
+        """统一 provider 名称，避免大小写重复。"""
+        provider_name = name.strip().lower()
+        if not provider_name:
+            raise ValueError("provider name cannot be empty")
+        return provider_name
+
+    def _validate_provider_update_nulls(self, provider_data: ProviderUpdate) -> None:
+        """禁止把非空字段显式更新为 null。"""
+        if (
+            "api_key" in provider_data.model_fields_set
+            and self._has_api_key_value(provider_data.api_key) is None
+        ):
+            raise ValueError("API key cannot be empty")
+        if (
+            "is_enabled" in provider_data.model_fields_set
+            and provider_data.is_enabled is None
+        ):
+            raise ValueError("is_enabled cannot be null")
+        if "name" in provider_data.model_fields_set and provider_data.name is None:
+            raise ValueError("provider name cannot be null")
+
+    def _validate_model_profile_update_nulls(
+        self, profile_data: ModelProfileUpdate
+    ) -> None:
+        """禁止把 model 与启用状态显式更新为 null。"""
+        if "model" in profile_data.model_fields_set and profile_data.model is None:
+            raise ValueError("model cannot be null")
+        if (
+            "is_enabled" in profile_data.model_fields_set
+            and profile_data.is_enabled is None
+        ):
+            raise ValueError("is_enabled cannot be null")
+
+    def _validate_catalog_provider_can_be_enabled(
+        self,
+        *,
+        provider: Provider,
+        provider_data: ProviderUpdate,
+    ) -> None:
+        """目录 provider 启用时必须已经有或同时提交 API key。"""
+        if provider.name == "ollama":
+            return
+        if provider.encrypted_api_key is None and provider_data.api_key is None:
+            raise ValueError("API key is required to enable this provider")
+
+    def _has_api_key_value(self, api_key: SecretStr | None) -> bool:
+        """检查 API key 是否真正有内容。"""
+        if api_key is None:
+            return False
+        return bool(api_key.get_secret_value().strip())
+
+    def _validate_custom_provider_can_be_enabled(
+        self,
+        *,
+        api_key: bool,
+        base_url: str | None,
+        is_enabled: bool = True,
+    ) -> None:
+        """自定义 provider 启用时必须满足运行时调用所需配置。"""
+        if not is_enabled:
+            return
+        if not api_key:
+            raise ValueError("API key is required to enable custom provider")
+        if not base_url or not base_url.strip():
+            raise ValueError("Base URL is required to enable custom provider")
