@@ -487,6 +487,7 @@ export const useSourceStore = defineStore("console-source", () => {
     patchSourceStatus,
     pauseItems,
     removeActiveJob,
+    removeSourceItemFromState,
     renameItem,
     resumeItems,
     setSourceItems,

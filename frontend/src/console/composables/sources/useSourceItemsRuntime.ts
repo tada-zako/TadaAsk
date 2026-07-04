@@ -34,6 +34,7 @@ const TERMINAL_ITEM_EVENTS = new Set<RAGJobEvent["event"]>([
   "item_failed",
   "item_paused",
   "item_skipped",
+  "item_deleted",
 ]);
 
 /**
@@ -390,6 +391,17 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     if (event.syncProgress != null) {
       // 更新 sync progress 显示
       setSyncProgress(sourceUid, event.syncProgress);
+    }
+
+    if (event.event === "item_deleted" && itemUid) {
+      // 后端清理旧 source item
+      sourceStore.removeSourceItemFromState(sourceUid, itemUid);
+      clearItemProgress(itemUid);
+      // 移除 selected 记录
+      selectedItemUids.value = selectedItemUids.value.filter(
+        (uid) => uid !== itemUid,
+      );
+      return;
     }
 
     if (itemUid && TERMINAL_ITEM_EVENTS.has(event.event)) {

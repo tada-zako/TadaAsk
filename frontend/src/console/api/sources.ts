@@ -41,6 +41,7 @@ export type RAGJobEventType =
   | "item_upserted"
   | "item_progress"
   | "item_skipped"
+  | "item_deleted"
   | "item_indexing"
   | "item_completed"
   | "item_paused"
@@ -60,6 +61,7 @@ export type RAGJobIngestStage =
   | "indexing_sql"
   | "indexing_vector"
   | "processing_chunks"
+  | "pruning"
   | "completed"
   | "failed"
   | "skipped"
@@ -74,6 +76,8 @@ export interface RAGJobCounters {
   completed: number;
   paused: number;
   failed: number;
+  pruned: number;
+  cleanupFailed: number;
 }
 
 export interface RAGJobEvent {
