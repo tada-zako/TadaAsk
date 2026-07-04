@@ -266,6 +266,17 @@ class SourceCRUD:
         )
         return result.scalars().all()
 
+    async def list_source_items_not_in_item_keys(
+        self, *, source_id: int, item_keys: set[str]
+    ) -> Sequence[SourceItem]:
+        """获取指定 source 下不属于当前 item_key 集合的数据项。"""
+        stmt = select(SourceItem).where(SourceItem.source_id == source_id)
+        if item_keys:
+            stmt = stmt.where(~SourceItem.item_key.in_(list(item_keys)))
+
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
     async def list_source_item_filenames_by_source_id(
         self, *, source_id: int
     ) -> Sequence[str]:

@@ -222,6 +222,8 @@ class RAGSyncCounters(BaseModel):
     completed: int = 0
     paused: int = 0
     failed: int = 0
+    pruned: int = 0
+    cleanup_failed: int = 0
 
 
 class RAGSyncEvent(BaseModel):

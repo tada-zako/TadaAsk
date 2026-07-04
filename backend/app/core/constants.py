@@ -129,6 +129,7 @@ class IngestStage(str, enum.Enum):
     INDEXING_SQL = "indexing_sql"
     INDEXING_VECTOR = "indexing_vector"
     PROCESSING_CHUNKS = "processing_chunks"  # 批处理阶段；包括 fts_tokenizing、embedding、indexing_sql/vector 等子阶段；用于前端展示整体进度
+    PRUNING = "pruning"
     COMPLETED = "completed"
     FAILED = "failed"
     SKIPPED = "skipped"  # 文档状态不匹配，跳过处理
@@ -149,6 +150,7 @@ class RAGSyncEventType(str, enum.Enum):
     ITEM_UPSERTED = "item_upserted"
     ITEM_PROGRESS = "item_progress"
     ITEM_SKIPPED = "item_skipped"
+    ITEM_DELETED = "item_deleted"
     ITEM_INDEXING = "item_indexing"
     ITEM_COMPLETED = "item_completed"
     ITEM_PAUSED = "item_paused"

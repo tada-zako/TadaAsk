@@ -16,8 +16,10 @@ from app.ingestion.crawler import (
 from app.db.models import Source, SourceItem
 from app.db.schemas import WebCrawlConfig, SourceItemInternal, DocumentContentInternal
 from app.crud import SourceCRUD
+from app.rag import VectorDatabase
 from app.api.schemas import RAGSyncCounters, RAGSyncEvent
 from app.core.constants import (
+    CrawlEntryType,
     SourceItemProcessStatus,
     IngestStage,
     RAGSyncEventType,
@@ -42,6 +44,16 @@ class CrawlWorkerDone:
 
 
 @dataclass(frozen=True)
+class StaleSourceItemRef:
+    """待清理的历史 source item 轻量引用。"""
+
+    id: int
+    uid: str
+    item_key: str
+    status: SourceItemProcessStatus
+
+
+@dataclass(frozen=True)
 class SourceRef:
     """
     后台任务使用的 source 轻量引用，避免跨 session 持有 ORM 对象
@@ -54,6 +66,7 @@ class SourceRef:
 
     id: int
     uid: str
+    collection_name: str
     source_type: SourceType
 
 
@@ -64,10 +77,12 @@ class WebCrawlSyncService:
         session_factory: async_sessionmaker[AsyncSession],
         crawler: WebCrawler,
         html_parser: HTMLPageParser,
+        vector_db: VectorDatabase,
     ):
         self.session_factory = session_factory
         self.crawler = crawler
         self.html_parser = html_parser
+        self.vector_db = vector_db
 
     async def sync_source(
         self,
@@ -107,6 +122,7 @@ class WebCrawlSyncService:
 
         # 1.1 discover URL
         discovered_urls = await self.crawler.discover_urls(config=config)
+        discovered_item_keys = {discovered.item_key for discovered in discovered_urls}
         counters.discovered = len(discovered_urls)
 
         if not discovered_urls:
@@ -197,7 +213,8 @@ class WebCrawlSyncService:
                     counters=counters,
                 )
 
-                sync_progress = processed_results / len(discovered_urls)
+                # 计算 progress 数值
+                sync_progress = processed_results / len(discovered_urls) - 0.2
 
                 if synced_uid:
                     changed_source_item_uids.append(synced_uid)
@@ -233,7 +250,16 @@ class WebCrawlSyncService:
 
             await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 4. 发送完成事件
+        # 4. 清理本轮不再属于 URL 列表的历史 source_items，避免旧索引继续进入 RAG。
+        async for cleanup_event in self._cleanup_stale_source_items(
+            source_ref=source_ref,
+            config=config,
+            discovered_item_keys=discovered_item_keys,
+            counters=counters,
+        ):
+            yield cleanup_event
+
+        # 5. 发送完成事件
         yield RAGSyncEvent(
             event=RAGSyncEventType.SYNC_COMPLETE,
             source_uid=source_ref.uid,
@@ -242,7 +268,8 @@ class WebCrawlSyncService:
             counters=counters,
             message=(
                 "Web crawl materialization completed; "
-                f"{len(changed_source_item_uids)} item(s) require indexing"
+                f"{len(changed_source_item_uids)} item(s) require indexing; "
+                f"{counters.pruned} stale item(s) pruned"
             ),
         )
 
@@ -296,7 +323,6 @@ class WebCrawlSyncService:
         - 如果 source_item 正在 indexing 阶段， 则跳过修改，避免内容和索引不一致
         - 如果 source_item 存在且页面未修改，则更新 metadata 并跳过 COMPLETED 状态的 source_item；对于其他状态的 source_item，更新状态为 PENDING
         - 如果 source_item 存在且页面已修改，则更新内容和 metadata，并标记为 PENDING
-        - TODO: 这里逻辑不完备，如果 source_items 中残留了本次 discovered_urls 未检索到的历史记录，会出现残余废文件，影响后续 RAG
         """
         async with self.session_factory() as session:
             async with session.begin():
@@ -451,6 +477,167 @@ class WebCrawlSyncService:
         counters.upserted += 1
         return existing_item.uid
 
+    async def _cleanup_stale_source_items(
+        self,
+        *,
+        source_ref: SourceRef,
+        config: WebCrawlConfig,
+        discovered_item_keys: set[str],
+        counters: RAGSyncCounters,
+    ) -> AsyncIterable[RAGSyncEvent]:
+        """
+        清理本轮未发现的历史网页项。
+
+        当前只对 url_list 开启硬删除；
+        后续扩展 sitemap/site_root 需要先确认 discovery 完整
+        且未被 max_pages 截断，再开放清理逻辑
+        """
+        if config.entry_type != CrawlEntryType.URL_LIST:
+            # 跳过暂不支持类型
+            return
+
+        # 加载所有旧 source_items
+        stale_items = await self._load_stale_source_items(
+            source_ref=source_ref,
+            discovered_item_keys=discovered_item_keys,
+        )
+        if not stale_items:
+            return
+
+        for stale_item in stale_items:
+            if stale_item.status in _INDEX_BUSY_STATUSES:
+                # 忙状态，跳过
+                counters.skipped += 1
+                yield RAGSyncEvent(
+                    event=RAGSyncEventType.ITEM_SKIPPED,
+                    source_uid=source_ref.uid,
+                    source_item_uid=stale_item.uid,
+                    source_item_status=stale_item.status,
+                    ingest_stage=IngestStage.SKIPPED,
+                    sync_progress=0.9,
+                    counters=counters,
+                    message=(
+                        "Stale web page cleanup skipped because item is busy: "
+                        f"{stale_item.item_key}"
+                    ),
+                )
+                continue
+
+            try:
+                (
+                    deleted_vector_count,
+                    vector_cleanup_error,
+                ) = await self._delete_stale_source_item(
+                    source_ref=source_ref,
+                    stale_item=stale_item,
+                )
+            except Exception as exc:
+                counters.cleanup_failed += 1
+                logger.exception(
+                    f"Failed to prune stale source item {stale_item.uid}: {exc}"
+                )
+                yield RAGSyncEvent(
+                    event=RAGSyncEventType.ITEM_FAILED,
+                    source_uid=source_ref.uid,
+                    source_item_uid=stale_item.uid,
+                    source_item_status=stale_item.status,
+                    ingest_stage=IngestStage.FAILED,
+                    sync_progress=0.9,
+                    counters=counters,
+                    message=f"Failed to prune stale web page: {stale_item.item_key}",
+                    error=str(exc),
+                )
+                continue
+
+            counters.pruned += 1
+            if vector_cleanup_error:
+                counters.cleanup_failed += 1
+
+            # 传输清理操作事务
+            yield RAGSyncEvent(
+                event=RAGSyncEventType.ITEM_DELETED,
+                source_uid=source_ref.uid,
+                source_item_uid=stale_item.uid,
+                ingest_stage=IngestStage.PRUNING,
+                sync_progress=0.9,
+                counters=counters,
+                message=(
+                    "Pruned stale web page source item: "
+                    f"{stale_item.item_key}; removed {deleted_vector_count} vector(s)"
+                ),
+                error=vector_cleanup_error,
+            )
+
+    async def _load_stale_source_items(
+        self,
+        *,
+        source_ref: SourceRef,
+        discovered_item_keys: set[str],
+    ) -> list[StaleSourceItemRef]:
+        """
+        加载本轮 URL 列表中已经不存在的历史 source items;
+        转换为 StaleSourceItemRef 结构对象，避免在 session 外直接操作 ORM 对象
+        """
+        async with self.session_factory() as session:
+            source_crud = SourceCRUD(session)
+            source_items = await source_crud.list_source_items_not_in_item_keys(
+                source_id=source_ref.id,
+                item_keys=discovered_item_keys,
+            )
+
+        return [
+            # 转换为 StaleSourceItemRef 对象
+            StaleSourceItemRef(
+                id=item.id,
+                uid=item.uid,
+                item_key=item.item_key,
+                status=item.status,
+            )
+            for item in source_items
+        ]
+
+    async def _delete_stale_source_item(
+        self,
+        *,
+        source_ref: SourceRef,
+        stale_item: StaleSourceItemRef,
+    ) -> tuple[int, str | None]:
+        """删除 stale item 的数据库记录，并尽力清理对应向量。"""
+        async with self.session_factory() as session:
+            async with session.begin():
+                source_crud = SourceCRUD(session)
+                vector_ids = list(
+                    await source_crud.list_vector_ids_by_source_item_id(
+                        source_item_id=stale_item.id
+                    )
+                )
+                # 删除数据库记录
+                deleted = await source_crud.delete_source_item_by_id(
+                    item_id=stale_item.id
+                )
+                if not deleted:
+                    raise ValueError(f"Source item not found: {stale_item.uid}")
+
+        if not vector_ids:
+            return 0, None
+
+        try:
+            # 删除向量数据库中对应的向量数据
+            await asyncio.to_thread(
+                self.vector_db.delete_data_from_collection,
+                collection_name=source_ref.collection_name,
+                ids=vector_ids,
+            )
+        except Exception as exc:
+            # DB 已删除，RAG 不会再召回该 item；
+            # 向量残留单独记录，后续增加可重试或全量重建兜底逻辑
+            logger.warning(
+                f"Failed to delete vectors for stale source item {stale_item.uid}: {exc}"
+            )
+            return len(vector_ids), str(exc)
+
+        return len(vector_ids), None
+
     async def _load_previous_metadata_by_item_key(
         self, source_ref: SourceRef
     ) -> dict[str, WebPageMetadata]:
@@ -481,6 +668,7 @@ class WebCrawlSyncService:
             return SourceRef(
                 id=source.id,
                 uid=source.uid,
+                collection_name=source.collection_name,
                 source_type=source.source_type,
             )
 
