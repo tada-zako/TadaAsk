@@ -11,8 +11,7 @@ import type { components } from "@/shared/api/generated/schema";
 
 export type SourceType = SourceRead["sourceType"];
 export type SourceTone = "success" | "warning" | "danger" | "muted";
-export type SourceItemsRouteName =
-  "source-local-file-items" | "source-web-crawl-items";
+export type SourceItemsRouteName = "source-items";
 export type RAGJobStatus = components["schemas"]["RAGJobStatus"];
 export type RAGJobType = components["schemas"]["RAGJobType"];
 export type WebCrawlConfigInput = components["schemas"]["WebCrawlConfig-Input"];

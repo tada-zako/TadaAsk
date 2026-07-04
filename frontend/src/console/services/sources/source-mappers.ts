@@ -80,7 +80,10 @@ export function toSourceItemRow(
 ): SourceItemRow {
   const progress = normalizeProgress(itemProgressByUid[sourceItem.uid]);
   const status = sourceItem.status;
-  const showProgress = status === "processing" || status === "pause_requested";
+  const showProgress =
+    progress !== null ||
+    status === "processing" ||
+    status === "pause_requested";
 
   return {
     uid: sourceItem.uid,
@@ -149,12 +152,8 @@ export function toSourceJobViewModel(
 export function getSourceItemsRouteName(
   sourceType: SourceType,
 ): SourceItemsRouteName | null {
-  if (sourceType === "local_file") {
-    return "source-local-file-items";
-  }
-
-  if (sourceType === "web_crawl") {
-    return "source-web-crawl-items";
+  if (sourceType === "local_file" || sourceType === "web_crawl") {
+    return "source-items";
   }
 
   return null;
