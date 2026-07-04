@@ -250,11 +250,13 @@ export const sourceApi = {
     client.GET("/admin/source/jobs/{job_uid}/events", {
       params: {
         path: { job_uid: jobUid },
-        header: options.lastEventId
-          ? { "Last-Event-ID": options.lastEventId }
-          : undefined,
       },
-      headers: { Accept: "text/event-stream" },
+      headers: {
+        Accept: "text/event-stream",
+        ...(options.lastEventId
+          ? { "Last-Event-ID": options.lastEventId }
+          : {}),
+      },
       parseAs: "stream",
       signal: options.signal,
     }),
