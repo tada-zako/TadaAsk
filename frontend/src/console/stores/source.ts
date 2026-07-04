@@ -5,7 +5,6 @@ import { translate as t } from "@/console/i18n";
 import { getErrorMessage } from "@/console/lib/api-result";
 import {
   createSource as createSourceRequest,
-  createSourceWorkspaceViewModel,
   deleteSource as deleteSourceRequest,
   deleteSourceItem as deleteSourceItemRequest,
   downloadSourceItem as downloadSourceItemRequest,
@@ -26,482 +25,263 @@ import {
   type SourceJobViewModel,
   type SourceWorkspaceViewModel,
 } from "@/console/services/source-workspace";
-import { createSourceEntityState } from "@/console/stores/sources/source-entity-state";
-import { createSourceJobRuntime } from "@/console/stores/sources/source-job-runtime";
-import { createSourceSelectionState } from "@/console/stores/sources/source-selection-state";
 import type {
   IngestPausedResponse,
-  RAGJobCounters,
-  RAGJobStartResponse,
   SourceDeleteResponse,
   SourceItemDeleteResponse,
   SourceItemDownloadResponse,
+  SourceItemProcessStatus,
   SourceItemRead,
   SourceRead,
   SourceUpdatePayload,
 } from "@/console/api/sources";
 
+type SourceItemsByUid = Record<string, SourceItemRead[]>;
+type SourceJobsByUid = Record<string, SourceJobViewModel[]>;
+type LoadOptions = {
+  silent?: boolean;
+};
+
 /**
- * Source 共享状态。
+ * Source 共享实体缓存。
  *
- * Store 管理 source 跨页面数据、选中态、任务进度；字段转换和 API 解包交给 service。
+ * Store 只负责跨页面需要复用的 source / item / active job 数据，以及薄请求动作。
+ * 页面选择态、SSE 连接、进度条和 stream 展示状态放到 view/composable 内管理。
  */
 export const useSourceStore = defineStore("console-source", () => {
-  // --- 响应式状态 ---
   const sources = ref<SourceRead[]>([]);
-  const currentSource = ref<SourceRead | null>(null);
-  const itemsBySourceUid = ref<Record<string, SourceItemRead[]>>({});
-  const selectedItemUidsBySourceUid = ref<Record<string, string[]>>({});
-  const activeJobsBySourceUid = ref<Record<string, SourceJobViewModel[]>>({});
-  const itemProgressByUid = ref<Record<string, number | null>>({});
-  const jobProgressBySourceUid = ref<Record<string, number | null>>({});
-  // SSE 事件流实时数据字段
-  const jobMessageBySourceUid = ref<Record<string, string | null>>({});
-  const jobErrorBySourceUid = ref<Record<string, string | null>>({});
-  const jobCountersBySourceUid = ref<Record<string, RAGJobCounters | null>>({});
-  // SSE 流控制：每个 job 一个 AbortController，支持断连与重连
-  const jobStreamControllersByUid = ref<Record<string, AbortController>>({});
-  // SSE Last-Event-ID，用于断线重连时续传
-  const jobLastEventIdByUid = ref<Record<string, string>>({});
+  const itemsBySourceUid = ref<SourceItemsByUid>({});
+  const activeJobsBySourceUid = ref<SourceJobsByUid>({});
   const isLoading = ref(false);
   const isMutating = ref(false);
   const errorMessage = ref<string | null>(null);
 
-  // --- 派生计算 ---
   const sourceRows = computed(() => sources.value.map(toSourceRow));
 
-  const currentSourceItems = computed(() =>
-    currentSource.value
-      ? (itemsBySourceUid.value[currentSource.value.uid] ?? [])
-      : [],
-  );
-
-  const currentWorkspace = computed<SourceWorkspaceViewModel | null>(() =>
-    currentSource.value
-      ? createSourceWorkspaceViewModel(
-          currentSource.value,
-          currentSourceItems.value,
-          { itemProgressByUid: itemProgressByUid.value },
-        )
-      : null,
-  );
-
-  const selectionState = createSourceSelectionState({
-    selectedItemUidsBySourceUid,
-  });
-  const entityState = createSourceEntityState({
-    currentSource,
-    itemsBySourceUid,
-    pruneItemSelection: selectionState.pruneItemSelection,
-    sources,
-  });
-  const jobRuntime = createSourceJobRuntime({
-    activeJobsBySourceUid,
-    itemProgressByUid,
-    jobCountersBySourceUid,
-    jobErrorBySourceUid,
-    jobLastEventIdByUid,
-    jobMessageBySourceUid,
-    jobProgressBySourceUid,
-    jobStreamControllersByUid,
-    patchSourceItem: entityState.patchSourceItem,
-    patchSourceItemStatus: entityState.patchSourceItemStatus,
-    patchSourceStatus: entityState.patchSourceStatus,
-    refreshSourceWorkspaceInBackground,
-    reloadActiveJobs: loadActiveJobs,
-  });
-
-  const { clearItemSelection, setItemSelection, toggleItemSelection } =
-    selectionState;
-  const {
-    patchSourceItem,
-    patchSourceItemStatus,
-    patchSourceItems,
-    patchSourceStatus,
-    removeSourceFromState,
-    removeSourceItemFromState,
-    setSourceItems,
-    syncCurrentSourceFromList,
-    upsertSource,
-  } = entityState;
-  const {
-    applyRagJobEvent,
-    clearSourceItemProgress,
-    connectJobStream,
-    connectSourceJobStreams,
-    disconnectAllJobStreams,
-    disconnectJobStream,
-    disconnectSourceJobStreams,
-    setSourceItemProgress,
-    setSourceJobProgress,
-    upsertActiveJob,
-  } = jobRuntime;
-
-  // --- 异步动作 ---
-  /** 加载并初始化所有知识库列表 */
   async function loadSources(): Promise<SourceRead[]> {
-    isLoading.value = true;
-    errorMessage.value = null;
-
-    try {
-      const workspace = await loadSourcesWorkspace();
-      sources.value = workspace.sources;
-      syncCurrentSourceFromList();
-      return workspace.sources;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.loadSources"),
-      );
-      throw error;
-    } finally {
-      isLoading.value = false;
-    }
+    return await withLoading(
+      t("sources.service.errors.loadSources"),
+      async () => {
+        const workspace = await loadSourcesWorkspace();
+        sources.value = workspace.sources;
+        return workspace.sources;
+      },
+    );
   }
 
-  // 刷新知识库列表（loadSources 的快捷别名）
-  async function refreshSources(): Promise<SourceRead[]> {
-    return await loadSources();
-  }
-
-  // 加载知识库详情及子项，写入共享状态
   async function loadSourceWorkspace(
     sourceUid: string,
+    options: LoadOptions = {},
   ): Promise<SourceWorkspaceViewModel> {
-    isLoading.value = true;
-    errorMessage.value = null;
-
-    try {
-      const workspace = await loadSourceWorkspaceRequest(sourceUid, {
-        itemProgressByUid: itemProgressByUid.value,
-      });
-      upsertSource(workspace.source);
-      currentSource.value = workspace.source;
-      setSourceItems(
-        sourceUid,
-        workspace.sourceItemRows.map((row) => row.sourceItem),
-      );
-      return workspace;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.loadSource"),
-      );
-      throw error;
-    } finally {
-      isLoading.value = false;
-    }
+    return await withLoading(
+      t("sources.service.errors.loadSource"),
+      async () => {
+        const workspace = await loadSourceWorkspaceRequest(sourceUid);
+        upsertSource(workspace.source);
+        setSourceItems(
+          sourceUid,
+          workspace.sourceItemRows.map((row) => row.sourceItem),
+        );
+        return workspace;
+      },
+      options,
+    );
   }
 
-  // 仅加载子项（不包含 source 详情），写入共享状态
   async function loadSourceItems(sourceUid: string): Promise<SourceItemRead[]> {
-    isLoading.value = true;
-    errorMessage.value = null;
-
-    try {
-      const items = await loadSourceItemsRequest(sourceUid);
-      setSourceItems(sourceUid, items);
-      return items;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.loadItems"),
-      );
-      throw error;
-    } finally {
-      isLoading.value = false;
-    }
+    return await withLoading(
+      t("sources.service.errors.loadItems"),
+      async () => {
+        const items = await loadSourceItemsRequest(sourceUid);
+        setSourceItems(sourceUid, items);
+        return items;
+      },
+    );
   }
 
-  // 创建知识库并 push 到本地列表
   async function createSource(input: CreateSourceInput): Promise<SourceRead> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const source = await createSourceRequest(input);
-      upsertSource(source);
-      return source;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.createSource"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+    return await withMutation(
+      t("sources.service.errors.createSource"),
+      async () => {
+        const source = await createSourceRequest(input);
+        upsertSource(source);
+        return source;
+      },
+    );
   }
 
-  // 更新知识库并同步到本地列表
   async function updateSource(
     sourceUid: string,
     input: SourceUpdatePayload,
   ): Promise<SourceRead> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const source = await updateSourceRequest(sourceUid, input);
-      upsertSource(source);
-      return source;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.updateSource"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+    return await withMutation(
+      t("sources.service.errors.updateSource"),
+      async () => {
+        const source = await updateSourceRequest(sourceUid, input);
+        upsertSource(source);
+        return source;
+      },
+    );
   }
 
-  // 删除知识库并从本地状态移除
   async function deleteSource(
     sourceUid: string,
   ): Promise<SourceDeleteResponse> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const response = await deleteSourceRequest(sourceUid);
-      removeSourceFromState(sourceUid);
-      clearSourceRuntimeState(sourceUid);
-      return response;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.deleteSource"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+    return await withMutation(
+      t("sources.service.errors.deleteSource"),
+      async () => {
+        const response = await deleteSourceRequest(sourceUid);
+        removeSourceFromState(sourceUid);
+        return response;
+      },
+    );
   }
 
-  // 上传本地文件到指定的知识库
   async function uploadItems(
     sourceUid: string,
     files: File[],
   ): Promise<SourceItemRead[]> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const uploadedItems = await uploadLocalSourceItems(sourceUid, files);
-      patchSourceItems(sourceUid, uploadedItems);
-      return uploadedItems;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.uploadItems"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+    return await withMutation(
+      t("sources.service.errors.uploadItems"),
+      async () => {
+        const uploadedItems = await uploadLocalSourceItems(sourceUid, files);
+        patchSourceItems(sourceUid, uploadedItems);
+        return uploadedItems;
+      },
+    );
   }
 
-  // 触发 web_crawl 同步任务，写入活跃任务并连接 SSE 进度流
-  async function syncWebCrawl(sourceUid: string): Promise<RAGJobStartResponse> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const job = await syncWebCrawlSource(sourceUid);
-      const jobView = toSourceJobViewModel(job);
-      patchSourceStatus(sourceUid, "processing");
-      setSourceJobProgress(sourceUid, 0);
-      jobMessageBySourceUid.value = {
-        ...jobMessageBySourceUid.value,
-        [sourceUid]: t("sources.service.jobs.syncStarted"),
-      };
-      upsertActiveJob(jobView);
-      void connectJobStream(jobView);
-      return job;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.syncWebCrawl"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+  async function syncWebCrawl(sourceUid: string): Promise<SourceJobViewModel> {
+    return await withMutation(
+      t("sources.service.errors.syncWebCrawl"),
+      async () => {
+        const response = await syncWebCrawlSource(sourceUid);
+        const job = toSourceJobViewModel(response);
+        patchSourceStatus(sourceUid, "processing");
+        upsertActiveJob(job);
+        return job;
+      },
+    );
   }
 
-  // 对选中子项启动索引，写入活跃任务并连接 SSE 进度流
   async function indexItems(
     sourceUid: string,
     sourceItemUids: string[],
-  ): Promise<RAGJobStartResponse> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const job = await indexSourceItemsRequest(sourceUid, sourceItemUids);
-      const jobView = toSourceJobViewModel(job);
-      markSourceItemsStatus(sourceUid, sourceItemUids, "processing", 0);
-      patchSourceStatus(sourceUid, "processing");
-      upsertActiveJob(jobView);
-      void connectJobStream(jobView);
-      return job;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.indexItems"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+  ): Promise<SourceJobViewModel> {
+    return await withMutation(
+      t("sources.service.errors.indexItems"),
+      async () => {
+        const response = await indexSourceItemsRequest(
+          sourceUid,
+          sourceItemUids,
+        );
+        const job = toSourceJobViewModel(response);
+        markSourceItemsStatus(sourceUid, sourceItemUids, "processing");
+        patchSourceStatus(sourceUid, "processing");
+        upsertActiveJob(job);
+        return job;
+      },
+    );
   }
 
-  // 暂停指定子项的索引处理，并立即将返回的处理状态 patch 到本地
   async function pauseItems(
     sourceUid: string,
     sourceItemUids: string[],
   ): Promise<IngestPausedResponse[]> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      markSourceItemsStatus(sourceUid, sourceItemUids, "pause_requested");
-      const pausedItems = await pauseSourceItemsRequest(
-        sourceUid,
-        sourceItemUids,
-      );
-      for (const item of pausedItems) {
-        patchSourceItemStatus(
+    return await withMutation(
+      t("sources.service.errors.pauseItems"),
+      async () => {
+        markSourceItemsStatus(sourceUid, sourceItemUids, "pause_requested");
+        const pausedItems = await pauseSourceItemsRequest(
           sourceUid,
-          item.sourceItemUid,
-          item.processStatus,
+          sourceItemUids,
         );
-      }
-      return pausedItems;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.pauseItems"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+
+        for (const item of pausedItems) {
+          patchSourceItemStatus(
+            sourceUid,
+            item.sourceItemUid,
+            item.processStatus,
+          );
+        }
+
+        return pausedItems;
+      },
+    );
   }
 
-  // 恢复已暂停子项的索引，写入活跃任务并连接 SSE 进度流
   async function resumeItems(
     sourceUid: string,
     sourceItemUids: string[],
-  ): Promise<RAGJobStartResponse> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const job = await resumeSourceItemsRequest(sourceUid, sourceItemUids);
-      const jobView = toSourceJobViewModel(job);
-      markSourceItemsStatus(sourceUid, sourceItemUids, "processing", 0);
-      patchSourceStatus(sourceUid, "processing");
-      upsertActiveJob(jobView);
-      void connectJobStream(jobView);
-      return job;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.resumeItems"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+  ): Promise<SourceJobViewModel> {
+    return await withMutation(
+      t("sources.service.errors.resumeItems"),
+      async () => {
+        const response = await resumeSourceItemsRequest(
+          sourceUid,
+          sourceItemUids,
+        );
+        const job = toSourceJobViewModel(response);
+        markSourceItemsStatus(sourceUid, sourceItemUids, "processing");
+        patchSourceStatus(sourceUid, "processing");
+        upsertActiveJob(job);
+        return job;
+      },
+    );
   }
 
-  // 重命名子项并局部更新本地状态
   async function renameItem(
     sourceUid: string,
     sourceItemUid: string,
     title: string,
   ): Promise<SourceItemRead> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const item = await renameSourceItemRequest(
-        sourceUid,
-        sourceItemUid,
-        title,
-      );
-      patchSourceItem(sourceUid, item);
-      return item;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.renameItem"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+    return await withMutation(
+      t("sources.service.errors.renameItem"),
+      async () => {
+        const item = await renameSourceItemRequest(
+          sourceUid,
+          sourceItemUid,
+          title,
+        );
+        patchSourceItem(sourceUid, item);
+        return item;
+      },
+    );
   }
 
-  // 删除子项并从本地状态移除
   async function deleteItem(
     sourceUid: string,
     sourceItemUid: string,
   ): Promise<SourceItemDeleteResponse> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      const response = await deleteSourceItemRequest(sourceUid, sourceItemUid);
-      removeSourceItemFromState(sourceUid, sourceItemUid);
-      clearSourceItemProgress(sourceItemUid);
-      return response;
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.deleteItem"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+    return await withMutation(
+      t("sources.service.errors.deleteItem"),
+      async () => {
+        const response = await deleteSourceItemRequest(
+          sourceUid,
+          sourceItemUid,
+        );
+        removeSourceItemFromState(sourceUid, sourceItemUid);
+        return response;
+      },
+    );
   }
 
-  // 触发 local_file 子项下载（service 层处理浏览器窗口打开）
   async function downloadItem(
     sourceUid: string,
     sourceItemUid: string,
   ): Promise<SourceItemDownloadResponse> {
-    isMutating.value = true;
-    errorMessage.value = null;
-
-    try {
-      return await downloadSourceItemRequest(sourceUid, sourceItemUid);
-    } catch (error) {
-      errorMessage.value = getErrorMessage(
-        error,
-        t("sources.service.errors.downloadItem"),
-      );
-      throw error;
-    } finally {
-      isMutating.value = false;
-    }
+    return await withMutation(
+      t("sources.service.errors.downloadItem"),
+      async () => await downloadSourceItemRequest(sourceUid, sourceItemUid),
+    );
   }
 
-  // 加载所有活跃 RAG 任务并按 sourceUid 分组存储
   async function loadActiveJobs(): Promise<SourceJobViewModel[]> {
     errorMessage.value = null;
 
     try {
       const jobs = await listActiveSourceJobs();
-      activeJobsBySourceUid.value = jobs.reduce<
-        Record<string, SourceJobViewModel[]>
-      >((result, job) => {
-        result[job.sourceUid] = [...(result[job.sourceUid] ?? []), job];
-        return result;
-      }, {});
+      activeJobsBySourceUid.value = groupJobsBySourceUid(jobs);
       return jobs;
     } catch (error) {
       errorMessage.value = getErrorMessage(
@@ -512,91 +292,218 @@ export const useSourceStore = defineStore("console-source", () => {
     }
   }
 
-  function clearSourceRuntimeState(sourceUid: string): void {
-    clearItemSelection(sourceUid);
-    jobRuntime.clearSourceJobRuntimeState(sourceUid);
+  function getSource(sourceUid: string): SourceRead | null {
+    return sources.value.find((source) => source.uid === sourceUid) ?? null;
   }
 
-  // SSE 流结束后静默刷新 workspace 数据，同步最新状态
-  async function refreshSourceWorkspaceInBackground(
-    sourceUid: string,
-  ): Promise<void> {
-    const workspace = await loadSourceWorkspaceRequest(sourceUid, {
-      itemProgressByUid: itemProgressByUid.value,
-    });
+  function getSourceItems(sourceUid: string): SourceItemRead[] {
+    return itemsBySourceUid.value[sourceUid] ?? [];
+  }
 
-    upsertSource(workspace.source);
-    if (currentSource.value?.uid === sourceUid) {
-      currentSource.value = workspace.source;
-    }
+  function upsertSource(source: SourceRead): void {
+    const exists = sources.value.some((item) => item.uid === source.uid);
+
+    sources.value = exists
+      ? sources.value.map((item) => (item.uid === source.uid ? source : item))
+      : [source, ...sources.value];
+  }
+
+  function removeSourceFromState(sourceUid: string): void {
+    sources.value = sources.value.filter((source) => source.uid !== sourceUid);
+
+    const nextItems = { ...itemsBySourceUid.value };
+    delete nextItems[sourceUid];
+    itemsBySourceUid.value = nextItems;
+
+    const nextJobs = { ...activeJobsBySourceUid.value };
+    delete nextJobs[sourceUid];
+    activeJobsBySourceUid.value = nextJobs;
+  }
+
+  function setSourceItems(sourceUid: string, items: SourceItemRead[]): void {
+    itemsBySourceUid.value = {
+      ...itemsBySourceUid.value,
+      [sourceUid]: items,
+    };
+  }
+
+  function patchSourceStatus(
+    sourceUid: string,
+    status: SourceRead["status"],
+  ): void {
+    sources.value = sources.value.map((source) =>
+      source.uid === sourceUid ? { ...source, status } : source,
+    );
+  }
+
+  function patchSourceItem(sourceUid: string, item: SourceItemRead): void {
+    patchSourceItems(sourceUid, [item]);
+  }
+
+  function patchSourceItems(sourceUid: string, items: SourceItemRead[]): void {
     setSourceItems(
       sourceUid,
-      workspace.sourceItemRows.map((row) => row.sourceItem),
+      mergeSourceItems(itemsBySourceUid.value[sourceUid] ?? [], items),
     );
+  }
+
+  function patchSourceItemStatus(
+    sourceUid: string,
+    sourceItemUid: string,
+    status: SourceItemProcessStatus,
+  ): void {
+    setSourceItems(
+      sourceUid,
+      getSourceItems(sourceUid).map((item) =>
+        item.uid === sourceItemUid ? { ...item, status } : item,
+      ),
+    );
+  }
+
+  function removeSourceItemFromState(
+    sourceUid: string,
+    sourceItemUid: string,
+  ): void {
+    setSourceItems(
+      sourceUid,
+      getSourceItems(sourceUid).filter((item) => item.uid !== sourceItemUid),
+    );
+  }
+
+  function upsertActiveJob(job: SourceJobViewModel): void {
+    const current = activeJobsBySourceUid.value[job.sourceUid] ?? [];
+    const next = current.some((item) => item.jobUid === job.jobUid)
+      ? current.map((item) => (item.jobUid === job.jobUid ? job : item))
+      : [...current, job];
+
+    activeJobsBySourceUid.value = {
+      ...activeJobsBySourceUid.value,
+      [job.sourceUid]: next,
+    };
+  }
+
+  function removeActiveJob(sourceUid: string, jobUid: string): void {
+    const nextJobs = (activeJobsBySourceUid.value[sourceUid] ?? []).filter(
+      (job) => job.jobUid !== jobUid,
+    );
+    const next = { ...activeJobsBySourceUid.value };
+
+    if (nextJobs.length) {
+      next[sourceUid] = nextJobs;
+    } else {
+      delete next[sourceUid];
+    }
+
+    activeJobsBySourceUid.value = next;
   }
 
   function markSourceItemsStatus(
     sourceUid: string,
     sourceItemUids: string[],
-    status: SourceItemRead["status"],
-    progress?: number,
+    status: SourceItemProcessStatus,
   ): void {
-    entityState.markSourceItemsStatus(
+    const targetUids = new Set(sourceItemUids);
+
+    setSourceItems(
       sourceUid,
-      sourceItemUids,
-      status,
-      progress !== undefined
-        ? (sourceItemUid) => setSourceItemProgress(sourceItemUid, progress)
-        : undefined,
+      getSourceItems(sourceUid).map((item) =>
+        targetUids.has(item.uid) ? { ...item, status } : item,
+      ),
     );
+  }
+
+  async function withLoading<T>(
+    fallbackMessage: string,
+    task: () => Promise<T>,
+    options: LoadOptions = {},
+  ): Promise<T> {
+    if (!options.silent) {
+      isLoading.value = true;
+    }
+    errorMessage.value = null;
+
+    try {
+      return await task();
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, fallbackMessage);
+      throw error;
+    } finally {
+      if (!options.silent) {
+        isLoading.value = false;
+      }
+    }
+  }
+
+  async function withMutation<T>(
+    fallbackMessage: string,
+    task: () => Promise<T>,
+  ): Promise<T> {
+    isMutating.value = true;
+    errorMessage.value = null;
+
+    try {
+      return await task();
+    } catch (error) {
+      errorMessage.value = getErrorMessage(error, fallbackMessage);
+      throw error;
+    } finally {
+      isMutating.value = false;
+    }
   }
 
   return {
     activeJobsBySourceUid,
-    applyRagJobEvent,
-    clearItemSelection,
-    clearSourceRuntimeState,
-    connectJobStream,
-    connectSourceJobStreams,
     createSource,
-    currentSource,
-    currentSourceItems,
-    currentWorkspace,
     deleteItem,
     deleteSource,
-    disconnectAllJobStreams,
-    disconnectJobStream,
-    disconnectSourceJobStreams,
     downloadItem,
     errorMessage,
+    getSource,
+    getSourceItems,
     indexItems,
     isLoading,
     isMutating,
-    itemProgressByUid,
     itemsBySourceUid,
-    jobCountersBySourceUid,
-    jobErrorBySourceUid,
-    jobLastEventIdByUid,
-    jobMessageBySourceUid,
-    jobProgressBySourceUid,
-    jobStreamControllersByUid,
     loadActiveJobs,
     loadSourceItems,
     loadSourceWorkspace,
     loadSources,
+    patchSourceItem,
+    patchSourceItemStatus,
+    patchSourceItems,
+    patchSourceStatus,
     pauseItems,
-    refreshSources,
+    removeActiveJob,
     renameItem,
     resumeItems,
-    selectedItemUidsBySourceUid,
-    setItemSelection,
-    setSourceItemProgress,
-    setSourceJobProgress,
+    setSourceItems,
     sourceRows,
     sources,
     syncWebCrawl,
-    toggleItemSelection,
     updateSource,
     uploadItems,
+    upsertActiveJob,
+    upsertSource,
   };
 });
+
+function mergeSourceItems(
+  current: SourceItemRead[],
+  updates: SourceItemRead[],
+): SourceItemRead[] {
+  const updateMap = new Map(updates.map((item) => [item.uid, item]));
+  const merged = current.map((item) => updateMap.get(item.uid) ?? item);
+  const currentUidSet = new Set(current.map((item) => item.uid));
+  const appended = updates.filter((item) => !currentUidSet.has(item.uid));
+
+  return [...merged, ...appended];
+}
+
+function groupJobsBySourceUid(
+  jobs: SourceJobViewModel[],
+): Record<string, SourceJobViewModel[]> {
+  return jobs.reduce<Record<string, SourceJobViewModel[]>>((result, job) => {
+    result[job.sourceUid] = [...(result[job.sourceUid] ?? []), job];
+    return result;
+  }, {});
+}
