@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onBeforeUnmount, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 
@@ -8,6 +8,7 @@ import { Progress } from "@/shared/components/ui/progress";
 
 import SourceItemsTablePanel from "@/console/components/sources/SourceItemsTablePanel.vue";
 import SourceItemsToolbar from "@/console/components/sources/SourceItemsToolbar.vue";
+import { useSourceItemsRuntime } from "@/console/composables/sources/useSourceItemsRuntime";
 import { useSourceStore } from "@/console/stores/source";
 import { getSourceItemsRouteName } from "@/console/services/source-workspace";
 import type { SourceTone } from "@/console/services/source-workspace";
@@ -19,68 +20,41 @@ type SourceItemsToolbarType = "local-file" | "web-crawl";
 const route = useRoute();
 const router = useRouter();
 const sourceStore = useSourceStore();
-const {
-  activeJobsBySourceUid,
-  currentWorkspace,
-  errorMessage,
-  isLoading,
-  isMutating,
-  jobCountersBySourceUid,
-  jobErrorBySourceUid,
-  jobMessageBySourceUid,
-  jobProgressBySourceUid,
-  jobStageBySourceUid,
-  jobStreamTypeBySourceUid,
-  jobStreamVisibleBySourceUid,
-  selectedItemUidsBySourceUid,
-} = storeToRefs(sourceStore);
-
-const searchQuery = ref("");
+const { errorMessage, isLoading, isMutating } = storeToRefs(sourceStore);
 const sourceUid = computed(() => String(route.params.sourceUid ?? ""));
-const source = computed(() => currentWorkspace.value?.source ?? null);
-const sourceRow = computed(() => currentWorkspace.value?.sourceRow ?? null);
-const itemRows = computed(() => currentWorkspace.value?.sourceItemRows ?? []);
+const {
+  clearSourceRuntimeState,
+  deleteItems,
+  deleteSource,
+  downloadItem,
+  filteredRows,
+  indexItems,
+  loadWorkspace: loadSourceItemsWorkspace,
+  pauseItems,
+  pruneSelection,
+  renameItem,
+  resetForSourceChange,
+  resumeItems,
+  rows,
+  searchQuery,
+  selectedItemUids,
+  setSelection,
+  source,
+  sourceRow,
+  syncBadgeLabel,
+  syncBadgeTone,
+  syncCounters,
+  syncCrawl,
+  syncMessage,
+  syncProgress,
+  syncStage,
+  syncVisible,
+  updateSource,
+  uploadFiles,
+} = useSourceItemsRuntime({ sourceUid });
 const isWebCrawl = computed(() => source.value?.sourceType === "web_crawl");
 const toolbarSourceType = computed<SourceItemsToolbarType>(() =>
   isWebCrawl.value ? "web-crawl" : "local-file",
-);
-const selectedItemUids = computed(
-  () => selectedItemUidsBySourceUid.value[sourceUid.value] ?? [],
-);
-const activeJobs = computed(
-  () => activeJobsBySourceUid.value[sourceUid.value] ?? [],
-);
-const syncJob = computed(
-  () =>
-    activeJobs.value.find((job) => job.jobType === "web_crawl_sync") ?? null,
-);
-const syncStreamVisible = computed(
-  () =>
-    isWebCrawl.value &&
-    (Boolean(syncJob.value) ||
-      (jobStreamVisibleBySourceUid.value[sourceUid.value] === true &&
-        jobStreamTypeBySourceUid.value[sourceUid.value] === "web_crawl_sync")),
-);
-const jobProgress = computed(
-  () => jobProgressBySourceUid.value[sourceUid.value] ?? null,
-);
-const jobStage = computed(
-  () => jobStageBySourceUid.value[sourceUid.value] ?? null,
-);
-const jobMessage = computed(
-  () =>
-    jobErrorBySourceUid.value[sourceUid.value] ??
-    jobMessageBySourceUid.value[sourceUid.value] ??
-    "Waiting for sync events.",
-);
-const jobCounters = computed(
-  () => jobCountersBySourceUid.value[sourceUid.value] ?? null,
-);
-const syncBadgeLabel = computed(
-  () => syncJob.value?.statusLabel ?? sourceRow.value?.statusLabel ?? "Idle",
-);
-const syncBadgeTone = computed<SourceTone>(
-  () => syncJob.value?.statusTone ?? sourceRow.value?.statusTone ?? "muted",
 );
 const sourceKicker = computed(() => {
   if (isWebCrawl.value) {
@@ -99,27 +73,11 @@ const sourceSubtitle = computed(() =>
     : "Upload files, review generated source items, and index items when ready.",
 );
 
-const filteredRows = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase();
-
-  if (!query) {
-    return itemRows.value;
-  }
-
-  return itemRows.value.filter((row) => {
-    const values = isWebCrawl.value
-      ? [row.title, row.originUrl, row.displayOrigin]
-      : [row.title, row.filename, row.displayOrigin];
-
-    return values.some((value) => value?.toLowerCase().includes(query));
-  });
-});
-
 watch(
   sourceUid,
   (uid, oldUid) => {
     if (oldUid) {
-      sourceStore.disconnectSourceJobStreams(oldUid);
+      resetForSourceChange(oldUid);
     }
 
     void loadWorkspace(uid);
@@ -127,9 +85,13 @@ watch(
   { immediate: true },
 );
 
+watch(rows, () => {
+  pruneSelection();
+});
+
 onBeforeUnmount(() => {
   if (sourceUid.value) {
-    sourceStore.disconnectSourceJobStreams(sourceUid.value);
+    clearSourceRuntimeState(sourceUid.value);
   }
 });
 
@@ -139,15 +101,11 @@ async function loadWorkspace(uid: string): Promise<void> {
     return;
   }
 
-  const workspace = await sourceStore.loadSourceWorkspace(uid);
+  await loadSourceItemsWorkspace();
 
-  if (!getSourceItemsRouteName(workspace.source.sourceType)) {
+  if (!source.value || !getSourceItemsRouteName(source.value.sourceType)) {
     await router.replace({ name: "sources" });
-    return;
   }
-
-  await sourceStore.loadActiveJobs();
-  await sourceStore.connectSourceJobStreams(uid);
 }
 
 async function handleUpdateSource(input: SourceUpdatePayload): Promise<void> {
@@ -155,7 +113,7 @@ async function handleUpdateSource(input: SourceUpdatePayload): Promise<void> {
     return;
   }
 
-  await sourceStore.updateSource(sourceUid.value, input);
+  await updateSource(input);
 }
 
 async function handleDeleteSource(): Promise<void> {
@@ -163,7 +121,7 @@ async function handleDeleteSource(): Promise<void> {
     return;
   }
 
-  await sourceStore.deleteSource(sourceUid.value);
+  await deleteSource();
   await router.push({ name: "sources" });
 }
 
@@ -172,8 +130,7 @@ async function handleUploadFiles(files: File[]): Promise<void> {
     return;
   }
 
-  await sourceStore.uploadItems(sourceUid.value, files);
-  await sourceStore.loadSourceWorkspace(sourceUid.value);
+  await uploadFiles(files);
 }
 
 async function handleSyncCrawl(): Promise<void> {
@@ -181,35 +138,31 @@ async function handleSyncCrawl(): Promise<void> {
     return;
   }
 
-  await sourceStore.syncWebCrawl(sourceUid.value);
+  await syncCrawl();
 }
 
 function handleSelectionChange(itemUids: string[]): void {
-  sourceStore.setItemSelection(sourceUid.value, itemUids);
+  setSelection(itemUids);
 }
 
 async function handleIndexItems(itemUids: string[]): Promise<void> {
-  await sourceStore.indexItems(sourceUid.value, itemUids);
+  await indexItems(itemUids);
 }
 
 async function handlePauseItems(itemUids: string[]): Promise<void> {
-  await sourceStore.pauseItems(sourceUid.value, itemUids);
+  await pauseItems(itemUids);
 }
 
 async function handleResumeItems(itemUids: string[]): Promise<void> {
-  await sourceStore.resumeItems(sourceUid.value, itemUids);
+  await resumeItems(itemUids);
 }
 
 async function handleRenameItem(itemUid: string, title: string): Promise<void> {
-  await sourceStore.renameItem(sourceUid.value, itemUid, title);
+  await renameItem(itemUid, title);
 }
 
 async function handleDeleteItems(itemUids: string[]): Promise<void> {
-  for (const itemUid of itemUids) {
-    await sourceStore.deleteItem(sourceUid.value, itemUid);
-  }
-
-  sourceStore.clearItemSelection(sourceUid.value);
+  await deleteItems(itemUids);
 }
 
 async function handleDownloadItem(itemUid: string): Promise<void> {
@@ -217,7 +170,7 @@ async function handleDownloadItem(itemUid: string): Promise<void> {
     return;
   }
 
-  await sourceStore.downloadItem(sourceUid.value, itemUid);
+  await downloadItem(itemUid);
 }
 
 function badgeClass(tone: SourceTone): string {
@@ -276,7 +229,7 @@ function badgeClass(tone: SourceTone): string {
 
     <!-- web crawl 进度展示 -->
     <section
-      v-if="syncStreamVisible"
+      v-if="syncVisible"
       class="grid gap-3 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) p-4"
     >
       <div class="flex items-center justify-between gap-4 max-[760px]:grid">
@@ -284,14 +237,14 @@ function badgeClass(tone: SourceTone): string {
           <div class="flex flex-wrap items-center gap-2">
             <strong class="text-sm text-(--text-strong)">Sync stream</strong>
             <span
-              v-if="jobStage"
+              v-if="syncStage"
               class="rounded-(--console-radius-xs) border border-(--line-soft) px-1.5 py-0.5 text-[11px] text-(--text-faint)"
             >
-              {{ jobStage }}
+              {{ syncStage }}
             </span>
           </div>
           <p class="mt-1 text-xs text-(--text-faint)">
-            {{ jobMessage }}
+            {{ syncMessage }}
           </p>
         </div>
         <Badge :class="badgeClass(syncBadgeTone)">
@@ -299,24 +252,24 @@ function badgeClass(tone: SourceTone): string {
         </Badge>
       </div>
 
-      <div v-if="jobProgress !== null" class="flex items-center gap-3">
+      <div v-if="syncProgress !== null" class="flex items-center gap-3">
         <Progress
           class="h-1.5 bg-(--surface-panel)"
-          :model-value="jobProgress"
+          :model-value="syncProgress"
         />
         <span class="w-10 text-right text-xs text-(--text-faint)">
-          {{ jobProgress }}%
+          {{ syncProgress }}%
         </span>
       </div>
 
       <div
-        v-if="jobCounters"
+        v-if="syncCounters"
         class="grid grid-cols-4 gap-2 text-xs text-(--text-faint) max-[760px]:grid-cols-2"
       >
-        <span>Discovered {{ jobCounters.discovered }}</span>
-        <span>Fetched {{ jobCounters.fetched }}</span>
-        <span>Completed {{ jobCounters.completed }}</span>
-        <span>Failed {{ jobCounters.failed }}</span>
+        <span>Discovered {{ syncCounters.discovered }}</span>
+        <span>Fetched {{ syncCounters.fetched }}</span>
+        <span>Completed {{ syncCounters.completed }}</span>
+        <span>Failed {{ syncCounters.failed }}</span>
       </div>
     </section>
 
