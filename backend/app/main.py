@@ -211,6 +211,7 @@ async def lifespan(app: FastAPI):
         session_factory=async_session,
         crawler=app.state.web_crawler,
         html_parser=app.state.html_page_parser,
+        vector_db=vector_db,
     )
     app.state.rag_job_manager = RAGJobManager()
 
