@@ -43,6 +43,7 @@ export const en = {
       project: "Project",
       chat: "Chat",
       sources: "Sources",
+      sourceItems: "Source items",
       localFileItems: "Local file items",
       webCrawlItems: "Web crawl items",
       ask: "Ask",
