@@ -27,7 +27,6 @@ import type {
   SourceJobViewModel,
   SourceRow,
   SourceType,
-  SourceWorkspaceOptions,
   SourceWorkspaceViewModel,
 } from "./source-types";
 
@@ -35,13 +34,12 @@ import type {
 export function createSourceWorkspaceViewModel(
   source: SourceRead,
   sourceItems: SourceItemRead[],
-  options: SourceWorkspaceOptions = {},
 ): SourceWorkspaceViewModel {
   return {
     source,
     sourceRow: toSourceRow(source),
     sourceItemRows: sourceItems.map((item) =>
-      toSourceItemRow(item, source.sourceType, options.itemProgressByUid),
+      toSourceItemRow(item, source.sourceType),
     ),
   };
 }
@@ -76,9 +74,9 @@ export function toSourceRow(source: SourceRead): SourceRow {
 export function toSourceItemRow(
   sourceItem: SourceItemRead,
   sourceType: SourceType,
-  itemProgressByUid: Record<string, number | null | undefined> = {},
+  itemProgress?: number | null,
 ): SourceItemRow {
-  const progress = normalizeProgress(itemProgressByUid[sourceItem.uid]);
+  const progress = normalizeProgress(itemProgress);
   const status = sourceItem.status;
   const showProgress =
     progress !== null ||

@@ -16,7 +16,6 @@ import { createSourceWorkspaceViewModel, toSourceRow } from "./source-mappers";
 import type {
   CreateSourceInput,
   SourceListWorkspaceViewModel,
-  SourceWorkspaceOptions,
   SourceWorkspaceViewModel,
 } from "./source-types";
 
@@ -38,7 +37,6 @@ export async function loadSourcesWorkspace(): Promise<SourceListWorkspaceViewMod
 // 获取知识库详情及子项列表并组装为 Workspace 视图模型。
 export async function loadSourceWorkspace(
   sourceUid: string,
-  options: SourceWorkspaceOptions = {},
 ): Promise<SourceWorkspaceViewModel> {
   const [sourceResult, itemsResult] = await Promise.all([
     sourceApi.get(sourceUid),
@@ -56,7 +54,7 @@ export async function loadSourceWorkspace(
     t("sources.service.errors.loadItems"),
   );
 
-  return createSourceWorkspaceViewModel(source, sourceItems, options);
+  return createSourceWorkspaceViewModel(source, sourceItems);
 }
 
 // 仅拉取指定知识库的子项列表，不包含 source 详情。

@@ -88,7 +88,3 @@ export interface SourceJobViewModel {
   error: string | null;
   job: RAGJobRead | RAGJobStartResponse;
 }
-
-export interface SourceWorkspaceOptions {
-  itemProgressByUid?: Record<string, number | null | undefined>;
-}

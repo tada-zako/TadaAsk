@@ -24,7 +24,7 @@ onMounted(() => {
 /** source 创建事件 */
 async function handleCreateSource(input: CreateSourceInput): Promise<void> {
   await sourceStore.createSource(input);
-  await sourceStore.refreshSources();
+  await sourceStore.loadSources();
 }
 
 /** source settings 更新 */
@@ -33,13 +33,13 @@ async function handleUpdateSource(
   input: SourceUpdatePayload,
 ): Promise<void> {
   await sourceStore.updateSource(sourceUid, input);
-  await sourceStore.refreshSources();
+  await sourceStore.loadSources();
 }
 
 /** source 删除 */
 async function handleDeleteSource(sourceUid: string): Promise<void> {
   await sourceStore.deleteSource(sourceUid);
-  await sourceStore.refreshSources();
+  await sourceStore.loadSources();
 }
 
 /** 请求访问 source item 内容 */

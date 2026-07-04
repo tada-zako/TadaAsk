@@ -35,8 +35,7 @@ export async function* parseSseStream<TEvent>(
 
         const frame = parseSseFrame(frameText);
         if (frame) {
-          // NOTE: 目前后端 SSE 传输的都是 schema data，
-          // 这里可以直接 JSON.parse 解析
+          // NOTE: 后端 SSE data 应该是单层 JSON object。
           const payload = frame.data ? JSON.parse(frame.data) : {};
           yield { ...payload, event: frame.event, sseId: frame.id } as TEvent;
         }
