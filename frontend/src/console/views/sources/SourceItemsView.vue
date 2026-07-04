@@ -27,7 +27,7 @@ const {
   deleteItems,
   deleteSource,
   downloadItem,
-  filteredRows,
+  filteredRows, // source items table 中直接关联的响应式变量
   indexItems,
   loadWorkspace: loadSourceItemsWorkspace,
   pauseItems,
@@ -77,6 +77,7 @@ watch(
   sourceUid,
   (uid, oldUid) => {
     if (oldUid) {
+      // 清空旧 source 中的残余 progress 设置和 SSE 连接
       resetForSourceChange(oldUid);
     }
 

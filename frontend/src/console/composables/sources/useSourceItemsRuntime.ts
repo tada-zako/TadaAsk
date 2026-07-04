@@ -43,9 +43,10 @@ const TERMINAL_ITEM_EVENTS = new Set<RAGJobEvent["event"]>([
  */
 export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
   const sourceStore = useSourceStore();
+  // ------ 响应式变量 ------
   const searchQuery = ref("");
   const selectedItemUids = ref<string[]>([]);
-  const progressByItemUid = ref<Record<string, number>>({});
+  const progressByItemUid = ref<Record<string, number>>({}); // source item uid -> progress number
   const syncProgressBySourceUid = ref<Record<string, number>>({});
   const syncMessageBySourceUid = ref<Record<string, string | null>>({});
   const syncErrorBySourceUid = ref<Record<string, string | null>>({});
@@ -72,6 +73,7 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     ReturnType<typeof setTimeout>
   >();
 
+  // ------ 计算属性 -----
   const source = computed(() => sourceStore.getSource(options.sourceUid.value));
   const sourceRow = computed(() =>
     source.value ? toSourceRow(source.value) : null,
@@ -173,12 +175,16 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     connectJob(job);
   }
 
+  /** 重点函数；文档 indexing 入口 */
   async function indexItems(itemUids: string[]): Promise<void> {
     for (const itemUid of itemUids) {
+      // 设置 item progress 进度条对象
       setItemProgress(itemUid, 0);
     }
 
+    // 首先请求后端创建 RAG job，并持有返回的 job 对象
     const job = await sourceStore.indexItems(options.sourceUid.value, itemUids);
+    // 建立 SSE 观察接口长连接
     connectJob(job);
   }
 
@@ -231,6 +237,9 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     selectedItemUids.value = [];
   }
 
+  /**
+   * 清空 source item workspace 当前相关的暂存数据，并断开 SSE 连接
+   */
   function clearSourceRuntimeState(sourceUid = options.sourceUid.value): void {
     disconnectSourceJobs(sourceUid);
     clearSyncHideTimer(sourceUid);
@@ -255,16 +264,19 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
   }
 
   function connectJob(job: SourceJobViewModel): void {
+    // web crawl source view 展开 sync panel 展示
     showSyncPanel(job);
 
     if (controllersByJobUid.has(job.jobUid)) {
       return;
     }
 
+    // 设置 SSE 流式中断器
     const controller = new AbortController();
     controllersByJobUid.set(job.jobUid, controller);
     jobSourceUidByJobUid.set(job.jobUid, job.sourceUid);
 
+    // 消费 SSE 流式数据
     void consumeJobStream(job, controller);
   }
 
@@ -280,11 +292,15 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     hideSyncPanel(sourceUid);
   }
 
+  /**
+   * 实际消耗 SSE 流式函数
+   */
   async function consumeJobStream(
     job: SourceJobViewModel,
     controller: AbortController,
   ): Promise<void> {
     try {
+      // SSE API 建立连接
       const stream = await streamRagJobEvents(job.jobUid, {
         lastEventId: lastEventIdByJobUid.get(job.jobUid),
         signal: controller.signal,
@@ -303,6 +319,7 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
       }
 
       if (!controller.signal.aborted) {
+        // SSE 流消耗完毕，并且不是由于中断，刷新页面和相关数据
         await refreshAfterStream(job.sourceUid);
         scheduleHideSyncPanel(job.sourceUid);
       }
@@ -316,11 +333,15 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
         scheduleHideSyncPanel(job.sourceUid);
       }
     } finally {
+      // 清除 job 相关残余数据
       controllersByJobUid.delete(job.jobUid);
       jobSourceUidByJobUid.delete(job.jobUid);
     }
   }
 
+  /**
+   * 基于 SSE 响应的 rag job event 更新响应式变量
+   */
   function applyJobEvent(event: RAGJobEvent, job: SourceJobViewModel): void {
     const sourceUid = event.sourceUid;
     const itemUid = event.sourceItemUid ?? event.sourceItem?.uid ?? null;
@@ -362,18 +383,24 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     }
 
     if (itemUid && event.itemProgress != null) {
+      // 更新 item progress 显示
       setItemProgress(itemUid, event.itemProgress);
     }
 
     if (event.syncProgress != null) {
+      // 更新 sync progress 显示
       setSyncProgress(sourceUid, event.syncProgress);
     }
 
     if (itemUid && TERMINAL_ITEM_EVENTS.has(event.event)) {
+      // sse 结束
       if (event.event === "item_completed" && event.itemProgress == null) {
+        // item 解析完成，更新 progress
         setItemProgress(itemUid, 1);
       }
 
+      // 设置 progress 清理计时器，避免进度条闪烁突变；
+      // 即由于立即刷新导致进度条立即移除进度条渲染
       scheduleClearItemProgress(itemUid);
     }
 
@@ -438,6 +465,9 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     deleteRefKey(progressByItemUid, itemUid);
   }
 
+  /**
+   * 设置 progress 清空计时器
+   */
   function scheduleClearItemProgress(itemUid: string): void {
     clearItemProgressTimer(itemUid);
 
@@ -479,6 +509,9 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     }
   }
 
+  /**
+   * 刷新 source item workspace 状态
+   */
   async function refreshAfterStream(sourceUid: string): Promise<void> {
     await sourceStore.loadSourceWorkspace(sourceUid, { silent: true });
     await sourceStore.loadActiveJobs();

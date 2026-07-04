@@ -39,6 +39,7 @@ export async function loadSourceWorkspace(
   sourceUid: string,
 ): Promise<SourceWorkspaceViewModel> {
   const [sourceResult, itemsResult] = await Promise.all([
+    // 并发请求 source + sourceItems
     sourceApi.get(sourceUid),
     sourceApi.listItems(sourceUid, { limit: 100, offset: 0 }),
   ]);

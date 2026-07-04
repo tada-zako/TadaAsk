@@ -68,6 +68,7 @@ export interface SourceListWorkspaceViewModel {
   sourceRows: SourceRow[];
 }
 
+// source item workspace 完整 source 相关数据存储结构
 export interface SourceWorkspaceViewModel {
   source: SourceRead;
   sourceRow: SourceRow;

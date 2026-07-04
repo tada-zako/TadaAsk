@@ -340,12 +340,14 @@ function badgeClass(tone: SourceTone): string {
                 </span>
               </div>
             </TableCell>
+
             <TableCell>{{ row.updatedLabel }}</TableCell>
             <TableCell>
               <Badge :class="badgeClass(row.statusTone)">
                 {{ row.statusLabel }}
               </Badge>
             </TableCell>
+
             <TableCell>
               <!-- indexing 进度条 -->
               <div v-if="row.showProgress" class="flex w-40 items-center gap-2">

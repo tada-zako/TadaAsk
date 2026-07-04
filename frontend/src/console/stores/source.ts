@@ -49,8 +49,12 @@ type LoadOptions = {
  * 页面选择态、SSE 连接、进度条和 stream 展示状态放到 view/composable 内管理。
  */
 export const useSourceStore = defineStore("console-source", () => {
-  const sources = ref<SourceRead[]>([]);
+  const sources = ref<SourceRead[]>([]); // source items table 中实际关联的最底层响应式变量
+
+  // source uid -> source items；增量保存，会随着用户查看的 source items 增多而增多；
+  // TODO: MVP 可以接受，未来可能需要定期清理
   const itemsBySourceUid = ref<SourceItemsByUid>({});
+
   const activeJobsBySourceUid = ref<SourceJobsByUid>({});
   const isLoading = ref(false);
   const isMutating = ref(false);
@@ -58,6 +62,10 @@ export const useSourceStore = defineStore("console-source", () => {
 
   const sourceRows = computed(() => sources.value.map(toSourceRow));
 
+  /**
+   * 加载所有 sources 列表；
+   * 不请求 source 关联的 source items
+   */
   async function loadSources(): Promise<SourceRead[]> {
     return await withLoading(
       t("sources.service.errors.loadSources"),
@@ -69,6 +77,10 @@ export const useSourceStore = defineStore("console-source", () => {
     );
   }
 
+  /**
+   * 加载 source workspace 入口函数；
+   * 请求 source 同时请求关联 source items
+   */
   async function loadSourceWorkspace(
     sourceUid: string,
     options: LoadOptions = {},
@@ -77,7 +89,8 @@ export const useSourceStore = defineStore("console-source", () => {
       t("sources.service.errors.loadSource"),
       async () => {
         const workspace = await loadSourceWorkspaceRequest(sourceUid);
-        upsertSource(workspace.source);
+        upsertSource(workspace.source); // 不直接覆盖全部的 sources，只覆盖单个 source
+        // 设置 source items 数据（只包含纯 sourceRead 对象数据）
         setSourceItems(
           sourceUid,
           workspace.sourceItemRows.map((row) => row.sourceItem),
