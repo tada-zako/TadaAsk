@@ -53,11 +53,7 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
   }
 
   // 全局 Sources 页面与 SourceItem 工作区
-  if (
-    route.name === "sources" ||
-    route.name === "source-local-file-items" ||
-    route.name === "source-web-crawl-items"
-  ) {
+  if (route.name === "sources" || route.name === "source-items") {
     items.push({
       active: route.name === "sources",
       key: "sources",
@@ -65,19 +61,11 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
       navigate: route.name === "sources" ? undefined : goSources,
     });
 
-    if (route.name === "source-local-file-items") {
+    if (route.name === "source-items") {
       items.push({
         active: true,
-        key: "source-local-file-items",
-        label: t("shell.breadcrumb.localFileItems"),
-      });
-    }
-
-    if (route.name === "source-web-crawl-items") {
-      items.push({
-        active: true,
-        key: "source-web-crawl-items",
-        label: t("shell.breadcrumb.webCrawlItems"),
+        key: "source-items",
+        label: t("shell.breadcrumb.sourceItems"),
       });
     }
 
