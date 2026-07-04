@@ -85,6 +85,8 @@ class SourceItemIndexingService:
         source_items: list[SourceItem],
     ) -> list[IngestPausedResponse]:
         """批量请求暂停文档处理。"""
+        # TODO (important!): 由于 sqlite 写锁存在，
+        # 现有的 pause 有较大的锁死风险，属于危险操作
         processing_uids = [
             item.uid
             for item in source_items
