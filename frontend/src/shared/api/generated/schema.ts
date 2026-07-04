@@ -538,10 +538,9 @@ export interface paths {
         put?: never;
         /**
          * Create Provider
-         * @description 创建或启用模型提供商。
+         * @description 创建自定义模型提供商，可同时提交 model_profile。
          *
-         *     已由模型目录缓存的 provider 会更新 API key 并启用；
-         *     custom provider 可同时提交 model_profile。
+         *     目录 provider 由启动同步自动创建，通过 PATCH 接口维护 API key 与启用状态。
          */
         post: operations["create_provider_admin_model_profile_provider_new_post"];
         delete?: never;
@@ -558,10 +557,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Enabled Providers
+         * List Providers
          * @description 获取提供商列表
          */
-        get: operations["list_enabled_providers_admin_model_profile_provider_list_get"];
+        get: operations["list_providers_admin_model_profile_provider_list_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -578,10 +577,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Enabled Providers With Models
+         * List Providers With Models
          * @description 获取提供商列表及其模型配置列表。
          */
-        get: operations["list_enabled_providers_with_models_admin_model_profile_provider_list_models_get"];
+        get: operations["list_providers_with_models_admin_model_profile_provider_list_models_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -602,15 +601,14 @@ export interface paths {
         post?: never;
         /**
          * Delete Provider
-         * @description 删除模型提供商及其模型配置
-         *     NOTE: 暂时不要使用
+         * @description 删除自定义模型提供商及其模型配置。
          */
         delete: operations["delete_provider_admin_model_profile_provider__provider_uid__delete"];
         options?: never;
         head?: never;
         /**
          * Update Provider
-         * @description 更新模型提供商配置。
+         * @description 更新模型提供商配置；目录 provider 只允许更新 API key 与启用状态。
          */
         patch: operations["update_provider_admin_model_profile_provider__provider_uid__patch"];
         trace?: never;
@@ -626,7 +624,7 @@ export interface paths {
         put?: never;
         /**
          * Create Model Profile
-         * @description 在指定 provider 下创建模型配置。
+         * @description 在自定义 provider 下创建模型配置。
          */
         post: operations["create_model_profile_admin_model_profile_provider__provider_uid__models_new_post"];
         delete?: never;
@@ -651,15 +649,14 @@ export interface paths {
         post?: never;
         /**
          * Delete Model Profile
-         * @description 删除模型配置
-         *     NOTE: 暂时不要使用
+         * @description 删除自定义 provider 下的模型配置。
          */
         delete: operations["delete_model_profile_admin_model_profile_provider__provider_uid__models__model_uid__delete"];
         options?: never;
         head?: never;
         /**
          * Update Model Profile
-         * @description 更新模型配置；前端可通过 is_enabled 控制模型是否启用。
+         * @description 更新模型配置；目录模型只允许切换 is_enabled。
          */
         patch: operations["update_model_profile_admin_model_profile_provider__provider_uid__models__model_uid__patch"];
         trace?: never;
@@ -3338,7 +3335,7 @@ export interface operations {
             };
         };
     };
-    list_enabled_providers_admin_model_profile_provider_list_get: {
+    list_providers_admin_model_profile_provider_list_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3358,7 +3355,7 @@ export interface operations {
             };
         };
     };
-    list_enabled_providers_with_models_admin_model_profile_provider_list_models_get: {
+    list_providers_with_models_admin_model_profile_provider_list_models_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3521,10 +3518,10 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Model profile UID */
-                model_uid: string;
                 /** @description Provider UID */
                 provider_uid: string;
+                /** @description Model profile UID */
+                model_uid: string;
             };
             cookie?: never;
         };
