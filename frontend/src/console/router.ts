@@ -55,6 +55,12 @@ const router = createRouter({
           component: () => import("./views/sources/SourcesView.vue"),
         },
         {
+          path: "provider-model",
+          name: "provider-model",
+          component: () =>
+            import("./views/provider-model/ProviderModelView.vue"),
+        },
+        {
           path: "sources/:sourceUid/items",
           name: "source-items",
           component: () => import("./views/sources/SourceItemsView.vue"),
