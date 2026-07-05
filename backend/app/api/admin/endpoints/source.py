@@ -179,8 +179,6 @@ async def valid_source_item(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Source item not found",
         )
-
-    # TODO: 提前验证 source_item.status，确保已经完成的 item，不进入 ingest
     return result
 
 
@@ -651,7 +649,6 @@ async def sync_web_crawl(
     return RAGJobStartResponse.model_validate(job)
 
 
-# TODO: 缺少文件存在验证，如果用户上传了相同的文件，应该复用已经存在的文件
 @router.post(
     "/{source_uid}/document/indexing",
     response_model=RAGJobStartResponse,

@@ -62,17 +62,6 @@ class HybridSearchService:
         self.fts_provider = fts_provider
         self.rerank_provider = rerank_provider
 
-        # TODO: 缓存机制应该配置在底层 module 中，作为有状态服务的一部分
-        # 简易缓存机制：对 embedding, query_expander 结果进行缓存
-        # self._embedding_cache = TTLCache[str, NDArray](
-        #     max_size=512,
-        #     ttl_seconds=1800,
-        # )
-        # self._query_expansion_cache = TTLCache[str, ExpandedQuery](
-        #     max_size=512,
-        #     ttl_seconds=1800,
-        # )
-
     def _rrf_merge(
         self,
         ranked_lists: list[RankedList],

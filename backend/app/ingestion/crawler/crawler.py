@@ -11,11 +11,7 @@ from . import (
     WebPageMetadata,
 )
 from app.db.schemas import WebCrawlConfig, WebCrawlExtractionRule
-from app.utils import (
-    normalize_url,
-    hostname_from_url,
-    path_prefix_from_url,
-)
+from app.utils import normalize_url
 from app.core.constants import CrawlEntryType
 
 
@@ -26,53 +22,10 @@ class WebCrawler:
         self,
         *,
         timeout: float = 20.0,
-        # TODO: 后续自定义这里的 User Agent
         user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
     ):
         self.timeout = timeout
         self.user_agent = user_agent
-
-    # TODO: validate 业务后续迁移到 API 层
-    def validate_and_normalize_config(self, config: WebCrawlConfig) -> WebCrawlConfig:
-        """校验 WebCrawlConfig 的合法性，并对 Config 进行规范化"""
-        if config.entry_type == CrawlEntryType.URL_LIST and not config.urls:
-            raise ValueError("urls is required when entry_type is url_list")
-        if config.entry_type == CrawlEntryType.SITEMAP_URL and not config.sitemap_url:
-            raise ValueError("sitemap_url is required when entry_type is sitemap_url")
-        if config.entry_type not in {
-            CrawlEntryType.URL_LIST,
-            CrawlEntryType.SITEMAP_URL,
-        }:
-            raise ValueError(f"Unsupported entry_type: {config.entry_type}")
-
-        # 确保 config 配置字段的全面
-        seed_urls: list[str] = []
-
-        if config.urls:
-            seed_urls.extend(str(url) for url in config.urls)
-        if config.sitemap_url:
-            seed_urls.append(str(config.sitemap_url))
-        if config.site_root_url:
-            seed_urls.append(str(config.site_root_url))
-
-        # 推断 allowed_domains 配置
-        allowed_domains = config.allowed_domains or sorted(
-            {hostname_from_url(url) for url in seed_urls}
-        )
-
-        # 推断 include_paths 配置
-        include_paths = config.include_paths
-        if config.entry_type == CrawlEntryType.SITE_ROOT and not include_paths:
-            include_paths = sorted(
-                {path_prefix_from_url(url) for url in seed_urls}
-            )  # 默认使用 site_root_url 的路径前缀作为 include_paths
-
-        return config.model_copy(
-            update={
-                "allowed_domains": allowed_domains,
-                "include_paths": include_paths,
-            }
-        )
 
     async def discover_urls(self, config: WebCrawlConfig) -> list[DiscoveredURL]:
         """根据 WebCrawlConfig 进行 URL 发现，返回待爬取的 URL 列表"""

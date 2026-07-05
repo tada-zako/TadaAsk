@@ -95,9 +95,8 @@ class ProjectRead(ProjectBase):
     uid: str
     created_at: datetime
 
+    # TODO: 这里的 visitor_default_model_profile 字段是废弃字段，后续删除
     visitor_default_model_profile: "ModelProfileRead | None" = None
-
-    # TODO: 具体的 chat sessions 传递数据后续完善
 
     model_config = ConfigDict(
         from_attributes=True,

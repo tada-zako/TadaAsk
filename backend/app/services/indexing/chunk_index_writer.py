@@ -133,7 +133,6 @@ class DocumentChunkIndexWriter:
 
         for batch_index, batch_chunks in enumerate(batches):
             # 3.2.0 暂停请求检查
-            # TODO: 这里的检查点传递可能需要注意，不确定如果顶层传递为 None，执行是否会有问题
             await maybe_checkpoint()
 
             chunk_texts = [chunk.content for chunk in batch_chunks]

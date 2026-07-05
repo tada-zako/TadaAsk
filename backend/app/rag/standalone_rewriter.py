@@ -31,8 +31,6 @@ class StandaloneQueryRewriter:
     ) -> str:
         """
         根据用户查询和最近的对话消息，生成改写后的查询文本。
-
-        TODO: 后续增加上下文大小限制，限制用于改写的上下文最大 token 量
         """
         # 格式化对话历史
         history_text = StandaloneQueryRewriter._format_history(standalone_context)

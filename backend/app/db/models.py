@@ -612,10 +612,9 @@ class ChatSession(Base):
         Enum(ChatSessionType)
     )  # 对话拥有者类型
 
-    visitor_id: Mapped[Optional[str]] = mapped_column(
-        String, nullable=True
-    )  # 访客标识，后续可以基于 IP 地址或其他方式生成访客 ID，实现对话的归属和分析
-    # TODO: 考虑是否需要记录访客 IP 字段，实现更加细致的访问分析
+    # NOTE: 保留字段；访客标识，后续可以基于 IP 地址或其他方式生成访客 ID，
+    # 实现对话的归属和分析；目前已经有 rate_limit，实际可能不会使用
+    visitor_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     title: Mapped[str]
     provider: Mapped[str] = mapped_column(String, nullable=False)
     model: Mapped[str] = mapped_column(String, nullable=False)
