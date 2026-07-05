@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
 import CustomProviderCreateDialog from "./CustomProviderCreateDialog.vue";
 import ProviderConnectDialog from "./ProviderConnectDialog.vue";
 import ProviderManageDialog from "./ProviderManageDialog.vue";
@@ -6,6 +8,7 @@ import type {
   AvailableProviderEntryViewModel,
   ConnectOfficialProviderInput,
   CreateCustomProviderInput,
+  ProviderModelStatusTone,
   ProviderRowViewModel,
   UpdateProviderInput,
 } from "@/console/services/provider-model";
@@ -32,15 +35,27 @@ const emit = defineEmits<{
   ): void;
   (event: "deleteProvider", providerUid: string): void;
 }>();
+
+const { t } = useI18n();
+
+function statusBadgeClass(tone: ProviderModelStatusTone): string {
+  if (tone === "success") {
+    return "border-emerald-400/25 bg-emerald-400/10 text-emerald-200";
+  }
+
+  return "border-(--line-soft) bg-(--surface-panel-soft) text-(--text-muted)";
+}
 </script>
 
 <template>
   <section class="console-section">
     <div class="console-section-head">
       <div>
-        <h2 class="console-section-title">Providers</h2>
+        <h2 class="console-section-title">
+          {{ t("providerModel.providers.title") }}
+        </h2>
         <p class="console-section-note">
-          Add credentials for official providers or define a custom endpoint.
+          {{ t("providerModel.providers.note") }}
         </p>
       </div>
     </div>
@@ -50,21 +65,25 @@ const emit = defineEmits<{
       <section class="console-panel overflow-hidden">
         <div class="console-panel-header">
           <div>
-            <h3 class="console-panel-title">Saved providers</h3>
-            <p class="console-panel-note">Credentials and endpoint settings.</p>
+            <h3 class="console-panel-title">
+              {{ t("providerModel.providers.savedTitle") }}
+            </h3>
+            <p class="console-panel-note">
+              {{ t("providerModel.providers.savedNote") }}
+            </p>
           </div>
         </div>
 
         <!-- 加载中 -->
         <div v-if="isLoading" class="px-4 py-5 text-sm text-(--text-muted)">
-          Loading providers...
+          {{ t("providerModel.providers.loadingSaved") }}
         </div>
         <!-- 空状态 -->
         <div
           v-else-if="!savedProviders.length"
           class="px-4 py-5 text-sm text-(--text-muted)"
         >
-          No saved providers yet.
+          {{ t("providerModel.providers.emptySaved") }}
         </div>
 
         <!-- provider 列表：v-for 遍历，ProviderManageDialog 管理操作 -->
@@ -94,6 +113,13 @@ const emit = defineEmits<{
                 >
                   {{ provider.badgeLabel }}
                 </Badge>
+                <Badge
+                  variant="outline"
+                  class="text-[11px]"
+                  :class="statusBadgeClass(provider.statusTone)"
+                >
+                  {{ provider.statusLabel }}
+                </Badge>
               </div>
               <p class="mt-1 truncate text-xs text-(--text-faint)">
                 {{ provider.description }}
@@ -118,16 +144,18 @@ const emit = defineEmits<{
       <section class="console-panel overflow-hidden">
         <div class="console-panel-header">
           <div>
-            <h3 class="console-panel-title">Available providers</h3>
+            <h3 class="console-panel-title">
+              {{ t("providerModel.providers.availableTitle") }}
+            </h3>
             <p class="console-panel-note">
-              Connect a catalog provider or custom endpoint.
+              {{ t("providerModel.providers.availableNote") }}
             </p>
           </div>
         </div>
 
         <!-- 加载中 -->
         <div v-if="isLoading" class="px-4 py-5 text-sm text-(--text-muted)">
-          Loading catalog providers...
+          {{ t("providerModel.providers.loadingAvailable") }}
         </div>
         <!-- 列表：kind === 'provider' → ProviderConnectDialog，否则 → CustomProviderCreateDialog -->
         <div v-else class="grid gap-0">
@@ -155,6 +183,14 @@ const emit = defineEmits<{
                   class="border-(--line-soft) bg-(--surface-panel-soft) text-[11px] text-(--text-muted)"
                 >
                   {{ entry.badgeLabel }}
+                </Badge>
+                <Badge
+                  v-if="entry.kind === 'provider'"
+                  variant="outline"
+                  class="text-[11px]"
+                  :class="statusBadgeClass(entry.statusTone)"
+                >
+                  {{ entry.statusLabel }}
                 </Badge>
               </div>
               <p class="mt-1 truncate text-xs text-(--text-faint)">
