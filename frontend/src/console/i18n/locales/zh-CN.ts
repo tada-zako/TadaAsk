@@ -45,6 +45,7 @@ export const zhCN: typeof en = {
       project: "项目",
       chat: "对话",
       sources: "数据源",
+      apiKeys: "API Keys",
       sourceItems: "数据源条目",
       localFileItems: "本地文件条目",
       webCrawlItems: "网页爬取条目",

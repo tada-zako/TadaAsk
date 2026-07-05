@@ -49,6 +49,9 @@ const projectInitial = computed(
 );
 const isProjectNavActive = computed(() => route.path.startsWith("/project"));
 const isSourcesActive = computed(() => route.path.startsWith("/sources"));
+const isProviderModelActive = computed(() =>
+  route.path.startsWith("/provider-model"),
+);
 
 onMounted(async () => {
   if (!getProjectUidFromRoute()) {
@@ -121,6 +124,10 @@ async function openProjectChild(child: "ask" | "settings") {
 
 async function openSources() {
   await router.push({ name: "sources" });
+}
+
+async function openProviderModel() {
+  await router.push({ name: "provider-model" });
 }
 
 // 退出登录
@@ -364,7 +371,9 @@ function getProjectUidFromRoute(): string | null {
         </a>
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
+          :class="isProviderModelActive ? 'console-nav-link-active' : ''"
           href="#"
+          @click.prevent="openProviderModel"
         >
           <KeyRound class="size-4" />
           <span class="max-[1180px]:hidden">

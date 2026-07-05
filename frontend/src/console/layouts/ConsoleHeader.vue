@@ -72,6 +72,15 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
     return items;
   }
 
+  if (route.name === "provider-model") {
+    items.push({
+      active: true,
+      key: "provider-model",
+      label: t("shell.breadcrumb.apiKeys"),
+    });
+    return items;
+  }
+
   // project 相关页面配置
   items.push({
     key: "project",
