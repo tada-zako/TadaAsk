@@ -377,7 +377,7 @@ export const en = {
       officialTitle: "Official provider models",
       showLess: "Collapse",
       showLessAria: "Collapse {provider} models",
-      showMore: "Show {count} more",
+      showMore: "Show more",
       showMoreAria: "Show more {provider} models",
       tokens: {
         contextAndOutput: "{context} context tokens / {output} output tokens",

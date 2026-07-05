@@ -359,7 +359,7 @@ export const zhCN: typeof en = {
       officialTitle: "官方提供商模型",
       showLess: "收起",
       showLessAria: "收起 {provider} 模型",
-      showMore: "再显示 {count} 个",
+      showMore: "显示更多",
       showMoreAria: "显示更多 {provider} 模型",
       tokens: {
         contextAndOutput: "{context} 上下文 tokens / {output} 输出 tokens",
