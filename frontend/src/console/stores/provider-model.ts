@@ -16,7 +16,7 @@ import {
   deleteProvider as deleteProviderRequest,
   listEnabledProvidersWithModels,
   listProvidersWithModels,
-  providerModelErrors,
+  providerModelError,
   updateModel as updateModelRequest,
   updateProvider as updateProviderRequest,
   type ConnectOfficialProviderInput,
@@ -60,7 +60,7 @@ export const useProviderModelStore = defineStore(
       options: LoadOptions = {},
     ): Promise<ProviderWithModelsRead[]> {
       return await withLoading(
-        providerModelErrors.loadWorkspace,
+        providerModelError("loadWorkspace"),
         async () => {
           const providerList = await listProvidersWithModels();
           providers.value = providerList;
@@ -74,7 +74,7 @@ export const useProviderModelStore = defineStore(
       options: LoadOptions = {},
     ): Promise<ProviderWithModelsRead[]> {
       return await withLoading(
-        providerModelErrors.loadEnabledWorkspace,
+        providerModelError("loadEnabledWorkspace"),
         async () => {
           const providerList = await listEnabledProvidersWithModels();
           enabledProviders.value = providerList;
@@ -90,7 +90,7 @@ export const useProviderModelStore = defineStore(
       input: ConnectOfficialProviderInput,
     ): Promise<ProviderRead> {
       return await withMutation(
-        providerModelErrors.connectProvider,
+        providerModelError("connectProvider"),
         async () => {
           const provider = await connectOfficialProviderRequest(
             providerUid,
@@ -106,7 +106,7 @@ export const useProviderModelStore = defineStore(
       input: CreateCustomProviderInput,
     ): Promise<ProviderWithModelsRead> {
       return await withMutation(
-        providerModelErrors.createProvider,
+        providerModelError("createProvider"),
         async () => {
           const provider = await createCustomProviderRequest(input);
           upsertProvider(provider);
@@ -120,7 +120,7 @@ export const useProviderModelStore = defineStore(
       input: UpdateProviderInput,
     ): Promise<ProviderRead> {
       return await withMutation(
-        providerModelErrors.updateProvider,
+        providerModelError("updateProvider"),
         async () => {
           const provider = await updateProviderRequest(providerUid, input);
           patchProvider(provider);
@@ -130,7 +130,7 @@ export const useProviderModelStore = defineStore(
     }
 
     async function deleteProvider(providerUid: string): Promise<void> {
-      await withMutation(providerModelErrors.deleteProvider, async () => {
+      await withMutation(providerModelError("deleteProvider"), async () => {
         await deleteProviderRequest(providerUid);
         removeProvider(providerUid);
       });
@@ -141,7 +141,7 @@ export const useProviderModelStore = defineStore(
       providerUid: string,
       input: CreateCustomModelInput,
     ): Promise<ModelProfileRead> {
-      return await withMutation(providerModelErrors.createModel, async () => {
+      return await withMutation(providerModelError("createModel"), async () => {
         const model = await createCustomModelRequest(providerUid, input);
         upsertModel(providerUid, model);
         return model;
@@ -153,7 +153,7 @@ export const useProviderModelStore = defineStore(
       modelUid: string,
       input: UpdateCustomModelInput,
     ): Promise<ModelProfileRead> {
-      return await withMutation(providerModelErrors.updateModel, async () => {
+      return await withMutation(providerModelError("updateModel"), async () => {
         const model = await updateModelRequest(providerUid, modelUid, input);
         upsertModel(providerUid, model);
         return model;
@@ -164,7 +164,7 @@ export const useProviderModelStore = defineStore(
       providerUid: string,
       modelUid: string,
     ): Promise<void> {
-      await withMutation(providerModelErrors.deleteModel, async () => {
+      await withMutation(providerModelError("deleteModel"), async () => {
         await deleteModelRequest(providerUid, modelUid);
         removeModel(providerUid, modelUid);
       });

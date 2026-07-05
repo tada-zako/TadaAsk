@@ -7,12 +7,14 @@ import type {
   ProviderUpdatePayload,
   ProviderWithModelsRead,
 } from "@/console/api/provider-model";
+import { translate as t } from "@/console/i18n";
 import { unwrapApiData } from "@/console/lib/api-result";
 import { normalizeOptionalText } from "@/console/lib/normalize";
 
 // === ViewModel 类型：供 UI 层消费 ===
 
 export type ProviderTone = "official" | "custom";
+export type ProviderModelStatusTone = "success" | "muted";
 
 export interface ProviderRowViewModel {
   uid: string;
@@ -24,6 +26,8 @@ export interface ProviderRowViewModel {
   isCustom: boolean;
   hasApiKey: boolean;
   badgeLabel: string;
+  statusLabel: string;
+  statusTone: ProviderModelStatusTone;
   description: string;
   provider: ProviderWithModelsRead;
 }
@@ -51,6 +55,8 @@ export interface ModelRowViewModel {
   supportsStream: boolean;
   supportsStructured: boolean;
   isEnabled: boolean;
+  statusLabel: string;
+  statusTone: ProviderModelStatusTone;
   description: string;
 }
 
@@ -62,6 +68,8 @@ export interface ModelProviderGroupViewModel {
   baseUrl: string | null;
   isCustom: boolean;
   badgeLabel: string;
+  statusLabel: string;
+  statusTone: ProviderModelStatusTone;
   description: string;
   models: ModelRowViewModel[];
 }
@@ -109,24 +117,30 @@ export interface UpdateCustomModelInput {
 
 // API 错误信息映射
 export const providerModelErrors = {
-  connectProvider: "Failed to connect provider.",
-  createModel: "Failed to create model.",
-  createProvider: "Failed to create provider.",
-  deleteModel: "Failed to delete model.",
-  deleteProvider: "Failed to delete provider.",
-  loadEnabledWorkspace: "Failed to load enabled provider models.",
-  loadWorkspace: "Failed to load provider models.",
-  updateModel: "Failed to update model.",
-  updateProvider: "Failed to update provider.",
+  connectProvider: "providerModel.service.errors.connectProvider",
+  createModel: "providerModel.service.errors.createModel",
+  createProvider: "providerModel.service.errors.createProvider",
+  deleteModel: "providerModel.service.errors.deleteModel",
+  deleteProvider: "providerModel.service.errors.deleteProvider",
+  loadEnabledWorkspace: "providerModel.service.errors.loadEnabledWorkspace",
+  loadWorkspace: "providerModel.service.errors.loadWorkspace",
+  updateModel: "providerModel.service.errors.updateModel",
+  updateProvider: "providerModel.service.errors.updateProvider",
 };
 
 // === 数据加载 ===
+
+export function providerModelError(
+  key: keyof typeof providerModelErrors,
+): string {
+  return t(providerModelErrors[key]);
+}
 
 export async function listProvidersWithModels(): Promise<
   ProviderWithModelsRead[]
 > {
   const { data, error } = await providerModelApi.listProvidersWithModels();
-  return unwrapApiData(data, error, providerModelErrors.loadWorkspace);
+  return unwrapApiData(data, error, providerModelError("loadWorkspace"));
 }
 
 export async function listEnabledProvidersWithModels(): Promise<
@@ -134,7 +148,7 @@ export async function listEnabledProvidersWithModels(): Promise<
 > {
   const { data, error } =
     await providerModelApi.listEnabledProvidersWithModels();
-  return unwrapApiData(data, error, providerModelErrors.loadEnabledWorkspace);
+  return unwrapApiData(data, error, providerModelError("loadEnabledWorkspace"));
 }
 
 // === Provider CRUD ===
@@ -148,7 +162,7 @@ export async function connectOfficialProvider(
     isEnabled: true,
   });
 
-  return unwrapApiData(data, error, providerModelErrors.connectProvider);
+  return unwrapApiData(data, error, providerModelError("connectProvider"));
 }
 
 export async function createCustomProvider(
@@ -167,7 +181,7 @@ export async function createCustomProvider(
     modelProfiles,
   });
 
-  return unwrapApiData(data, error, providerModelErrors.createProvider);
+  return unwrapApiData(data, error, providerModelError("createProvider"));
 }
 
 export async function updateProvider(
@@ -199,12 +213,12 @@ export async function updateProvider(
     providerUid,
     payload,
   );
-  return unwrapApiData(data, error, providerModelErrors.updateProvider);
+  return unwrapApiData(data, error, providerModelError("updateProvider"));
 }
 
 export async function deleteProvider(providerUid: string): Promise<void> {
   const { data, error } = await providerModelApi.deleteProvider(providerUid);
-  unwrapApiData(data, error, providerModelErrors.deleteProvider);
+  unwrapApiData(data, error, providerModelError("deleteProvider"));
 }
 
 // === Model CRUD ===
@@ -218,7 +232,7 @@ export async function createCustomModel(
     createModelProfilePayload(input),
   );
 
-  return unwrapApiData(data, error, providerModelErrors.createModel);
+  return unwrapApiData(data, error, providerModelError("createModel"));
 }
 
 export async function updateModel(
@@ -251,7 +265,7 @@ export async function updateModel(
     modelUid,
     payload,
   );
-  return unwrapApiData(data, error, providerModelErrors.updateModel);
+  return unwrapApiData(data, error, providerModelError("updateModel"));
 }
 
 export async function deleteModel(
@@ -262,7 +276,7 @@ export async function deleteModel(
     providerUid,
     modelUid,
   );
-  unwrapApiData(data, error, providerModelErrors.deleteModel);
+  unwrapApiData(data, error, providerModelError("deleteModel"));
 }
 
 // === Workspace 工厂：将后端数据组装为 ViewModel 树 ===
@@ -270,7 +284,10 @@ export async function deleteModel(
 export function createProviderModelWorkspace(
   providers: ProviderWithModelsRead[],
 ): ProviderModelWorkspaceViewModel {
-  const savedProviders = providers.filter(isSavedProvider).map(toProviderRow);
+  const savedProviders = providers
+    .filter(isSavedProvider)
+    .map(toProviderRow)
+    .sort(compareProviderRows);
   const availableCatalogProviders = providers
     .filter((provider) => !provider.isCustom && !hasApiKey(provider))
     .map(toAvailableProviderRow);
@@ -285,10 +302,10 @@ export function createProviderModelWorkspace(
       ...availableCatalogProviders,
       {
         kind: "custom-entry",
-        displayName: "Custom provider",
+        displayName: t("providerModel.providers.customEntryName"),
         initial: "+",
-        badgeLabel: "Custom",
-        description: "OpenAI-compatible endpoint",
+        badgeLabel: t("providerModel.badges.custom"),
+        description: t("providerModel.providers.openAiCompatibleEndpoint"),
       },
     ],
     officialModelGroups: modelGroups.filter((group) => !group.isCustom),
@@ -304,8 +321,8 @@ function toAvailableProviderRow(
   return {
     ...toProviderRow(provider),
     kind: "provider",
-    badgeLabel: "Official",
-    description: "Official catalog provider",
+    badgeLabel: t("providerModel.badges.official"),
+    description: t("providerModel.providers.officialCatalogProvider"),
   };
 }
 
@@ -322,8 +339,14 @@ function toProviderRow(provider: ProviderWithModelsRead): ProviderRowViewModel {
     isEnabled: provider.isEnabled,
     isCustom,
     hasApiKey: hasApiKey(provider),
-    badgeLabel: isCustom ? "Custom" : "API Key",
-    description: provider.baseUrl ?? (isCustom ? "Custom provider" : ""),
+    badgeLabel: isCustom
+      ? t("providerModel.badges.custom")
+      : t("providerModel.badges.apiKey"),
+    statusLabel: providerStatusLabel(provider.isEnabled),
+    statusTone: providerStatusTone(provider.isEnabled),
+    description:
+      provider.baseUrl ??
+      (isCustom ? t("providerModel.providers.customProvider") : ""),
     provider,
   };
 }
@@ -341,10 +364,14 @@ function toModelProviderGroup(
     initial: providerInitial(displayName),
     baseUrl: provider.baseUrl ?? null,
     isCustom,
-    badgeLabel: isCustom ? "Custom" : "Official",
+    badgeLabel: isCustom
+      ? t("providerModel.badges.custom")
+      : t("providerModel.badges.official"),
+    statusLabel: providerStatusLabel(provider.isEnabled),
+    statusTone: providerStatusTone(provider.isEnabled),
     description: isCustom
-      ? "Custom provider · OpenAI-compatible endpoint"
-      : "Official provider · API key saved",
+      ? t("providerModel.models.customProviderDescription")
+      : t("providerModel.models.officialProviderDescription"),
     models: (provider.modelProfiles ?? []).map((model) =>
       toModelRow(model, isCustom),
     ),
@@ -363,6 +390,8 @@ function toModelRow(
     supportsStream: model.supportsStream,
     supportsStructured: model.supportsStructured,
     isEnabled: model.isEnabled,
+    statusLabel: providerStatusLabel(model.isEnabled),
+    statusTone: providerStatusTone(model.isEnabled),
     description: isCustomProvider
       ? modelTokenDescription(model)
       : modelCapabilityDescription(model),
@@ -411,6 +440,18 @@ function isSavedProvider(provider: ProviderWithModelsRead): boolean {
   return provider.isCustom || hasApiKey(provider);
 }
 
+/** 辅助 saved providers 排序；official provider 位于 custom provider 之前 */
+function compareProviderRows(
+  left: ProviderRowViewModel,
+  right: ProviderRowViewModel,
+): number {
+  if (left.isCustom !== right.isCustom) {
+    return left.isCustom ? 1 : -1;
+  }
+
+  return 0;
+}
+
 // === 内部工具函数 ===
 
 function hasApiKey(provider: ProviderWithModelsRead | ProviderRead): boolean {
@@ -419,18 +460,18 @@ function hasApiKey(provider: ProviderWithModelsRead | ProviderRead): boolean {
 
 function modelCapabilityDescription(model: ModelProfileRead): string {
   if (model.supportsStream && model.supportsStructured) {
-    return "Stream and structured output supported";
+    return t("providerModel.models.capabilities.streamAndStructured");
   }
 
   if (model.supportsStream) {
-    return "Stream output supported";
+    return t("providerModel.models.capabilities.stream");
   }
 
   if (model.supportsStructured) {
-    return "Structured output supported";
+    return t("providerModel.models.capabilities.structured");
   }
 
-  return "Catalog model availability";
+  return t("providerModel.models.capabilities.catalog");
 }
 
 function modelTokenDescription(model: ModelProfileRead): string {
@@ -438,18 +479,31 @@ function modelTokenDescription(model: ModelProfileRead): string {
   const output = formatTokenCount(model.maxOutputTokens ?? null);
 
   if (context && output) {
-    return `${context} context tokens / ${output} output tokens`;
+    return t("providerModel.models.tokens.contextAndOutput", {
+      context,
+      output,
+    });
   }
 
   if (context) {
-    return `${context} context tokens`;
+    return t("providerModel.models.tokens.contextOnly", { context });
   }
 
   if (output) {
-    return `${output} output tokens`;
+    return t("providerModel.models.tokens.outputOnly", { output });
   }
 
-  return "Context uses provider defaults";
+  return t("providerModel.models.tokens.providerDefaults");
+}
+
+function providerStatusLabel(isEnabled: boolean): string {
+  return isEnabled
+    ? t("providerModel.status.enabled")
+    : t("providerModel.status.disabled");
+}
+
+function providerStatusTone(isEnabled: boolean): ProviderModelStatusTone {
+  return isEnabled ? "success" : "muted";
 }
 
 function formatTokenCount(value: number | null): string | null {
