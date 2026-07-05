@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { X } from "@lucide/vue";
 
 import type { CreateCustomProviderInput } from "@/console/services/provider-model";
@@ -31,6 +32,7 @@ const apiKey = ref("");
 // 初始模型名列表，至少保留一行
 const modelNames = ref([""]);
 const localError = ref<string | null>(null);
+const { t } = useI18n();
 
 // 每次打开重置
 watch(open, (nextOpen) => {
@@ -57,17 +59,17 @@ function handleCreate(): void {
   const key = apiKey.value.trim();
 
   if (!name) {
-    localError.value = "Provider name is required.";
+    localError.value = t("providerModel.validation.providerNameRequired");
     return;
   }
 
   if (!endpoint) {
-    localError.value = "Base URL is required.";
+    localError.value = t("providerModel.validation.baseUrlRequired");
     return;
   }
 
   if (!key) {
-    localError.value = "API key is required.";
+    localError.value = t("providerModel.validation.apiKeyRequired");
     return;
   }
 
@@ -95,28 +97,32 @@ function resetForm(): void {
     <DialogTrigger as-child>
       <Button
         type="button"
-        aria-label="Create custom provider"
+        :aria-label="t('providerModel.aria.createCustomProvider')"
         variant="outline"
         size="sm"
         class="border-(--line-soft) bg-(--surface-panel-soft)"
       >
-        Connect
+        {{ t("providerModel.actions.connect") }}
       </Button>
     </DialogTrigger>
     <DialogContent
       class="overflow-hidden border-(--line) bg-[#101113] p-0 shadow-[0_28px_90px_rgba(0,0,0,0.54)] sm:max-w-[36rem]"
     >
       <DialogHeader class="border-b border-(--line-soft) px-5 py-4 text-left">
-        <DialogTitle>Create custom provider</DialogTitle>
+        <DialogTitle>
+          {{ t("providerModel.dialogs.createProviderTitle") }}
+        </DialogTitle>
         <DialogDescription>
-          Define the endpoint, credential, and initial model names.
+          {{ t("providerModel.dialogs.createProviderDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="grid gap-4 px-5 py-5">
         <!-- Provider 名称 -->
         <div class="grid gap-2">
-          <Label for="custom-provider-name">Provider name</Label>
+          <Label for="custom-provider-name">
+            {{ t("providerModel.labels.providerName") }}
+          </Label>
           <Input
             id="custom-provider-name"
             v-model="providerName"
@@ -126,7 +132,9 @@ function resetForm(): void {
 
         <!-- Base URL -->
         <div class="grid gap-2">
-          <Label for="custom-provider-base-url">Base URL</Label>
+          <Label for="custom-provider-base-url">
+            {{ t("providerModel.labels.baseUrl") }}
+          </Label>
           <Input
             id="custom-provider-base-url"
             v-model="baseUrl"
@@ -136,7 +144,9 @@ function resetForm(): void {
 
         <!-- API key -->
         <div class="grid gap-2">
-          <Label for="custom-provider-key">API key</Label>
+          <Label for="custom-provider-key">
+            {{ t("providerModel.labels.apiKey") }}
+          </Label>
           <Input
             id="custom-provider-key"
             v-model="apiKey"
@@ -147,7 +157,7 @@ function resetForm(): void {
 
         <!-- 初始模型名列表：动态行，每行带删除按钮 -->
         <div class="grid gap-2">
-          <Label>Models</Label>
+          <Label>{{ t("providerModel.labels.models") }}</Label>
           <div class="grid gap-2">
             <div
               v-for="(_, index) in modelNames"
@@ -156,11 +166,19 @@ function resetForm(): void {
             >
               <Input
                 v-model="modelNames[index]"
-                :placeholder="index === 0 ? 'qoder-coder' : 'qoder-lite'"
+                :placeholder="
+                  index === 0
+                    ? t('providerModel.placeholders.modelPrimary')
+                    : t('providerModel.placeholders.modelSecondary')
+                "
               />
               <Button
                 type="button"
-                :aria-label="`Remove custom model row ${index + 1}`"
+                :aria-label="
+                  t('providerModel.aria.removeCustomModelRow', {
+                    index: index + 1,
+                  })
+                "
                 variant="ghost"
                 size="icon-sm"
                 @click="removeModelRow(index)"
@@ -171,13 +189,13 @@ function resetForm(): void {
           </div>
           <Button
             type="button"
-            aria-label="Add another custom provider model"
+            :aria-label="t('providerModel.aria.addCustomProviderModel')"
             variant="ghost"
             size="sm"
             class="text-primary hover:text-primary h-auto w-fit border-0 bg-transparent p-0 text-[13px] font-semibold hover:bg-transparent"
             @click="addModelRow"
           >
-            + Add model
+            + {{ t("providerModel.actions.addModel") }}
           </Button>
         </div>
 
@@ -191,21 +209,21 @@ function resetForm(): void {
       >
         <Button
           type="button"
-          aria-label="Cancel custom provider creation"
+          :aria-label="t('providerModel.aria.cancelCustomProviderCreation')"
           variant="outline"
           class="w-20"
           @click="open = false"
         >
-          Cancel
+          {{ t("common.actions.cancel") }}
         </Button>
         <Button
           type="button"
-          aria-label="Create custom provider"
+          :aria-label="t('providerModel.aria.createCustomProvider')"
           class="w-20"
           :disabled="props.isMutating"
           @click="handleCreate"
         >
-          Create
+          {{ t("common.actions.create") }}
         </Button>
       </DialogFooter>
     </DialogContent>

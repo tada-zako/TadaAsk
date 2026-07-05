@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import type {
   CreateCustomModelInput,
@@ -61,6 +62,7 @@ const contextWindowTokens = ref("");
 const maxOutputTokens = ref("");
 const isEnabled = ref(true);
 const localError = ref<string | null>(null);
+const { t } = useI18n();
 
 // 每次打开/切换 model 时重置表单
 watch(open, (nextOpen) => {
@@ -83,7 +85,7 @@ function handleSubmit(): void {
   const name = modelName.value.trim();
 
   if (!name) {
-    localError.value = "Model name is required.";
+    localError.value = t("providerModel.validation.modelNameRequired");
     return;
   }
 
@@ -152,17 +154,23 @@ function parseTokenLimit(value: string): number | null {
     >
       <DialogHeader class="border-b border-(--line-soft) px-5 py-4 text-left">
         <DialogTitle>
-          {{ mode === "create" ? "Add custom model" : "Edit custom model" }}
+          {{
+            mode === "create"
+              ? t("providerModel.dialogs.addModelTitle")
+              : t("providerModel.dialogs.editModelTitle")
+          }}
         </DialogTitle>
         <DialogDescription>
-          Set the model name, token limits, and availability.
+          {{ t("providerModel.dialogs.modelDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="grid gap-4 px-5 py-5">
         <!-- 模型名称 -->
         <div class="grid gap-2">
-          <Label :for="`${providerUid}-${mode}-custom-model-name`">Model</Label>
+          <Label :for="`${providerUid}-${mode}-custom-model-name`">
+            {{ t("providerModel.labels.model") }}
+          </Label>
           <Input
             :id="`${providerUid}-${mode}-custom-model-name`"
             v-model="modelName"
@@ -174,7 +182,7 @@ function parseTokenLimit(value: string): number | null {
         <div class="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
           <div class="grid gap-2">
             <Label :for="`${providerUid}-${mode}-custom-context`">
-              Context window tokens
+              {{ t("providerModel.labels.contextWindowTokens") }}
             </Label>
             <Input
               :id="`${providerUid}-${mode}-custom-context`"
@@ -185,7 +193,7 @@ function parseTokenLimit(value: string): number | null {
           </div>
           <div class="grid gap-2">
             <Label :for="`${providerUid}-${mode}-custom-output`">
-              Max output tokens
+              {{ t("providerModel.labels.maxOutputTokens") }}
             </Label>
             <Input
               :id="`${providerUid}-${mode}-custom-output`"
@@ -201,14 +209,20 @@ function parseTokenLimit(value: string): number | null {
           class="flex items-center justify-between gap-4 rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-panel-soft) px-3 py-3"
         >
           <div>
-            <p class="text-sm font-medium text-(--text-strong)">Enabled</p>
+            <p class="text-sm font-medium text-(--text-strong)">
+              {{ t("providerModel.status.enabled") }}
+            </p>
             <p class="mt-1 text-xs text-(--text-faint)">
-              Make this model available in selection flows.
+              {{ t("providerModel.dialogs.modelEnableHelp") }}
             </p>
           </div>
           <Switch
             :model-value="isEnabled"
-            :aria-label="`Enable model for ${providerDisplayName}`"
+            :aria-label="
+              t('providerModel.aria.enableModelForProvider', {
+                provider: providerDisplayName,
+              })
+            "
             @update:model-value="isEnabled = Boolean($event)"
           />
         </div>
@@ -222,31 +236,38 @@ function parseTokenLimit(value: string): number | null {
             <AlertDialogTrigger as-child>
               <Button
                 type="button"
-                aria-label="Delete custom model"
+                :aria-label="t('providerModel.aria.deleteCustomModel')"
                 variant="destructive"
                 size="sm"
                 :disabled="isMutating"
               >
-                Delete model
+                {{ t("providerModel.dialogs.deleteModel") }}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent
               class="border-(--line) bg-[#101113] shadow-[0_28px_90px_rgba(0,0,0,0.54)]"
             >
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this model?</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {{ t("providerModel.dialogs.deleteModelConfirmTitle") }}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  This removes the custom model profile from
-                  {{ providerDisplayName }}.
+                  {{
+                    t("providerModel.dialogs.deleteModelConfirmDescription", {
+                      provider: providerDisplayName,
+                    })
+                  }}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{{
+                  t("common.actions.cancel")
+                }}</AlertDialogCancel>
                 <AlertDialogAction
                   class="bg-red-500 text-white hover:bg-red-500/90"
                   @click="handleDelete"
                 >
-                  Delete
+                  {{ t("common.actions.delete") }}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -263,21 +284,25 @@ function parseTokenLimit(value: string): number | null {
       >
         <Button
           type="button"
-          aria-label="Cancel custom model dialog"
+          :aria-label="t('providerModel.aria.cancelCustomModelDialog')"
           variant="outline"
           class="w-20"
           @click="open = false"
         >
-          Cancel
+          {{ t("common.actions.cancel") }}
         </Button>
         <Button
           type="button"
-          aria-label="Save custom model"
+          :aria-label="t('providerModel.aria.saveCustomModel')"
           class="w-20"
           :disabled="isMutating"
           @click="handleSubmit"
         >
-          {{ mode === "create" ? "Create" : "Save" }}
+          {{
+            mode === "create"
+              ? t("common.actions.create")
+              : t("common.actions.save")
+          }}
         </Button>
       </DialogFooter>
     </DialogContent>

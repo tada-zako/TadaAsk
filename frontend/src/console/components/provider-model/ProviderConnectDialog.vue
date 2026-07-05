@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import type {
   AvailableProviderViewModel,
@@ -34,6 +35,7 @@ const emit = defineEmits<{
 const open = ref(false);
 const apiKey = ref("");
 const localError = ref<string | null>(null);
+const { t } = useI18n();
 
 // 每次打开重置输入
 watch(open, (nextOpen) => {
@@ -47,7 +49,7 @@ function handleConnect(): void {
   const key = apiKey.value.trim();
 
   if (!key) {
-    localError.value = "API key is required.";
+    localError.value = t("providerModel.validation.apiKeyRequired");
     return;
   }
 
@@ -62,26 +64,38 @@ function handleConnect(): void {
     <DialogTrigger as-child>
       <Button
         type="button"
-        :aria-label="`Connect ${provider.displayName} provider`"
+        :aria-label="
+          t('providerModel.aria.connectProvider', {
+            provider: provider.displayName,
+          })
+        "
         variant="outline"
         size="sm"
         class="border-(--line-soft) bg-(--surface-panel-soft)"
       >
-        Connect
+        {{ t("providerModel.actions.connect") }}
       </Button>
     </DialogTrigger>
     <DialogContent
       class="overflow-hidden border-(--line) bg-[#101113] p-0 shadow-[0_28px_90px_rgba(0,0,0,0.54)] sm:max-w-[28rem]"
     >
       <DialogHeader class="border-b border-(--line-soft) px-5 py-4 text-left">
-        <DialogTitle>Connect {{ provider.displayName }}</DialogTitle>
+        <DialogTitle>
+          {{
+            t("providerModel.dialogs.connectTitle", {
+              provider: provider.displayName,
+            })
+          }}
+        </DialogTitle>
         <DialogDescription>
-          Add an API key to enable this provider.
+          {{ t("providerModel.dialogs.connectDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="grid gap-2 px-5 py-5">
-        <Label :for="`${provider.uid}-api-key`">API key</Label>
+        <Label :for="`${provider.uid}-api-key`">
+          {{ t("providerModel.labels.apiKey") }}
+        </Label>
         <Input
           :id="`${provider.uid}-api-key`"
           v-model="apiKey"
@@ -98,21 +112,29 @@ function handleConnect(): void {
       >
         <Button
           type="button"
-          :aria-label="`Cancel ${provider.displayName} connection`"
+          :aria-label="
+            t('providerModel.aria.cancelProviderConnection', {
+              provider: provider.displayName,
+            })
+          "
           variant="outline"
           class="w-20"
           @click="open = false"
         >
-          Cancel
+          {{ t("common.actions.cancel") }}
         </Button>
         <Button
           type="button"
-          :aria-label="`Connect ${provider.displayName} provider`"
+          :aria-label="
+            t('providerModel.aria.connectProvider', {
+              provider: provider.displayName,
+            })
+          "
           class="w-20"
           :disabled="isMutating"
           @click="handleConnect"
         >
-          Connect
+          {{ t("providerModel.actions.connect") }}
         </Button>
       </DialogFooter>
     </DialogContent>

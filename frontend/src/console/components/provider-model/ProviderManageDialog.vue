@@ -5,6 +5,7 @@
 -->
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import type {
   ProviderRowViewModel,
@@ -55,6 +56,7 @@ const baseUrl = ref("");
 const apiKey = ref("");
 const isEnabled = ref(false);
 const localError = ref<string | null>(null);
+const { t } = useI18n();
 
 // 每次打开/切换 provider 时重置表单
 watch(open, (nextOpen) => {
@@ -85,17 +87,21 @@ function handleSave(): void {
     const endpoint = baseUrl.value.trim();
 
     if (!name) {
-      localError.value = "Provider name is required.";
+      localError.value = t("providerModel.validation.providerNameRequired");
       return;
     }
 
     if (isEnabled.value && !endpoint) {
-      localError.value = "Base URL is required when enabled.";
+      localError.value = t(
+        "providerModel.validation.baseUrlRequiredWhenEnabled",
+      );
       return;
     }
 
     if (isEnabled.value && !props.provider.hasApiKey && !key) {
-      localError.value = "API key is required when enabled.";
+      localError.value = t(
+        "providerModel.validation.apiKeyRequiredWhenEnabled",
+      );
       return;
     }
 
@@ -132,12 +138,16 @@ function resetForm(): void {
     <DialogTrigger as-child>
       <Button
         type="button"
-        :aria-label="`Manage ${provider.displayName} provider`"
+        :aria-label="
+          t('providerModel.aria.manageProvider', {
+            provider: provider.displayName,
+          })
+        "
         variant="outline"
         size="sm"
         class="border-(--line-soft) bg-(--surface-panel-soft)"
       >
-        Manage
+        {{ t("providerModel.actions.manage") }}
       </Button>
     </DialogTrigger>
     <DialogContent
@@ -147,41 +157,49 @@ function resetForm(): void {
         <DialogTitle>
           {{
             provider.isCustom
-              ? "Manage provider"
-              : `Manage ${provider.displayName}`
+              ? t("providerModel.dialogs.manageProviderTitle")
+              : t("providerModel.dialogs.manageProviderNamedTitle", {
+                  provider: provider.displayName,
+                })
           }}
         </DialogTitle>
         <DialogDescription>
-          Update the provider credential and availability.
+          {{ t("providerModel.dialogs.manageProviderDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="grid gap-4 px-5 py-5">
         <!-- 自定义 provider：可编辑名称和 Base URL -->
         <div v-if="provider.isCustom" class="grid gap-2">
-          <Label for="manage-provider-name">Provider name</Label>
+          <Label for="manage-provider-name">
+            {{ t("providerModel.labels.providerName") }}
+          </Label>
           <Input id="manage-provider-name" v-model="providerName" />
         </div>
 
         <div v-if="provider.isCustom" class="grid gap-2">
-          <Label for="manage-provider-base-url">Base URL</Label>
+          <Label for="manage-provider-base-url">
+            {{ t("providerModel.labels.baseUrl") }}
+          </Label>
           <Input id="manage-provider-base-url" v-model="baseUrl" />
         </div>
 
         <!-- API key（共通）：留空保留现有 key -->
         <div class="grid gap-2">
-          <Label :for="`${provider.uid}-manage-api-key`">API key</Label>
+          <Label :for="`${provider.uid}-manage-api-key`">
+            {{ t("providerModel.labels.apiKey") }}
+          </Label>
           <Input
             :id="`${provider.uid}-manage-api-key`"
             v-model="apiKey"
             type="password"
-            placeholder="Leave blank to keep existing key"
+            :placeholder="t('providerModel.placeholders.keepExistingKey')"
           />
           <p
             v-if="!provider.isCustom"
             class="text-xs leading-5 text-(--text-faint)"
           >
-            Official providers keep their catalog name and base URL.
+            {{ t("providerModel.dialogs.officialProviderReadOnlyHelp") }}
           </p>
         </div>
 
@@ -191,19 +209,23 @@ function resetForm(): void {
         >
           <div>
             <p class="text-sm font-medium text-(--text-strong)">
-              Enable provider
+              {{ t("providerModel.dialogs.enableProvider") }}
             </p>
             <p class="mt-1 text-xs text-(--text-faint)">
               {{
                 provider.isCustom
-                  ? "Custom providers require a base URL and API key."
-                  : "Available for model selection after saving."
+                  ? t("providerModel.dialogs.customProviderEnableHelp")
+                  : t("providerModel.dialogs.officialProviderEnableHelp")
               }}
             </p>
           </div>
           <Switch
             :model-value="isEnabled"
-            :aria-label="`Enable ${provider.displayName} provider`"
+            :aria-label="
+              t('providerModel.aria.enableProvider', {
+                provider: provider.displayName,
+              })
+            "
             @update:model-value="isEnabled = Boolean($event)"
           />
         </div>
@@ -213,39 +235,51 @@ function resetForm(): void {
           v-if="provider.isCustom"
           class="rounded-(--console-radius-md) border border-red-400/20 bg-red-400/10 p-3"
         >
-          <p class="text-sm font-medium text-red-100">Delete provider</p>
+          <p class="text-sm font-medium text-red-100">
+            {{ t("providerModel.dialogs.deleteProvider") }}
+          </p>
           <p class="mt-1 text-xs leading-5 text-red-100/65">
-            Removes this custom provider and its custom model profiles.
+            {{ t("providerModel.dialogs.deleteProviderHelp") }}
           </p>
           <AlertDialog>
             <AlertDialogTrigger as-child>
               <Button
                 type="button"
-                :aria-label="`Delete ${provider.displayName} provider`"
+                :aria-label="
+                  t('providerModel.aria.deleteProvider', {
+                    provider: provider.displayName,
+                  })
+                "
                 variant="destructive"
                 size="sm"
                 class="mt-3"
                 :disabled="isMutating"
               >
-                Delete provider
+                {{ t("providerModel.dialogs.deleteProvider") }}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent
               class="border-(--line) bg-[#101113] shadow-[0_28px_90px_rgba(0,0,0,0.54)]"
             >
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this provider?</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {{ t("providerModel.dialogs.deleteProviderConfirmTitle") }}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  This removes the custom provider and its model profiles.
+                  {{
+                    t("providerModel.dialogs.deleteProviderConfirmDescription")
+                  }}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{{
+                  t("common.actions.cancel")
+                }}</AlertDialogCancel>
                 <AlertDialogAction
                   class="bg-red-500 text-white hover:bg-red-500/90"
                   @click="handleDelete"
                 >
-                  Delete
+                  {{ t("common.actions.delete") }}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -262,21 +296,25 @@ function resetForm(): void {
       >
         <Button
           type="button"
-          aria-label="Cancel provider management"
+          :aria-label="t('providerModel.aria.cancelProviderManagement')"
           variant="outline"
           class="w-20"
           @click="open = false"
         >
-          Cancel
+          {{ t("common.actions.cancel") }}
         </Button>
         <Button
           type="button"
-          :aria-label="`Save ${provider.displayName} provider`"
+          :aria-label="
+            t('providerModel.aria.saveProvider', {
+              provider: provider.displayName,
+            })
+          "
           class="w-20"
           :disabled="isMutating"
           @click="handleSave"
         >
-          Save
+          {{ t("common.actions.save") }}
         </Button>
       </DialogFooter>
     </DialogContent>
