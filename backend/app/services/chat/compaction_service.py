@@ -1,6 +1,8 @@
 from typing import cast
 from dataclasses import dataclass
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from ..utils import TokenBudget
 from app.providers import (
     TextCompleter,
@@ -9,7 +11,7 @@ from app.providers import (
     SUMMARIZATION_PROMPT,
     UPDATE_SUMMARIZATION_PROMPT,
 )
-from app.crud import ChatMessageCRUD, ChatSessionCRUD
+from app.crud import ChatMessageCRUD
 from app.db.models import ChatMessage
 from app.core.constants import ChatMessageRole, ChatMessageType
 from app.utils import TokenCounter
@@ -29,12 +31,10 @@ class CompactionPlan:
 class CompactionService:
     def __init__(
         self,
-        chat_message_crud: ChatMessageCRUD,
-        chat_session_crud: ChatSessionCRUD,
+        session_factory: async_sessionmaker[AsyncSession],
         token_counter: TokenCounter,
     ):
-        self.chat_message_crud = chat_message_crud
-        self.chat_session_crud = chat_session_crud
+        self.session_factory = session_factory
         self.token_counter = token_counter
 
     def estimate_without_rag(
@@ -90,7 +90,7 @@ class CompactionService:
             逐条向前计算累计 token 数量直到 used_tokens
             超过 token_budget.max_input_tokens * token_budget.recent_tail_keep_ratio
         2. 此时，如果 compact_until_sequence - 1 < 0，说明此时上下文过短，尚无法进行 compaction；
-              否则，返回 compaction 计划，包含 tail_start_sequence 和 compact_until_sequence
+            否则，返回 compaction 计划，包含 tail_start_sequence 和 compact_until_sequence
         """
         tail_keep_tokens = int(
             token_budget.max_input_tokens * token_budget.recent_tail_keep_ratio
@@ -208,13 +208,19 @@ class CompactionService:
         # TODO: 确保 new_compaction_content 不超过一定 token
         # TODO: 统计 token 用量，更新数据库中的消息记录
 
-        # 保存新的 compaction 消息到数据库
-        return await self.chat_message_crud.append_message(
-            chat_session_id=chat_session_id,
-            role=ChatMessageRole.SYSTEM,
-            message=new_compaction_content,
-            type=ChatMessageType.COMPACTION,
-            provider=provider,
-            model=model,
-            tail_start_sequence=plan.tail_start_sequence,
-        )
+        # 保存新的 compaction 消息到数据库；
+        # LLM 调用完成后才开启短事务。
+        async with self.session_factory() as session:
+            async with session.begin():
+                chat_message_crud = ChatMessageCRUD(session=session)
+                new_message = await chat_message_crud.append_message(
+                    chat_session_id=chat_session_id,
+                    role=ChatMessageRole.SYSTEM,
+                    message=new_compaction_content,
+                    type=ChatMessageType.COMPACTION,
+                    provider=provider,
+                    model=model,
+                    tail_start_sequence=plan.tail_start_sequence,
+                )
+                await session.refresh(new_message)
+                return new_message
