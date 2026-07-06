@@ -7,6 +7,7 @@ from .endpoints import (
     auth,
     project,
     chat,
+    chat_stream,
     model_profile,
     session as session_endpoints,
     source,
@@ -93,6 +94,11 @@ router.include_router(
 )
 router.include_router(
     chat.router, tags=["Chat"], dependencies=[Depends(get_current_admin)]
+)
+router.include_router(
+    chat_stream.router,
+    tags=["Chat", "SSE"],
+    dependencies=[Depends(get_current_admin_factory)],
 )
 router.include_router(
     session_endpoints.router,
