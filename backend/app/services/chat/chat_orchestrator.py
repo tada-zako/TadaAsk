@@ -1,13 +1,13 @@
 from typing import AsyncIterable
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .generation_registry import GenerationRegistry
 from .context_builder import ContextBuilder
 from .compaction_service import CompactionService
-from ..search import RAGRetrievalService
+from ..search import RAGRetrievalService, SearchSourceRef
 from ..schemas import (
     ChatStreamEvent,
     SessionReadyData,
@@ -34,6 +34,7 @@ from app.db.schemas import (
     ChatMessageRead,
     ChatSessionRead,
     ChatSessionInternal,
+    RAGSnapshot,
 )
 from app.core.constants import (
     ChatMessageRole,
@@ -54,9 +55,28 @@ class ChatInput:
 class RAGChatPlugin:
     """RAG Chat 插件封装"""
 
-    sources: list[Source]
     rag_retrieval: RAGRetrievalService
     rag_options: HybridSearchOptions
+    source_refs: list[SearchSourceRef] = field(init=False)
+
+    def __init__(
+        self,
+        sources: list[Source],
+        rag_retrieval: RAGRetrievalService,
+        rag_options: HybridSearchOptions,
+    ) -> None:
+        """将 ORM Source 转换为长流程安全的轻量引用"""
+        self.rag_retrieval = rag_retrieval
+        self.rag_options = rag_options
+        self.source_refs = [
+            SearchSourceRef(
+                id=source.id,
+                uid=source.uid,
+                collection_name=source.collection_name,
+                source_item_ids=[item.id for item in source.source_items],
+            )
+            for source in sources
+        ]
 
     async def rag_retrieval_for_chat(
         self,
@@ -69,7 +89,7 @@ class RAGChatPlugin:
     ) -> RAGRetrievalResult:
         """封装 RAG 检索方法，供 ChatOrchestrator 调用"""
         return await self.rag_retrieval.retrieve_for_chat(
-            sources=self.sources,
+            sources=self.source_refs,
             user_query=user_query,
             recent_messages=recent_messages,
             compaction_message=compaction_message,
@@ -87,16 +107,12 @@ class ChatOrchestratorService:
     def __init__(
         self,
         *,
-        session: AsyncSession,
-        chat_message_crud: ChatMessageCRUD,
-        chat_session_crud: ChatSessionCRUD,
+        session_factory: async_sessionmaker[AsyncSession],
         context_builder: ContextBuilder,
         generation_registry: GenerationRegistry,
         compaction_service: CompactionService,
     ):
-        self.session = session
-        self.chat_message_crud = chat_message_crud
-        self.chat_session_crud = chat_session_crud
+        self.session_factory = session_factory
         self.context_builder = context_builder
         self.generation_registry = generation_registry
         self.compaction_service = compaction_service
@@ -121,48 +137,143 @@ class ChatOrchestratorService:
             # visitor 侧必须带有 project 上下文
             raise ValueError("Visitor chat requires project context")
 
-        chat_session_uid = chat_input.chat_session_uid
-        if chat_session_uid:
-            if requester_type == ChatSessionType.VISITOR:
-                # 查询 visitor session
-                assert project_id is not None
-                chat_session = await self.chat_session_crud.get_visitor_session_by_uid(
-                    project_id=project_id,
-                    chat_session_uid=chat_session_uid,
-                )
-            elif project_id is not None:
-                # 查询带 project 上下文的 admin session
-                chat_session = (
-                    await self.chat_session_crud.get_admin_project_session_by_uid(
+        async with self.session_factory() as session:
+            async with session.begin():
+                chat_session_crud = ChatSessionCRUD(session=session)
+                chat_session_uid = chat_input.chat_session_uid
+                if chat_session_uid:
+                    if requester_type == ChatSessionType.VISITOR:
+                        # 查询 visitor session
+                        assert project_id is not None
+                        chat_session = (
+                            await chat_session_crud.get_visitor_session_by_uid(
+                                project_id=project_id,
+                                chat_session_uid=chat_session_uid,
+                            )
+                        )
+                    elif project_id is not None:
+                        # 查询带 project 上下文的 admin session
+                        chat_session = (
+                            await chat_session_crud.get_admin_project_session_by_uid(
+                                project_id=project_id,
+                                chat_session_uid=chat_session_uid,
+                            )
+                        )
+                    else:
+                        # 查询 global 上下文 admin session
+                        chat_session = (
+                            await chat_session_crud.get_admin_global_session_by_uid(
+                                chat_session_uid=chat_session_uid,
+                            )
+                        )
+
+                    if not chat_session:
+                        raise ValueError("Invalid chat_session_uid")
+
+                    return chat_session, False
+
+                # 创建新的 ChatSession
+                new_chat_session = await chat_session_crud.create_chat_session(
+                    chat_session_data=ChatSessionInternal(
+                        # TODO: 命名后续基于 LLM 响应结果动态更新
+                        title="",
+                        owner_type=requester_type,
+                        provider=provider,
+                        model=model,
                         project_id=project_id,
-                        chat_session_uid=chat_session_uid,
                     )
                 )
-            else:
-                # 查询 global 上下文 admin session
-                chat_session = (
-                    await self.chat_session_crud.get_admin_global_session_by_uid(
-                        chat_session_uid=chat_session_uid,
+                await session.refresh(new_chat_session)
+                return new_chat_session, True
+
+    async def _append_initial_messages(
+        self,
+        *,
+        chat_session_id: int,
+        user_message_text: str,
+        provider: str,
+        model: str,
+    ) -> tuple[ChatMessage, ChatMessage]:
+        """短事务写入用户消息和 assistant placeholder"""
+        async with self.session_factory() as session:
+            async with session.begin():
+                chat_message_crud = ChatMessageCRUD(session=session)
+                user_message = await chat_message_crud.append_message(
+                    chat_session_id=chat_session_id,
+                    message=user_message_text,
+                    role=ChatMessageRole.USER,
+                    type=ChatMessageType.MESSAGE,
+                    provider=provider,
+                    model=model,
+                )
+
+                assistant_message = await chat_message_crud.append_message(
+                    chat_session_id=chat_session_id,
+                    role=ChatMessageRole.ASSISTANT,
+                    message="",
+                    type=ChatMessageType.MESSAGE,
+                    provider=provider,
+                    model=model,
+                )
+
+                await session.refresh(user_message)
+                await session.refresh(assistant_message)
+                return user_message, assistant_message
+
+    async def _load_context_messages(
+        self,
+        *,
+        chat_session_id: int,
+        current_message: ChatMessage,
+        compaction_message: ChatMessage | None = None,
+    ) -> tuple[ChatMessage | None, list[ChatMessage]]:
+        """短 session 加载 compaction 和 recent messages。"""
+        async with self.session_factory() as session:
+            chat_message_crud = ChatMessageCRUD(session=session)
+            if compaction_message is None:
+                compaction_message = (
+                    await chat_message_crud.get_lastest_compaction_message(
+                        chat_session_id=chat_session_id
                     )
                 )
 
-            if not chat_session:
-                raise ValueError("Invalid chat_session_uid")
-
-            return chat_session, False
-
-        # 创建新的 ChatSession
-        new_chat_session = await self.chat_session_crud.create_chat_session(
-            chat_session_data=ChatSessionInternal(
-                # TODO: 命名后续基于 LLM 响应结果动态更新
-                title="",
-                owner_type=requester_type,
-                provider=provider,
-                model=model,
-                project_id=project_id,
+            recent_messages = list(
+                await chat_message_crud.load_recent_messages(
+                    chat_session_id=chat_session_id,
+                    current_message=current_message,
+                    compaction_message=compaction_message,
+                )
             )
-        )
-        return new_chat_session, True
+            return compaction_message, recent_messages
+
+    async def _update_assistant_message(
+        self,
+        *,
+        chat_session_id: int,
+        assistant_message_id: int,
+        new_message: str | None = None,
+        new_rag_snapshot: RAGSnapshot | None = None,
+    ) -> ChatMessageRead | None:
+        """短事务更新 assistant 消息，并返回可直接下发的读取模型"""
+        if new_message is None and new_rag_snapshot is None:
+            # 都不传，干嘛调用...
+            return None
+
+        async with self.session_factory() as session:
+            async with session.begin():
+                chat_message_crud = ChatMessageCRUD(session=session)
+                updated_message = (
+                    await chat_message_crud.update_assistant_message_by_id(
+                        chat_session_id=chat_session_id,
+                        assistant_message_id=assistant_message_id,
+                        new_message=new_message,
+                        new_rag_snapshot=new_rag_snapshot,
+                    )
+                )
+                if not updated_message:
+                    raise ValueError("Assistant message not found")
+
+                return ChatMessageRead.model_validate(updated_message)
 
     def _resolve_system_prompt(self) -> str:
         """
@@ -190,20 +301,10 @@ class ChatOrchestratorService:
         如果需要，内部主动触发 compact 行为
         返回 (compaction_message | None, recent_messages)；
         """
-        # 1. 获取最新的压缩消息
-        compaction_message = (
-            await self.chat_message_crud.get_lastest_compaction_message(
-                chat_session_id=chat_session.id
-            )
-        )
-
-        # 2. 获取最近消息
-        recent_messages = list(
-            await self.chat_message_crud.load_recent_messages(
-                chat_session_id=chat_session.id,
-                current_message=current_message,
-                compaction_message=compaction_message,
-            )
+        # 1. 获取最新的压缩消息和最近消息
+        compaction_message, recent_messages = await self._load_context_messages(
+            chat_session_id=chat_session.id,
+            current_message=current_message,
         )
 
         # 3. 首先计算 compaction + recent + current 消息是否有可能会超出最大上下文限制
@@ -229,16 +330,11 @@ class ChatOrchestratorService:
                 token_budget=token_budget,
             )
 
-            # 确保数据库保持最新状态
-            await self.session.flush()
-
             compaction_message = new_compaction_message
-            recent_messages = list(
-                await self.chat_message_crud.load_recent_messages(
-                    chat_session_id=chat_session.id,
-                    current_message=current_message,
-                    compaction_message=compaction_message,
-                )
+            _, recent_messages = await self._load_context_messages(
+                chat_session_id=chat_session.id,
+                current_message=current_message,
+                compaction_message=compaction_message,
             )
 
         return compaction_message, recent_messages
@@ -276,20 +372,9 @@ class ChatOrchestratorService:
         )
 
         # 1.2 用户/Assistant 消息入库
-        user_message = await self.chat_message_crud.append_message(
+        user_message, assistant_message = await self._append_initial_messages(
             chat_session_id=chat_session.id,
-            message=chat_input.message,
-            role=ChatMessageRole.USER,
-            type=ChatMessageType.MESSAGE,
-            provider=provider_name,
-            model=model_name,
-        )
-
-        assistant_message = await self.chat_message_crud.append_message(
-            chat_session_id=chat_session.id,
-            role=ChatMessageRole.ASSISTANT,
-            message="",
-            type=ChatMessageType.MESSAGE,
+            user_message_text=chat_input.message,
             provider=provider_name,
             model=model_name,
         )
@@ -339,8 +424,9 @@ class ChatOrchestratorService:
                 )
 
                 # 2.2.1 RAG 检索结果写库
-                await self.chat_message_crud.update_assistant_message(
-                    assistant_message=assistant_message,
+                await self._update_assistant_message(
+                    chat_session_id=chat_session.id,
+                    assistant_message_id=assistant_message.id,
                     new_rag_snapshot=rag_result.snapshot,
                 )
 
@@ -367,8 +453,9 @@ class ChatOrchestratorService:
 
                         # 更新 Assistant 消息内容和 RAG 快照
                         final_message = stream_response.text
-                        await self.chat_message_crud.update_assistant_message(
-                            assistant_message=assistant_message,
+                        await self._update_assistant_message(
+                            chat_session_id=chat_session.id,
+                            assistant_message_id=assistant_message.id,
                             new_message=final_message,
                         )
 
@@ -388,13 +475,13 @@ class ChatOrchestratorService:
 
             # 4 生成完成；更新数据库并 yield 事件
             final_message = stream_response.text
-            await self.chat_message_crud.update_assistant_message(
-                assistant_message=assistant_message,
+            updated_message = await self._update_assistant_message(
+                chat_session_id=chat_session.id,
+                assistant_message_id=assistant_message.id,
                 new_message=final_message,
             )
-            yield MessageDoneData(
-                message=ChatMessageRead.model_validate(assistant_message)
-            )
+            if updated_message:
+                yield MessageDoneData(message=updated_message)
 
             # 4.0 TODO: 统计 token 用量，更新数据库中的消息记录
 
@@ -402,8 +489,9 @@ class ChatOrchestratorService:
             # 4.1 生成过程中被取消
             final_message = stream_response.text if stream_response else ""
             if final_message:
-                await self.chat_message_crud.update_assistant_message(
-                    assistant_message=assistant_message,
+                await self._update_assistant_message(
+                    chat_session_id=chat_session.id,
+                    assistant_message_id=assistant_message.id,
                     new_message=final_message,
                 )
 
@@ -419,8 +507,9 @@ class ChatOrchestratorService:
             final_message = stream_response.text if stream_response else ""
 
             if final_message:
-                await self.chat_message_crud.update_assistant_message(
-                    assistant_message=assistant_message,
+                await self._update_assistant_message(
+                    chat_session_id=chat_session.id,
+                    assistant_message_id=assistant_message.id,
                     new_message=final_message,
                 )
 

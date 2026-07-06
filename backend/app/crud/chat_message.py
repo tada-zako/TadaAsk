@@ -1,7 +1,7 @@
 from typing import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import select, func, delete, insert
+from sqlalchemy import select, func, delete, insert, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ChatMessage
@@ -352,6 +352,37 @@ class ChatMessageCRUD:
         # updated_at 由数据库/SQL 表达式更新，返回前显式刷新避免 Pydantic 触发 async lazy load。
         await self.session.refresh(assistant_message, attribute_names=["updated_at"])
         return assistant_message
+
+    async def update_assistant_message_by_id(
+        self,
+        *,
+        chat_session_id: int,
+        assistant_message_id: int,
+        new_message: str | None = None,
+        new_rag_snapshot: RAGSnapshot | None = None,
+    ) -> ChatMessage | None:
+        """按 id 更新 assistant 消息"""
+        values = {}
+        if new_message is not None:
+            values["message"] = new_message
+
+        if new_rag_snapshot is not None:
+            values["rag_snapshot"] = new_rag_snapshot.model_dump()
+
+        if not values:
+            return None
+
+        result = await self.session.execute(
+            update(ChatMessage)
+            .where(
+                ChatMessage.id == assistant_message_id,
+                ChatMessage.chat_session_id == chat_session_id,
+                ChatMessage.role == ChatMessageRole.ASSISTANT,
+            )
+            .values(**values)
+            .returning(ChatMessage)
+        )
+        return result.scalar_one_or_none()
 
     async def delete_messages_after_sequence(
         self,
