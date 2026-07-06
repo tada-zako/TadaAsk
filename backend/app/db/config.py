@@ -29,9 +29,14 @@ engine = create_async_engine(
 
 @event.listens_for(engine.sync_engine, "connect")
 def enable_sqlite_foreign_keys(dbapi_connection, connection_record):
-    """监听 SQLite 连接事件，启用外键支持"""
+    """监听 SQLite 连接事件，启用基础运行参数。"""
     cursor = dbapi_connection.cursor()
+    # 外键支持
     cursor.execute("PRAGMA foreign_keys=ON")
+    # WAL + busy_timeout 缓解 MVP 阶段 SQLite 并发读写互相阻塞的问题
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
     cursor.close()
 
 
