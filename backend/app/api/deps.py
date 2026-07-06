@@ -313,60 +313,24 @@ def get_source_item_service(
     )
 
 
-def get_hybrid_search_service(
-    session: "SessionDeps",
-    source_crud: "SourceCRUDeps",
-    rag_search_crud: "RAGSearchCRUDeps",
-    vector_db: "VectorDBDeps",
-    query_expander: "QueryExpanderDeps",
-    embedding: "EmbeddingProviderDeps",
-    fts_provider: "FTSProviderDeps",
-    rerank_provider: "RerankProviderDeps",
-) -> HybridSearchService:
+def get_hybrid_search_service(request: Request) -> HybridSearchService:
     """HybridSearchService 依赖注入接口"""
-    return HybridSearchService(
-        session=session,
-        source_crud=source_crud,
-        rag_search_crud=rag_search_crud,
-        vector_db=vector_db,
-        query_expander=query_expander,
-        embedding=embedding,
-        fts_provider=fts_provider,
-        rerank_provider=rerank_provider,
-    )
+    return request.app.state.hybrid_search_service
 
 
-def get_rag_retrieval_service(
-    rag_search_crud: "RAGSearchCRUDeps",
-    hybrid_search_service: "HybridSearchServiceDeps",
-    token_counter: "TokenCounterDeps",
-) -> RAGRetrievalService:
+def get_rag_retrieval_service(request: Request) -> RAGRetrievalService:
     """RAGRetrievalService 依赖注入接口"""
-    return RAGRetrievalService(
-        rag_search_crud=rag_search_crud,
-        hybrid_search_service=hybrid_search_service,
-        token_counter=token_counter,
-    )
+    return request.app.state.rag_retrieval_service
 
 
-def get_context_builder(
-    token_counter: "TokenCounterDeps",
-) -> ContextBuilder:
+def get_context_builder(request: Request) -> ContextBuilder:
     """ContextBuilder 依赖注入接口"""
-    return ContextBuilder(token_counter=token_counter)
+    return request.app.state.chat_context_builder
 
 
-def get_compaction_service(
-    chat_message_crud: "ChatMessageCRUDeps",
-    chat_session_crud: "ChatSessionCRUDeps",
-    token_counter: "TokenCounterDeps",
-) -> CompactionService:
+def get_compaction_service(request: Request) -> CompactionService:
     """CompactionService 依赖注入接口"""
-    return CompactionService(
-        chat_message_crud=chat_message_crud,
-        chat_session_crud=chat_session_crud,
-        token_counter=token_counter,
-    )
+    return request.app.state.compaction_service
 
 
 def get_chat_session_ops_service(
@@ -382,23 +346,9 @@ def get_chat_session_ops_service(
     )
 
 
-def get_chat_orchestrator_service(
-    session: "SessionDeps",
-    chat_message_crud: "ChatMessageCRUDeps",
-    chat_session_crud: "ChatSessionCRUDeps",
-    context_builder: "ContextBuilderDeps",
-    generation_registry: "GenerationRegistryDeps",
-    compaction_service: "CompactionServiceDeps",
-) -> ChatOrchestratorService:
+def get_chat_orchestrator_service(request: Request) -> ChatOrchestratorService:
     """ChatOrchestratorService 依赖注入接口"""
-    return ChatOrchestratorService(
-        session=session,
-        chat_message_crud=chat_message_crud,
-        chat_session_crud=chat_session_crud,
-        context_builder=context_builder,
-        generation_registry=generation_registry,
-        compaction_service=compaction_service,
-    )
+    return request.app.state.chat_orchestrator_service
 
 
 # =========== 组合依赖 ===========

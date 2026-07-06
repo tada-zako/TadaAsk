@@ -36,7 +36,13 @@ from app.rag import (
 )
 from app.rag.utils import FTSTokenizer, JiebaFTSTokenizer
 from app.utils import embedding_tokenizer_factory, EmbeddingTokenizer, TokenCounter
-from app.services.chat import GenerationRegistry
+from app.services.chat import (
+    ChatOrchestratorService,
+    CompactionService,
+    ContextBuilder,
+    GenerationRegistry,
+)
+from app.services.search import HybridSearchService, RAGRetrievalService
 from app.services.model_profiles import ModelProfileService
 from app.services.indexing import SourceItemIndexingService
 from app.services.jobs import RAGJobManager
@@ -195,6 +201,39 @@ async def lifespan(app: FastAPI):
     # 挂载 TokenCounter 实例
     token_counter = TokenCounter(tokenizer=embedding_tokenizer)
     app.state.token_counter = token_counter
+
+    # ======= Chat / RAG 在线对话服务挂载 =======
+    context_builder = ContextBuilder(token_counter=token_counter)
+    app.state.chat_context_builder = context_builder
+
+    compaction_service = CompactionService(
+        session_factory=async_session,
+        token_counter=token_counter,
+    )
+    app.state.compaction_service = compaction_service
+
+    hybrid_search_service = HybridSearchService(
+        session_factory=async_session,
+        vector_db=vector_db,
+        query_expander=query_expander,
+        embedding=embedding_provider,
+        fts_provider=fts_search_provider,
+        rerank_provider=rerank_provider,
+    )
+    app.state.hybrid_search_service = hybrid_search_service
+
+    rag_retrieval_service = RAGRetrievalService(
+        hybrid_search_service=hybrid_search_service,
+        token_counter=token_counter,
+    )
+    app.state.rag_retrieval_service = rag_retrieval_service
+
+    app.state.chat_orchestrator_service = ChatOrchestratorService(
+        session_factory=async_session,
+        context_builder=context_builder,
+        generation_registry=generation_registry,
+        compaction_service=compaction_service,
+    )
 
     # ======= RAG 后台任务相关服务挂载 =======
     indexing_service = SourceItemIndexingService(
