@@ -205,45 +205,6 @@ async def valid_project(
     return project
 
 
-async def valid_project_with_settings(
-    project_crud: Annotated[ProjectCRUD, Depends(get_project_crud)],
-    project_uid: Annotated[str, Path(..., description="Project UID")],
-) -> Project:
-    """验证项目 UID 是否有效，返回包含设置的项目实例或抛出 HTTPException"""
-    project = await project_crud.get_project_with_settings_by_uid(
-        project_uid=project_uid
-    )
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    settings = project.project_settings
-    provider = settings.visitor_default_provider
-    model_profile = settings.visitor_default_model_profile
-
-    # 0. 校验项目默认提供商和模型配置是否存在
-    if not provider or not model_profile:
-        raise HTTPException(
-            status_code=400,
-            detail="Visitor default provider or model not configured for the project, please check if the project settings are properly initialized.",
-        )
-
-    # 1. 校验默认提供商是否启用
-    if not provider.is_enabled:
-        raise HTTPException(
-            status_code=400,
-            detail=f"The default model provider '{provider.name}' is currently disabled.",
-        )
-
-    # 2. 校验默认模型配置是否启用
-    if not model_profile.is_enabled:
-        raise HTTPException(
-            status_code=400,
-            detail=f"The default model '{model_profile.model}' is currently disabled.",
-        )
-
-    return project
-
-
 async def valid_chat_session(
     chat_session_crud: "ChatSessionCRUDeps",
     chat_session_uid: Annotated[
@@ -391,7 +352,6 @@ ModelProfileCRUDeps = Annotated[ModelProfileCRUD, Depends(get_model_profile_crud
 ClientIPDeps = Annotated[str, Depends(get_client_ip)]
 # valid project 依赖
 ValidProjectDeps = Annotated[Project, Depends(valid_project)]
-ValidVisitorChatProjectDeps = Annotated[Project, Depends(valid_project_with_settings)]
 ValidChatSessionDeps = Annotated[ChatSession, Depends(valid_chat_session)]
 
 

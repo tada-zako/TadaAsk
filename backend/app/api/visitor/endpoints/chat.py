@@ -8,17 +8,16 @@ from ...deps import (
     VisitorRateLimiterDeps,
     APIKeyCipherDeps,
     ClientIPDeps,
-    ValidVisitorChatProjectDeps,
-    ProjectCRUDeps,
-    RAGSearchCRUDeps,
     ChatOrchestratorServiceDeps,
     RAGRetrievalServiceDeps,
     GenerationRegistryDeps,
+    SessionFactoryDeps,
 )
 from ...schemas import VisitorChatRequest, VisitorChatCancelResponse
 from app.services.chat import ChatInput, RAGChatPlugin
 from app.providers import FullCompleter, completer_factory, ModelSettings
-from app.db.models import Provider, ModelProfile, ProjectWidget
+from app.crud import ProjectCRUD, RAGSearchCRUD
+from app.db.models import Provider, ModelProfile, Project, ProjectWidget
 from app.db.schemas import (
     HybridSearchOptions,
     ProviderWithModelInternalRead,
@@ -44,17 +43,73 @@ async def get_visitor_chat_request(
     return chat_request
 
 
+async def valid_visitor_stream_project(
+    session_factory: SessionFactoryDeps,
+    project_uid: Annotated[str, Path(..., description="Project UID")],
+) -> Project:
+    """Visitor stream 专用 project 校验；短事务加载 settings/provider/model。"""
+    async with session_factory() as session:
+        project_crud = ProjectCRUD(session=session)
+        project = await project_crud.get_project_with_settings_by_uid(
+            project_uid=project_uid
+        )
+
+    # 0. 校验项目是否存在
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # 0.1 校验 settings
+    project_settings = project.project_settings
+    if not project_settings:
+        raise HTTPException(
+            status_code=400,
+            detail="Visitor settings are not configured for the project.",
+        )
+
+    provider = project_settings.visitor_default_provider
+    model_profile = project_settings.visitor_default_model_profile
+
+    # 1. 校验项目默认提供商和模型配置是否存在
+    if not provider or not model_profile:
+        raise HTTPException(
+            status_code=400,
+            detail="Visitor default provider or model not configured for the project, please check if the project settings are properly initialized.",
+        )
+
+    # 1.2 校验默认提供商是否启用
+    if not provider.is_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The default model provider '{provider.name}' is currently disabled.",
+        )
+
+    # 2. 校验默认模型配置是否启用
+    if not model_profile.is_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The default model '{model_profile.model}' is currently disabled.",
+        )
+
+    return project
+
+
+VisitorStreamProjectDeps = Annotated[Project, Depends(valid_visitor_stream_project)]
+
+
 async def valid_visitor_widget(
     request: Request,
-    project: ValidVisitorChatProjectDeps,
-    project_crud: ProjectCRUDeps,
+    project: VisitorStreamProjectDeps,
+    session_factory: SessionFactoryDeps,
     widget_uid: Annotated[str, Path(..., description="Widget UID")],
 ) -> ProjectWidget:
     """验证 visitor 请求中的 widget 是否属于 project 且允许当前 Origin"""
-    widget = await project_crud.get_project_widget_by_uid(
-        project_id=project.id,
-        widget_uid=widget_uid,
-    )
+    async with session_factory() as session:
+        project_crud = ProjectCRUD(session=session)
+        widget = await project_crud.get_project_widget_by_uid(
+            project_id=project.id,
+            widget_uid=widget_uid,
+        )
+
     if not widget:
         raise HTTPException(status_code=404, detail="Project widget not found")
 
@@ -82,7 +137,7 @@ async def valid_visitor_widget(
 
 
 async def get_visitor_provider_with_model(
-    project: ValidVisitorChatProjectDeps,
+    project: VisitorStreamProjectDeps,
     api_key_cipher: APIKeyCipherDeps,
 ) -> ProviderWithModelInternalRead:
     """
@@ -117,7 +172,7 @@ async def get_visitor_completer(
 
 
 async def get_visitor_model_settings(
-    project: ValidVisitorChatProjectDeps,
+    project: VisitorStreamProjectDeps,
     provider_with_model: Annotated[
         ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
     ],
@@ -130,8 +185,8 @@ async def get_visitor_model_settings(
 
 
 async def get_rag_plugin(
-    project: ValidVisitorChatProjectDeps,
-    rag_search_crud: RAGSearchCRUDeps,
+    project: VisitorStreamProjectDeps,
+    session_factory: SessionFactoryDeps,
     rag_retrieval: RAGRetrievalServiceDeps,
     provider_with_model: Annotated[
         ProviderWithModelInternalRead, Depends(get_visitor_provider_with_model)
@@ -172,19 +227,22 @@ async def get_rag_plugin(
                 detail="Model does not support structured output, cannot use FULL search mode",
             )
 
-    sources = await rag_search_crud.resolve_visitor_search_sources(
-        project_id=project.id
-    )
-    if not sources:
-        raise HTTPException(
-            status_code=400, detail="No valid sources found for RAG chat"
+    async with session_factory() as session:
+        rag_search_crud = RAGSearchCRUD(session=session)
+        sources = await rag_search_crud.resolve_visitor_search_sources(
+            project_id=project.id
         )
 
-    return RAGChatPlugin(
-        rag_retrieval=rag_retrieval,
-        sources=sources,
-        rag_options=rag_options,
-    )
+        if not sources:
+            raise HTTPException(
+                status_code=400, detail="No valid sources found for RAG chat"
+            )
+
+        return RAGChatPlugin(
+            rag_retrieval=rag_retrieval,
+            sources=sources,
+            rag_options=rag_options,
+        )
 
 
 async def enforce_visitor_project_rate_limit(
@@ -243,12 +301,13 @@ async def visitor_stream_lease(
 @router.post(
     "/project/{project_uid}/widget/{widget_uid}/chat/stream",
     response_class=EventSourceResponse,
+    tags=["SSE"],
 )
 async def stream_chat(
     chat_request: Annotated[VisitorChatRequest, Depends(get_visitor_chat_request)],
     _rate_limit: Annotated[None, Depends(enforce_visitor_chat_rate_limit)],
     _lease: Annotated[VisitorStreamLease, Depends(visitor_stream_lease)],
-    project: ValidVisitorChatProjectDeps,
+    project: VisitorStreamProjectDeps,
     _widget: Annotated[ProjectWidget, Depends(valid_visitor_widget)],
     completer: Annotated[FullCompleter, Depends(get_visitor_completer)],
     provider_with_model: Annotated[
