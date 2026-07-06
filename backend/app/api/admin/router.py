@@ -11,6 +11,7 @@ from .endpoints import (
     model_profile,
     session as session_endpoints,
     source,
+    source_sse,
 )
 from ..deps import AdminCRUDeps, SessionFactoryDeps
 from ..schemas import TokenData
@@ -85,6 +86,12 @@ router.include_router(
     prefix="/source",
     tags=["Source"],
     dependencies=[Depends(get_current_admin)],
+)
+router.include_router(
+    source_sse.router,
+    prefix="/source",
+    tags=["Source", "SSE"],
+    dependencies=[Depends(get_current_admin_factory)],
 )
 router.include_router(
     model_profile.router,
