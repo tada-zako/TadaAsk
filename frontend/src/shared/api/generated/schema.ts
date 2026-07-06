@@ -427,26 +427,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/admin/source/jobs/{job_uid}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stream Rag Job Events
-         * @description RAG job SSE 观察接口
-         */
-        get: operations["stream_rag_job_events_admin_source_jobs__job_uid__events_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/admin/source/jobs/active": {
         parameters: {
             query?: never;
@@ -521,6 +501,26 @@ export interface paths {
          * @description 创建恢复文档解析任务
          */
         post: operations["resume_ingest_admin_source__source_uid__document_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/source/jobs/{job_uid}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Rag Job Events
+         * @description RAG job SSE 观察接口。
+         */
+        get: operations["stream_rag_job_events_admin_source_jobs__job_uid__events_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -681,50 +681,6 @@ export interface paths {
         patch: operations["update_model_profile_admin_model_profile_provider__provider_uid__models__model_uid__patch"];
         trace?: never;
     };
-    "/admin/project/{project_uid}/chat/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Stream Chat
-         * @description Project 上下文中的 Admin 流式对话;
-         *     默认使用 project 关联的 sources 进行 RAG 检索，
-         *     chat_session 关联到 project
-         */
-        post: operations["stream_chat_admin_project__project_uid__chat_stream_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/admin/chat/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Stream Global Chat
-         * @description Global 上下文的 Admin 流式对话；
-         *     仅使用请求体中显式指定的 sources 进行 RAG 检索，
-         *     chat_session 不关联 project
-         */
-        post: operations["stream_global_chat_admin_chat_stream_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/admin/session/{chat_session_uid}/messages/{message_uid}/revert": {
         parameters: {
             query?: never;
@@ -782,6 +738,48 @@ export interface paths {
          * @description 取消当前 admin session 下的活跃 LLM 生成；已结束时幂等 no-op
          */
         post: operations["cancel_admin_generation_admin_session__chat_session_uid__generation__generation_uid__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/project/{project_uid}/chat/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stream Chat
+         * @description Project 上下文中的 Admin 流式对话；
+         *     默认使用 project 关联的 sources 进行 RAG 检索，chat_session 关联到 project。
+         */
+        post: operations["stream_chat_admin_project__project_uid__chat_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/chat/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stream Global Chat
+         * @description Global 上下文的 Admin 流式对话；
+         *     仅使用请求体中显式指定的 sources 进行 RAG 检索，chat_session 不关联 project。
+         */
+        post: operations["stream_global_chat_admin_chat_stream_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3166,39 +3164,6 @@ export interface operations {
             };
         };
     };
-    stream_rag_job_events_admin_source_jobs__job_uid__events_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "Last-Event-ID"?: string | null;
-            };
-            path: {
-                job_uid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_active_rag_jobs_admin_source_jobs_active_get: {
         parameters: {
             query?: never;
@@ -3309,6 +3274,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RAGJobStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_rag_job_events_admin_source_jobs__job_uid__events_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Last-Event-ID"?: string | null;
+            };
+            path: {
+                job_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
                 };
             };
             /** @description Validation Error */
@@ -3625,75 +3623,6 @@ export interface operations {
             };
         };
     };
-    stream_chat_admin_project__project_uid__chat_stream_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Project UID */
-                project_uid: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AdminRAGChatRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    stream_global_chat_admin_chat_stream_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AdminRAGChatRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/event-stream": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     revert_chat_session_admin_session__chat_session_uid__messages__message_uid__revert_post: {
         parameters: {
             query?: never;
@@ -3790,6 +3719,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminChatCancelResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_chat_admin_project__project_uid__chat_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project UID */
+                project_uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRAGChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_global_chat_admin_chat_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRAGChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
                 };
             };
             /** @description Validation Error */

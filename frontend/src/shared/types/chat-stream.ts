@@ -14,6 +14,10 @@ export type ChatStreamEvent =
       created: boolean;
     }
   | {
+      event: "session_title_updated";
+      session: ChatSessionRead;
+    }
+  | {
       event: "generation_start";
       generationUid: string;
       sessionUid: string;
