@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 import numpy as np
 from numpy.typing import NDArray
 
@@ -11,15 +11,25 @@ from app.rag import (
     VectorDatabase,
     VectorQueryResult,
     QueryExpander,
+    FTSResult,
     FTSProvider,
     EmbeddingProvider,
     RerankProvider,
 )
 from app.providers import StructuredCompleter
-from app.db.models import Source
 from app.db.schemas import HybridSearchResult, HybridSearchOptions
-from app.crud import SourceCRUD, RAGSearchCRUD
+from app.crud import RAGSearchCRUD
 from app.core.constants import SearchMode
+
+
+@dataclass(frozen=True)
+class SearchSourceRef:
+    """RAG 检索长流程使用的 Source 轻量引用。"""
+
+    id: int
+    uid: str
+    collection_name: str
+    source_item_ids: list[int]
 
 
 @dataclass
@@ -43,9 +53,7 @@ class HybridSearchService:
     def __init__(
         self,
         *,
-        session: AsyncSession,
-        source_crud: SourceCRUD,
-        rag_search_crud: RAGSearchCRUD,
+        session_factory: async_sessionmaker[AsyncSession],
         vector_db: VectorDatabase,
         query_expander: QueryExpander,
         embedding: EmbeddingProvider,
@@ -53,9 +61,7 @@ class HybridSearchService:
         rerank_provider: RerankProvider,
     ):
         """具体的参数由依赖注入"""
-        self.session = session
-        self.source_crud = source_crud
-        self.rag_search_crud = rag_search_crud
+        self.session_factory = session_factory
         self.vector_db = vector_db
         self.query_expander = query_expander
         self.embedding = embedding
@@ -94,7 +100,7 @@ class HybridSearchService:
     async def _vector_search_sources(
         self,
         *,
-        sources: list[Source],
+        sources: list[SearchSourceRef],
         query_embedding: NDArray[np.float32],
         top_k: int,
         concurrency: int = 6,
@@ -106,7 +112,7 @@ class HybridSearchService:
         # TODO: 这里的并发控制应该提升到更通用的层面，作为有状态服务的一部分；目前先在这里实现一个简单的 Semaphore 控制并发量
         semaphore = asyncio.Semaphore(concurrency)
 
-        async def query_one_source(source: Source) -> list[VectorQueryResult]:
+        async def query_one_source(source: SearchSourceRef) -> list[VectorQueryResult]:
             async with semaphore:
                 return await asyncio.to_thread(
                     self.vector_db.query_collection,
@@ -116,7 +122,7 @@ class HybridSearchService:
                     where={
                         "source_item_id": {
                             # NOTE: 确保不会检索到 ingest 未 completed 的相关数据
-                            "$in": [item.id for item in source.source_items]
+                            "$in": source.source_item_ids,
                         }
                     },
                 )
@@ -129,6 +135,66 @@ class HybridSearchService:
         return [
             item for sublist in results if isinstance(sublist, list) for item in sublist
         ]
+
+    async def _semantic_fts_search(
+        self,
+        *,
+        query: str,
+        source_item_ids: list[int],
+        limit: int,
+    ) -> list[FTSResult]:
+        """短 session 执行语义 FTS 检索"""
+        if not source_item_ids:
+            return []
+
+        async with self.session_factory() as session:
+            return await self.fts_provider.semantic_search(
+                session=session,
+                user_query=query,
+                source_item_ids=source_item_ids,
+                limit=limit,
+            )
+
+    async def _keywords_fts_search(
+        self,
+        *,
+        lex_queries: list[str],
+        source_item_ids: list[int],
+        limit: int,
+    ) -> list[FTSResult]:
+        """短 session 执行关键词 FTS 检索。"""
+        if not source_item_ids:
+            return []
+
+        async with self.session_factory() as session:
+            return await self.fts_provider.keywords_search(
+                session=session,
+                lex_queries=lex_queries,
+                source_item_ids=source_item_ids,
+                limit=limit,
+            )
+
+    async def _get_chunk_ids_by_vector_ids(
+        self, *, vector_ids: list[str]
+    ) -> dict[str, int]:
+        """短 session 读取 vector_id -> chunk_id 映射。"""
+        async with self.session_factory() as session:
+            rag_search_crud = RAGSearchCRUD(session=session)
+            return await rag_search_crud.get_chunk_ids_by_vector_ids(
+                vector_ids=vector_ids,
+            )
+
+    async def _get_ranked_results_by_chunk_ids(
+        self,
+        *,
+        chunk_ids: list[int],
+    ) -> list[HybridSearchResult]:
+        """短 session 读取 RRF 命中 chunk 的展示详情。"""
+        async with self.session_factory() as session:
+            rag_search_crud = RAGSearchCRUD(session=session)
+            return await rag_search_crud.get_ranked_results_by_chunk_ids(
+                chunk_ids=chunk_ids,
+            )
 
     async def _rrf_fetch_and_rerank(
         self,
@@ -157,8 +223,8 @@ class HybridSearchService:
         chunk_id_to_rrf_score = dict(rrf_results)
 
         # 3. 基于 chunk_id 获取对应的 search result 详情
-        ranked_hits = await self.rag_search_crud.get_ranked_results_by_chunk_ids(
-            chunk_ids=chunk_ids
+        ranked_hits = await self._get_ranked_results_by_chunk_ids(
+            chunk_ids=chunk_ids,
         )
 
         # 3.1 如果没有命中结果，直接返回
@@ -279,7 +345,7 @@ class HybridSearchService:
         self,
         *,
         query: str,
-        sources: list[Source],
+        sources: list[SearchSourceRef],
         options: HybridSearchOptions,
         debug: SearchDebugInfo | None = None,
     ) -> tuple[list[RankedList], list[HybridSearchResult]]:
@@ -299,12 +365,11 @@ class HybridSearchService:
 
         # 1.2 创建并行任务：raw FTS search
         source_item_ids = [
-            item.id for source in sources for item in source.source_items
+            item_id for source in sources for item_id in source.source_item_ids
         ]
         fts_task = asyncio.create_task(
-            self.fts_provider.semantic_search(
-                session=self.session,
-                user_query=query,
+            self._semantic_fts_search(
+                query=query,
                 source_item_ids=source_item_ids,
                 limit=options.fts_k,
             )
@@ -329,7 +394,7 @@ class HybridSearchService:
             vector_results = await vector_search_task
 
         # 3.0 构建 vector_id -> chunk_id 的映射
-        vector_id_to_chunk_id = await self.rag_search_crud.get_chunk_ids_by_vector_ids(
+        vector_id_to_chunk_id = await self._get_chunk_ids_by_vector_ids(
             vector_ids=[r.vector_id for r in vector_results],
         )
 
@@ -384,7 +449,7 @@ class HybridSearchService:
         self,
         *,
         query: str,
-        sources: list[Source],
+        sources: list[SearchSourceRef],
         raw_ranked_lists: list[RankedList],
         options: HybridSearchOptions,
         completer: StructuredCompleter,
@@ -422,11 +487,10 @@ class HybridSearchService:
 
         # 3.1 创建并行任务：expanded query FTS search
         source_item_ids = [
-            item.id for source in sources for item in source.source_items
+            item_id for source in sources for item_id in source.source_item_ids
         ]
         fts_task = asyncio.create_task(
-            self.fts_provider.keywords_search(
-                session=self.session,
+            self._keywords_fts_search(
                 lex_queries=expanded_query.keywords,
                 source_item_ids=source_item_ids,
                 limit=options.fts_k,
@@ -476,7 +540,7 @@ class HybridSearchService:
 
         # 4.2.1 创建 vector_id -> chunk_id 的映射
         all_vector_ids = [r.vector_id for sublist in vector_results for r in sublist]
-        vector_id_to_chunk_id = await self.rag_search_crud.get_chunk_ids_by_vector_ids(
+        vector_id_to_chunk_id = await self._get_chunk_ids_by_vector_ids(
             vector_ids=all_vector_ids,
         )
 
@@ -534,7 +598,7 @@ class HybridSearchService:
         *,
         query: str,
         # TODO: 之后将这里的 sources 重命名为 source_with_items
-        sources: list[Source],
+        sources: list[SearchSourceRef],
         options: HybridSearchOptions,
         completer: StructuredCompleter,
         enable_debug: bool = False,

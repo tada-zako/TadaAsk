@@ -1,10 +1,9 @@
-from .hybrid_search import HybridSearchService
+from .hybrid_search import HybridSearchService, SearchSourceRef
 from ..schemas import RAGRetrievalResult
 from ..utils import TokenBudget
 from app.rag import StandaloneQueryRewriter
-from app.crud import RAGSearchCRUD
 from app.providers import Message, StructuredCompleter
-from app.db.models import Source, ChatMessage
+from app.db.models import ChatMessage
 from app.db.schemas import HybridSearchOptions, RAGSnapshotItem, RAGSnapshot
 from app.core.constants import ChatMessageRole
 from app.utils import TokenCounter
@@ -19,11 +18,9 @@ class RAGRetrievalService:
     def __init__(
         self,
         *,
-        rag_search_crud: RAGSearchCRUD,
         hybrid_search_service: HybridSearchService,
         token_counter: TokenCounter,
     ):
-        self.rag_search_crud = rag_search_crud
         self.hybrid_search_service = hybrid_search_service
         self.token_counter = token_counter
 
@@ -94,7 +91,7 @@ class RAGRetrievalService:
     async def retrieve_for_chat(
         self,
         *,
-        sources: list[Source],
+        sources: list[SearchSourceRef],
         user_query: str,
         recent_messages: list[ChatMessage],
         compaction_message: ChatMessage | None,
