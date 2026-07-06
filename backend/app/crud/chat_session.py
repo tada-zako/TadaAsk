@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from sqlalchemy import select, not_
+from sqlalchemy import select, not_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import ChatSession
@@ -169,6 +169,21 @@ class ChatSessionCRUD:
         await self.session.flush()  # 刷新以获取更新后的数据
         await self.session.refresh(chat_session, attribute_names=["updated_at"])
         return chat_session
+
+    async def update_chat_session_title_by_id(
+        self,
+        *,
+        chat_session_id: int,
+        new_title: str,
+    ) -> ChatSession | None:
+        """按 source id 更新会话标题"""
+        result = await self.session.execute(
+            update(ChatSession)
+            .where(ChatSession.id == chat_session_id)
+            .values(title=new_title)
+            .returning(ChatSession)
+        )
+        return result.scalar_one_or_none()
 
     async def update_chat_session_provider_and_model(
         self, chat_session: ChatSession, provider: str, model: str

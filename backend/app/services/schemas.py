@@ -56,6 +56,19 @@ class SessionReadyData(BaseModel):
     )
 
 
+class SessionTitleUpdatedData(BaseModel):
+    event: Literal["session_title_updated"] = Field(
+        default="session_title_updated"
+    )
+    session: ChatSessionRead
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
 class GenerationStartData(BaseModel):
     event: Literal["generation_start"] = Field(default="generation_start")
     generation_uid: str
@@ -105,5 +118,10 @@ class ErrorData(BaseModel):
 
 
 ChatStreamEvent = Union[
-    SessionReadyData, GenerationStartData, TextDeltaData, MessageDoneData, ErrorData
+    SessionReadyData,
+    SessionTitleUpdatedData,
+    GenerationStartData,
+    TextDeltaData,
+    MessageDoneData,
+    ErrorData,
 ]

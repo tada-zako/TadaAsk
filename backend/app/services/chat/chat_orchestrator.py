@@ -2,6 +2,7 @@ from typing import AsyncIterable
 import asyncio
 from dataclasses import dataclass, field
 
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .generation_registry import GenerationRegistry
@@ -11,6 +12,7 @@ from ..search import RAGRetrievalService, SearchSourceRef
 from ..schemas import (
     ChatStreamEvent,
     SessionReadyData,
+    SessionTitleUpdatedData,
     GenerationStartData,
     TextDeltaData,
     MessageDoneData,
@@ -24,7 +26,9 @@ from app.providers import (
     StructuredCompleter,
     StreamedResponse,
     ModelSettings,
+    Message,
     DEFAULT_SYSTEM_PROMPT,
+    TITLE_GENERATION_PROMPT,
 )
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
 from app.db.models import Project, ChatSession, ChatMessage, Source
@@ -41,6 +45,10 @@ from app.core.constants import (
     ChatMessageType,
     ChatSessionType,
 )
+
+
+SESSION_TITLE_MAX_CHARS = 50
+SESSION_TITLE_FALLBACK = "New chat"
 
 
 @dataclass
@@ -117,6 +125,26 @@ class ChatOrchestratorService:
         self.generation_registry = generation_registry
         self.compaction_service = compaction_service
 
+    @staticmethod
+    def _normalize_session_title(title: str | None) -> str | None:
+        """清洗模型输出或用户输入中的会话标题。"""
+        if not title:
+            return None
+
+        stripped_title = title.strip()
+        first_line = (
+            stripped_title.splitlines()[0]
+            if stripped_title.splitlines()
+            else stripped_title
+        )
+        normalized = " ".join(first_line.split())
+        normalized = normalized.strip(" \t\r\n\"'`")
+        if not normalized:
+            return None
+
+        # 按最大 title chars 截断
+        return normalized[:SESSION_TITLE_MAX_CHARS]
+
     async def _valid_or_create_chat_session(
         self,
         *,
@@ -175,8 +203,7 @@ class ChatOrchestratorService:
                 # 创建新的 ChatSession
                 new_chat_session = await chat_session_crud.create_chat_session(
                     chat_session_data=ChatSessionInternal(
-                        # TODO: 命名后续基于 LLM 响应结果动态更新
-                        title="",
+                        title=SESSION_TITLE_FALLBACK,
                         owner_type=requester_type,
                         provider=provider,
                         model=model,
@@ -275,12 +302,72 @@ class ChatOrchestratorService:
 
                 return ChatMessageRead.model_validate(updated_message)
 
-    def _resolve_system_prompt(self) -> str:
-        """
-        解析系统提示词的内部方法
+    async def _generate_and_update_session_title(
+        self,
+        *,
+        chat_session_id: int,
+        user_message: str,
+        completer: TextCompleter,
+    ) -> ChatSessionRead | None:
+        """为新会话生成标题并短事务更新；失败时返回 None，不影响主回答。"""
+        try:
+            # 非流式对话请求生成 title
+            response = await completer.chat(
+                messages=[
+                    # 基础的 title gen context
+                    Message(
+                        role=ChatMessageRole.SYSTEM,
+                        content=TITLE_GENERATION_PROMPT,
+                    ),
+                    Message(
+                        role=ChatMessageRole.USER,
+                        content=user_message,
+                    ),
+                ],
+                model_settings=ModelSettings.for_title_generation(),
+            )
+            # 规范化 title
+            generated_title = self._normalize_session_title(response.text)
+            if not generated_title:
+                return None
 
-        TODO: 这里只实现一个简单版本；后续考虑具体的组装细节
-        """
+            async with self.session_factory() as session:
+                async with session.begin():
+                    # 打开 DB 短连接，更新 session title
+                    chat_session_crud = ChatSessionCRUD(session=session)
+                    updated_session = (
+                        await chat_session_crud.update_chat_session_title_by_id(
+                            chat_session_id=chat_session_id,
+                            new_title=generated_title,
+                        )
+                    )
+                    if not updated_session:
+                        return None
+
+                    return ChatSessionRead.model_validate(updated_session)
+        except Exception as exc:
+            logger.warning(f"Failed to generate chat session title: {exc}")
+            return None
+
+    def _resolve_system_prompt(
+        self,
+        *,
+        project: Project | None,
+        requester_type: ChatSessionType,
+    ) -> str:
+        """解析 chat system prompt"""
+        if requester_type != ChatSessionType.VISITOR:
+            # TODO: admin 暂时使用默认硬编码提示词
+            return DEFAULT_SYSTEM_PROMPT
+
+        # visitor 如果有设置 project.settings.visitor_system_prompt 则使用
+        project_settings = project.project_settings if project else None
+        visitor_prompt = (
+            project_settings.visitor_system_prompt if project_settings else None
+        )
+        if visitor_prompt and visitor_prompt.strip():
+            return visitor_prompt.strip()
+
         return DEFAULT_SYSTEM_PROMPT
 
     async def _prepare_chat_context(
@@ -380,10 +467,24 @@ class ChatOrchestratorService:
         )
 
         # 1.2.2 预备 system_prompt 以及 token_budget
-        system_prompt = self._resolve_system_prompt()
+        system_prompt = self._resolve_system_prompt(
+            project=project,
+            requester_type=requester_type,
+        )
         token_budget = TokenBudget.from_model_profile(provider_with_model.model_profile)
 
-        # 1.2.3 预备参数
+        # 1.2.3 新会话标题生成
+        if session_created:
+            updated_session = await self._generate_and_update_session_title(
+                chat_session_id=chat_session.id,
+                user_message=chat_input.message,
+                completer=completer,
+            )
+            if updated_session:
+                # 失败时保留临时标题并继续主回答
+                yield SessionTitleUpdatedData(session=updated_session)
+
+        # 1.2.4 预备参数
         generation = None
         stream_response: StreamedResponse | None = None
         try:

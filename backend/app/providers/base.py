@@ -287,6 +287,17 @@ class ModelSettings:
             thinking=False,
         )
 
+    @classmethod
+    def for_title_generation(cls) -> "ModelSettings":
+        """会话标题生成：短输出、低发散度、失败时业务层可静默降级。"""
+        return cls(
+            max_tokens=64,
+            temperature=0.2,
+            top_p=1.0,
+            timeout=10.0,
+            thinking=False,
+        )
+
 
 @dataclass
 class ModelResponse:
