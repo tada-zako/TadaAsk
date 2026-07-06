@@ -323,7 +323,7 @@ async def stream_admin_chat_events(
         )
 
 
-# TODO: opencode 设计：每个 new session 都会在上下文顶部插入一条“自动聊天会话标签生成”的要求
+# NOTE TODO: opencode 设计：每个 new session 都会在上下文顶部插入一条“自动聊天会话标签生成”的要求
 @router.post("/project/{project_uid}/chat/stream", response_class=EventSourceResponse)
 async def stream_chat(
     chat_request: Annotated[AdminRAGChatRequest, Depends(get_admin_rag_chat_request)],
