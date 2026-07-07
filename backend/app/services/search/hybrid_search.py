@@ -248,6 +248,8 @@ class HybridSearchService:
             hit.rrf_score = chunk_id_to_rrf_score.get(hit.chunk_id)
             hit.rerank_score = rerank_score
 
+        # NOTE TODO: 5.2 这里后续应该基于 score 设置最低阈值，如果低于该阈值，不允许作为 rag result 返回
+
         # 6. 基于 rerank_score 进行最终排序
         sorted_reranked = sorted(
             ranked_hits,

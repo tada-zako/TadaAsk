@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>TadaAsk Global Chat Layout Wireframe</title>
+    <style>
+      :root {
+        --bg: #050505;
+        --shell: #080809;
+        --panel: #0b0b0c;
+        --raised: #101113;
+        --hover: #1b1e23;
+        --line: #24262b;
+        --line-strong: #343741;
+        --text: #f5f5f4;
+        --muted: #a1a1aa;
+        --faint: #71717a;
+        --primary: #24d3c4;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Segoe UI", sans-serif;
+      }
+
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        min-height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--raised);
+        color: var(--text);
+        padding: 0 12px;
+        cursor: pointer;
+        transition:
+          background 0.16s ease,
+          border-color 0.16s ease,
+          transform 0.16s ease;
+      }
+
+      button:hover {
+        border-color: var(--line-strong);
+        background: var(--hover);
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        height: 100vh;
+      }
+
+      .sidebar {
+        background: var(--shell);
+        padding: 16px;
+        border-right: 1px solid var(--line);
+        overflow: auto;
+      }
+
+      .sidebar h2 {
+        margin-bottom: 24px;
+      }
+
+      .sidebar p {
+        margin: 0 0 10px;
+        color: var(--muted);
+      }
+
+      .main {
+        display: grid;
+        grid-template-rows: 54px minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        background: var(--bg);
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .content {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr);
+        position: relative;
+        min-height: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .chat-layout {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .chat-layout.sessions-collapsed {
+        grid-template-columns: 56px minmax(0, 1fr);
+      }
+
+      .sessions {
+        background: var(--panel);
+        padding: 16px;
+        border-right: 1px solid var(--line);
+        overflow: auto;
+      }
+
+      .sessions-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .sessions-head h2 {
+        margin-bottom: 0;
+        font-size: 16px;
+      }
+
+      .sessions-rail {
+        display: grid;
+        gap: 12px;
+        align-content: start;
+        justify-items: center;
+        background: var(--panel);
+        padding: 12px 8px;
+        border-right: 1px solid var(--line);
+      }
+
+      .icon-button {
+        display: inline-grid;
+        width: 36px;
+        height: 36px;
+        place-items: center;
+        padding: 0;
+      }
+
+      .session-tools {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .session-tool-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .source-button {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .thread {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        min-height: 0;
+      }
+
+      .messages {
+        padding: 24px;
+        overflow: auto;
+      }
+
+      .message {
+        background: var(--raised);
+        max-width: 720px;
+        margin-bottom: 18px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .message.user {
+        background: #17191c;
+        margin-left: auto;
+      }
+
+      .message p:last-child {
+        margin-bottom: 0;
+      }
+
+      .message-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .message-meta button {
+        min-height: 28px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .composer {
+        background: var(--shell);
+        padding: 16px;
+        border-top: 1px solid var(--line);
+      }
+
+      .composer-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 10px;
+      }
+
+      .composer-actions span {
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 92px;
+        background: var(--raised);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+        resize: vertical;
+      }
+
+      textarea:focus {
+        border-color: rgba(36, 211, 196, 0.5);
+        outline: none;
+      }
+
+      .session-row {
+        padding: 12px 0;
+        margin-bottom: 0;
+        border-bottom: 1px solid var(--line);
+        transition: color 0.16s ease;
+      }
+
+      .session-row:hover {
+        color: var(--primary);
+      }
+
+      .session-row p {
+        margin: 6px 0 0;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .source-row,
+      .citation-card {
+        background: var(--raised);
+        padding: 12px;
+        margin-bottom: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .source-row p,
+      .citation-card p {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .citation-card blockquote {
+        margin: 10px 0 0;
+        padding-left: 10px;
+        border-left: 3px solid var(--line-strong);
+        color: var(--muted);
+      }
+
+      .compact-list {
+        margin: 0 0 16px;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      .sheet {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 420px;
+        padding: 16px;
+        overflow: auto;
+        border-left: 1px solid var(--line);
+        background: var(--panel);
+        box-shadow: -24px 0 80px rgba(0, 0, 0, 0.35);
+        animation: sheet-in 0.18s ease-out;
+      }
+
+      .sheet.sources-sheet {
+        width: 360px;
+      }
+
+      .sheet-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .sheet-head h2 {
+        margin-bottom: 0;
+        font-size: 18px;
+      }
+
+      @keyframes sheet-in {
+        from {
+          opacity: 0;
+          transform: translateX(16px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ConsoleShell：真实页面中 sidebar/topbar 来自控制台 Layout，Global chat 只占据 main content。 -->
+    <div class="app">
+      <aside class="sidebar">
+        <h2>TadaAsk</h2>
+        <nav>
+          <p>Project overview</p>
+          <p>Project ask</p>
+          <p><strong>Global chat</strong></p>
+          <p>Sources</p>
+          <p>Model providers</p>
+          <p>Global settings</p>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">Console / Global chat</header>
+
+        <section class="content">
+          <!-- Chat 主体：默认只保留 sessions + thread 两栏，避免右侧常驻面板压缩聊天区。 -->
+          <section class="chat-layout">
+            <!-- Sessions panel：可滚动会话列表。Collapse 按钮会切换到 .sessions-collapsed，只保留左侧窄 rail 和 New session icon。 -->
+            <aside class="sessions">
+              <div class="sessions-head">
+                <h2>Sessions</h2>
+                <!-- 点击：创建新 session。sessions 收缩后该按钮仍保留在左上角。 -->
+                <button class="icon-button">+</button>
+              </div>
+              <div class="session-tools">
+                <!-- 点击：打开下方隐藏的 sources sheet，用于配置下一条消息的 sourceUids。 -->
+                <button class="source-button">Configure sources</button>
+                <div class="session-tool-row">
+                  <!-- 点击：把 sessions 面板收缩为 56px rail。 -->
+                  <button>Collapse</button>
+                  <!-- 点击：刷新/重新加载当前 global sessions 列表。 -->
+                  <button>Refresh</button>
+                </div>
+              </div>
+              <article class="session-row">
+                <strong>Widget embed question</strong>
+                <p>Latest answer has 3 citations</p>
+              </article>
+              <article class="session-row">
+                <strong>Plain model test</strong>
+                <p>No source selected</p>
+              </article>
+              <article class="session-row">
+                <strong>Source indexing check</strong>
+                <p>2 sources selected</p>
+              </article>
+            </aside>
+
+            <!-- Thread：消息历史 + composer。发送中时 composer 禁止再次 Send，只保留 Stop/Cancel。 -->
+            <section class="thread">
+              <div class="messages">
+                <article class="message user">
+                  <div class="message-meta">
+                    <strong>Admin</strong>
+                    <button>从这里重新开始</button>
+                  </div>
+                  <p>如何在静态文档站点中嵌入挂件？</p>
+                </article>
+
+                <article class="message assistant">
+                  <div class="message-meta">
+                    <strong>TadaAsk</strong>
+                    <!-- 点击：打开 citations sheet，并把当前 assistant message 设置为 selectedMessage。 -->
+                    <button>查看引用</button>
+                  </div>
+                  <p>将挂件脚本添加到宿主页面，并传入对应的项目标识符。</p>
+                  <p>引用：[1] [2] [3]</p>
+                </article>
+
+                <article class="message user">
+                  <div class="message-meta">
+                    <strong>Admin</strong>
+                    <button>从这里重新开始</button>
+                  </div>
+                  <p>如果没有选择 source，会发生什么？</p>
+                </article>
+
+                <article class="message assistant">
+                  <div class="message-meta">
+                    <strong>TadaAsk</strong>
+                    <!-- 点击：打开 citations sheet；如果该 message 无 ragSnapshot，则 sheet 显示空状态。 -->
+                    <button>查看引用</button>
+                  </div>
+                  <p>不会走 RAG，会退化为普通 LLM chat。</p>
+                  <p>本轮没有引用。</p>
+                </article>
+              </div>
+
+              <footer class="composer">
+                <textarea placeholder="Ask anything..."></textarea>
+                <div class="composer-actions">
+                  <span>Selected sources: Product docs, Frontend notes</span>
+                  <div>
+                    <!-- 点击：POST /admin/chat/stream；generation_start 后禁用 Send。 -->
+                    <button>Send</button>
+                    <!-- 点击：使用 generationUid 调 cancel；仅生成中显示或启用。 -->
+                    <button>Stop</button>
+                  </div>
+                </div>
+              </footer>
+            </section>
+          </section>
+
+          <!-- Sources sheet：默认关闭。由 sessions 面板的 Configure sources 打开；选择结果只影响下一条发送的 sourceUids。 -->
+          <aside class="sheet sources-sheet" hidden>
+            <div class="sheet-head">
+              <h2>Context sources</h2>
+              <!-- 点击：关闭 sources sheet，保留当前已选 sourceUids。 -->
+              <button>Close</button>
+            </div>
+            <p>这里配置下一条消息要发送的 sourceUids。为空时就是普通 chat。</p>
+
+            <article class="source-row">
+              <label><input type="checkbox" checked /> Product docs</label>
+              <p>Indexed · 24 items</p>
+            </article>
+
+            <article class="source-row">
+              <label><input type="checkbox" checked /> Frontend notes</label>
+              <p>Indexed · 8 items</p>
+            </article>
+
+            <article class="source-row">
+              <label><input type="checkbox" /> Draft crawl</label>
+              <p>Not ready · cannot be used for RAG</p>
+            </article>
+          </aside>
+
+          <!-- Citations sheet：由 assistant message 的“查看引用”打开；展示 selected assistant message 的 ragSnapshot.items。 -->
+          <aside class="sheet citations-sheet">
+            <div class="sheet-head">
+              <h2>Citations</h2>
+              <!-- 点击：关闭 citations sheet，不改变当前会话消息。 -->
+              <button>Close</button>
+            </div>
+            <p>展示当前选中的 assistant message 的 ragSnapshot。</p>
+
+            <section>
+              <h3>Snapshot summary</h3>
+              <ul class="compact-list">
+                <li>Message: selected assistant answer</li>
+                <li>Query: 如何在静态文档站点中嵌入挂件？</li>
+                <li>Standalone query: 如何嵌入 TadaAsk widget？</li>
+              </ul>
+            </section>
+
+            <article class="citation-card">
+              <h3>[1] frontend-ui-scope-constraints.md</h3>
+              <p>Source: Frontend notes</p>
+              <p>Section: Widget UI boundary</p>
+              <p>Page: - · usedInContext: true · score: 0.92</p>
+              <blockquote>
+                Widget public API 尚未最终确定。MVP 阶段样式自定义主要通过 CSS tokens 完成。
+              </blockquote>
+            </article>
+
+            <article class="citation-card">
+              <h3>[2] widget-install.md</h3>
+              <p>Source: Product docs</p>
+              <p>URL: https://example.com/docs/widget-install</p>
+              <p>usedInContext: true · score: 0.87</p>
+              <blockquote>
+                Embed the script on the host page and pass the project identifier.
+              </blockquote>
+            </article>
+          </aside>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
