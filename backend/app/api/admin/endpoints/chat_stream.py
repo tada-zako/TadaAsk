@@ -36,10 +36,12 @@ async def valid_stream_project(
     session_factory: SessionFactoryDeps,
     project_uid: Annotated[str, Path(..., description="Project UID")],
 ) -> Project:
-    """Admin stream 专用 project 校验；短事务查询后返回已加载基础字段。"""
+    """Admin stream 专用 project 校验；短事务查询后返回已加载 settings 的项目。"""
     async with session_factory() as session:
         project_crud = ProjectCRUD(session=session)
-        project = await project_crud.get_project_by_uid(project_uid=project_uid)
+        project = await project_crud.get_project_with_settings_by_uid(
+            project_uid=project_uid
+        )
 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -249,6 +251,7 @@ async def stream_admin_chat_events(
         chat_input=ChatInput(
             message=chat_request.message,
             chat_session_uid=chat_request.chat_session_uid,
+            admin_system_prompt=chat_request.admin_system_prompt,
         ),
         completer=completer,
         provider_with_model=provider_with_model,

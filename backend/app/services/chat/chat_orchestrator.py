@@ -57,6 +57,7 @@ class ChatInput:
 
     message: str
     chat_session_uid: str | None
+    admin_system_prompt: str | None = None
 
 
 @dataclass
@@ -354,21 +355,31 @@ class ChatOrchestratorService:
         *,
         project: Project | None,
         requester_type: ChatSessionType,
+        chat_input: ChatInput,
     ) -> str:
         """解析 chat system prompt"""
-        if requester_type != ChatSessionType.VISITOR:
-            # TODO: admin 暂时使用默认硬编码提示词
+        custom_prompt: str | None = None
+
+        if project is not None:
+            # project scoped chat 统一使用 project settings 中的 visitor prompt 作为附加提示词。
+            project_settings = project.project_settings
+            custom_prompt = (
+                project_settings.visitor_system_prompt if project_settings else None
+            )
+        elif requester_type == ChatSessionType.ADMIN:
+            # global admin chat 允许请求级附加 system prompt。
+            custom_prompt = chat_input.admin_system_prompt
+
+        if not custom_prompt or not custom_prompt.strip():
             return DEFAULT_SYSTEM_PROMPT
 
-        # visitor 如果有设置 project.settings.visitor_system_prompt 则使用
-        project_settings = project.project_settings if project else None
-        visitor_prompt = (
-            project_settings.visitor_system_prompt if project_settings else None
+        return (
+            DEFAULT_SYSTEM_PROMPT.rstrip()
+            + "\n\n[Project/Admin Instructions]\n"
+            + "Follow these additional instructions unless they conflict with the default instructions above.\n\n"
+            + custom_prompt.strip()
+            + "\n[/Project/Admin Instructions]"
         )
-        if visitor_prompt and visitor_prompt.strip():
-            return visitor_prompt.strip()
-
-        return DEFAULT_SYSTEM_PROMPT
 
     async def _prepare_chat_context(
         self,
@@ -470,6 +481,7 @@ class ChatOrchestratorService:
         system_prompt = self._resolve_system_prompt(
             project=project,
             requester_type=requester_type,
+            chat_input=chat_input,
         )
         token_budget = TokenBudget.from_model_profile(provider_with_model.model_profile)
 

@@ -24,6 +24,10 @@ class AdminChatRequest(BaseModel):
     chat_session_uid: str | None = None
     provider_uid: str
     model_uid: str
+    admin_system_prompt: str | None = Field(
+        default=None,
+        description="Admin 侧请求级附加 system prompt；为空时使用默认系统提示词",
+    )
 
     # LLM 请求参数配置
     temperature: float | None = None
