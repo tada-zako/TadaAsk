@@ -882,6 +882,10 @@ class HybridSearchOptions(HybridSearchRequest):
     min_rerank_overlap: int = 0  # 最小 (FTS & vector) 与 rerank 重叠数量；
     max_hit_score_gap_threshold: float = 0.75  # 最大命中分数阈值；
 
+    # 最终结果质量阈值；None 表示不启用对应 score 过滤。
+    min_rerank_score: float | None = 0.1
+    min_rrf_score: float | None = None
+
 
 # ======= RAG Snap Schemas =======
 class RAGSnapshotItem(BaseModel):

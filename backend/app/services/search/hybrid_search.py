@@ -209,11 +209,12 @@ class HybridSearchService:
         """
 
         # 1. 执行 RRF 合并
+        candidate_limit = max(options.rerank_k, options.top_k)
         rrf_results = self._rrf_merge(
             ranked_lists,
             k=options.rrf_k,
-            # 使用 rerank_k 作为 RRF 候选数量；减少 rerank 计算量
-            limit=options.rerank_k,
+            # 使用候选池数量限制 RRF 结果；减少 rerank 计算量，同时保证 top_k 有足够候选。
+            limit=candidate_limit,
         )
         if not rrf_results:
             return []
@@ -248,18 +249,36 @@ class HybridSearchService:
             hit.rrf_score = chunk_id_to_rrf_score.get(hit.chunk_id)
             hit.rerank_score = rerank_score
 
-        # NOTE TODO: 5.2 这里后续应该基于 score 设置最低阈值，如果低于该阈值，不允许作为 rag result 返回
+        # 5.2 基于最终可用 score 过滤低质量结果，避免弱相关内容进入 RAG context。
+        filtered_hits: list[HybridSearchResult] = []
+        for hit in ranked_hits:
+            if (
+                hit.rerank_score is not None
+                and options.min_rerank_score is not None
+                and hit.rerank_score < options.min_rerank_score
+            ):
+                continue
 
-        # 6. 基于 rerank_score 进行最终排序
-        sorted_reranked = sorted(
-            ranked_hits,
-            key=lambda x: x.rerank_score
-            if x.rerank_score is not None
-            else float("-inf"),
+            if (
+                hit.rerank_score is None
+                and options.min_rrf_score is not None
+                and (hit.rrf_score is None or hit.rrf_score < options.min_rrf_score)
+            ):
+                continue
+
+            filtered_hits.append(hit)
+
+        # 6. 基于 rerank_score / rrf_score 进行最终排序
+        sorted_hits = sorted(
+            filtered_hits,
+            key=lambda x: (
+                x.rerank_score if x.rerank_score is not None else float("-inf"),
+                x.rrf_score if x.rrf_score is not None else float("-inf"),
+            ),
             reverse=True,
         )
 
-        return sorted_reranked[: options.rerank_k]
+        return sorted_hits[: options.top_k]
 
     def _estimate_confidence(
         self,
