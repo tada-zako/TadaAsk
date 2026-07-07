@@ -1013,6 +1013,11 @@ export interface components {
             providerUid: string;
             /** Modeluid */
             modelUid: string;
+            /**
+             * Adminsystemprompt
+             * @description Admin 侧请求级附加 system prompt；为空时使用默认系统提示词
+             */
+            adminSystemPrompt?: string | null;
             /** Temperature */
             temperature?: number | null;
             /** Topp */
