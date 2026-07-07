@@ -1210,52 +1210,52 @@ export interface components {
              */
             mode: components["schemas"]["SearchMode"];
             /**
-             * Top K
+             * Topk
              * @description Number of top results to return
              * @default 8
              */
-            top_k: number;
+            topK: number;
             /**
-             * Rerank Enabled
+             * Rerankenabled
              * @description Whether to enable reranking; defaults to True
              * @default true
              */
-            rerank_enabled: boolean;
+            rerankEnabled: boolean;
             /**
-             * Fts K
+             * Ftsk
              * @description Number of candidates to retrieve from FTS search
              * @default 30
              */
-            fts_k: number;
+            ftsK: number;
             /**
-             * Vector K
+             * Vectork
              * @description Number of candidates to retrieve from vector search
              * @default 20
              */
-            vector_k: number;
+            vectorK: number;
             /**
-             * Rerank K
+             * Rerankk
              * @description Number of candidates to rerank
              * @default 12
              */
-            rerank_k: number;
+            rerankK: number;
             /**
-             * Max Alternative Queries
+             * Maxalternativequeries
              * @description Maximum number of alternative queries to generate for query expansion
              * @default 2
              */
-            max_alternative_queries: number;
+            maxAlternativeQueries: number;
             /**
-             * Max Keywords
+             * Maxkeywords
              * @description Maximum number of keywords to extract for query expansion
              * @default 5
              */
-            max_keywords: number;
+            maxKeywords: number;
             /**
-             * Standalone Enabled
+             * Standaloneenabled
              * @default false
              */
-            standalone_enabled: boolean;
+            standaloneEnabled: boolean;
         };
         /**
          * IngestPausedResponse

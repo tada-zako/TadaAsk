@@ -867,6 +867,12 @@ class HybridSearchRequest(BaseModel):
 
     standalone_enabled: bool = False  # 是否执行 standalone 操作
 
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
 
 class HybridSearchOptions(HybridSearchRequest):
     """混合搜索选项；包含搜索参数和策略配置"""
