@@ -1,0 +1,1524 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TadaAsk Global Chat UI Preview V2</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #050505;
+        --shell: #080809;
+        --panel: rgba(15, 16, 18, 0.76);
+        --panel-soft: rgba(255, 255, 255, 0.035);
+        --raised: #18191d;
+        --composer: #2b2c31;
+        --hover: rgba(255, 255, 255, 0.06);
+        --line: #24262b;
+        --line-soft: rgba(255, 255, 255, 0.06);
+        --line-strong: #343741;
+        --text: #f5f5f4;
+        --body: #d4d4d8;
+        --muted: #a1a1aa;
+        --faint: #71717a;
+        --disabled: #52525b;
+        --primary: #24d3c4;
+        --primary-fg: #031110;
+        --yellow: #e7c85a;
+        --red: #ff6b6b;
+        --sidebar-width: 184px;
+        --sessions-width: 228px;
+        --chat-column: 820px;
+        --sheet-width: 600px;
+        --radius-sm: 6px;
+        --radius: 8px;
+        --radius-lg: 10px;
+        --radius-xl: 18px;
+        --font:
+          "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        letter-spacing: 0;
+      }
+
+      body {
+        padding: 24px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: default;
+      }
+
+      .preview {
+        display: grid;
+        gap: 34px;
+      }
+
+      .state-title {
+        display: flex;
+        width: min(1320px, 100%);
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin: 0 auto;
+      }
+
+      .state-title h1 {
+        font-size: 20px;
+        font-weight: 720;
+      }
+
+      .state-title span {
+        color: var(--faint);
+        font-size: 13px;
+      }
+
+      .frame {
+        position: relative;
+        overflow: hidden;
+        width: min(1320px, 100%);
+        height: 790px;
+        margin: 0 auto;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background:
+          radial-gradient(circle at 74% -18%, rgba(36, 211, 196, 0.08), transparent 25rem),
+          #050505;
+        box-shadow: 0 26px 92px rgba(0, 0, 0, 0.3);
+      }
+
+      .shell {
+        display: grid;
+        height: 100%;
+        min-height: 0;
+        grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--line-soft);
+        background: rgba(8, 8, 9, 0.96);
+        padding: 16px 12px;
+      }
+
+      .brand {
+        display: flex;
+        height: 38px;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 22px;
+        padding: 0 4px;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 27px;
+        height: 27px;
+        place-items: center;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        background: var(--panel);
+        color: var(--primary);
+        font-weight: 760;
+      }
+
+      .brand strong {
+        font-size: 14px;
+        font-weight: 680;
+      }
+
+      .nav {
+        display: grid;
+        gap: 5px;
+      }
+
+      .nav-item {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        gap: 8px;
+        border-radius: var(--radius);
+        color: var(--muted);
+        font-size: 13px;
+        padding: 0 9px;
+      }
+
+      .nav-item.active {
+        background: rgba(255, 255, 255, 0.055);
+        color: var(--text);
+      }
+
+      .nav-dot {
+        width: 16px;
+        color: var(--primary);
+        text-align: center;
+      }
+
+      .main {
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-rows: 54px minmax(0, 1fr);
+      }
+
+      .topbar {
+        display: flex;
+        min-height: 54px;
+        align-items: center;
+        justify-content: center;
+        border-bottom: 1px solid var(--line-soft);
+        background: rgba(5, 5, 5, 0.76);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .topbar strong {
+        color: var(--text);
+        font-weight: 650;
+      }
+
+      .chat-stage {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: var(--sessions-width) minmax(0, 1fr);
+      }
+
+      .chat-stage.collapsed {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .sessions-panel {
+        display: grid;
+        min-height: 0;
+        grid-template-rows: auto auto auto minmax(0, 1fr);
+        border-right: 1px solid var(--line-soft);
+        background: rgba(11, 11, 12, 0.86);
+        padding: 14px 10px;
+      }
+
+      .chat-stage.collapsed .sessions-panel {
+        display: none;
+      }
+
+      .sessions-head {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 0 4px 9px;
+      }
+
+      .sessions-head h2 {
+        color: var(--text);
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .new-chat {
+        display: flex;
+        min-height: 38px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.055);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .session-actions {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .context-action {
+        display: flex;
+        min-height: 34px;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.025);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 620;
+      }
+
+      .session-section-label {
+        margin: 0 8px 7px;
+        color: var(--disabled);
+        font-size: 10px;
+        font-weight: 760;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .session-list {
+        display: grid;
+        align-content: start;
+        gap: 2px;
+        min-height: 0;
+        overflow: auto;
+      }
+
+      .session-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 24px;
+        min-height: 39px;
+        align-items: center;
+        border-radius: var(--radius-sm);
+        color: var(--muted);
+        padding: 0 4px 0 10px;
+      }
+
+      .session-row.active {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      .session-row strong {
+        overflow: hidden;
+        font-size: 13px;
+        font-weight: 620;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .session-row .archive {
+        opacity: 0.58;
+      }
+
+      .thread {
+        position: relative;
+        display: grid;
+        min-width: 0;
+        min-height: 0;
+        grid-template-rows: auto minmax(0, 1fr);
+        background: #050505;
+      }
+
+      .thread-header {
+        display: flex;
+        min-height: 44px;
+        align-items: center;
+        padding: 0 0;
+      }
+
+      .thread-header-inner {
+        display: flex;
+        width: min(var(--chat-column), calc(100% - 48px));
+        align-items: center;
+        gap: 10px;
+        margin: 0 auto;
+      }
+
+      .thread-header h2 {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--body);
+        font-size: 15px;
+        font-weight: 690;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .thread-scroll {
+        min-height: 0;
+        overflow: auto;
+        padding: 22px 0 156px;
+      }
+
+      .chat-column {
+        display: grid;
+        width: min(var(--chat-column), calc(100% - 48px));
+        gap: 26px;
+        margin: 0 auto;
+      }
+
+      .message {
+        display: grid;
+        gap: 7px;
+        max-width: 100%;
+      }
+
+      .message.user {
+        justify-self: end;
+        max-width: 62%;
+      }
+
+      .user-bubble {
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-xl);
+        background: #1c1e22;
+        color: var(--text);
+        padding: 8px 12px;
+        font-size: 14px;
+        line-height: 1.62;
+      }
+
+      .user-meta {
+        display: flex;
+        min-height: 22px;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .user-tools {
+        display: flex;
+        gap: 5px;
+      }
+
+      .assistant-body {
+        color: var(--body);
+        font-size: 14px;
+        line-height: 1.76;
+      }
+
+      .assistant-body p + p {
+        margin-top: 10px;
+      }
+
+      .source-summary {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 7px;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-size: 12px;
+        padding: 0;
+      }
+
+      .source-dot {
+        display: inline-grid;
+        width: 18px;
+        height: 18px;
+        place-items: center;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--body);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .composer-dock {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        padding: 0 0 22px;
+        pointer-events: none;
+      }
+
+      .composer {
+        display: grid;
+        overflow: hidden;
+        width: min(var(--chat-column), calc(100% - 48px));
+        min-height: 112px;
+        margin: 0 auto;
+        border: 1px solid rgba(255, 255, 255, 0.095);
+        border-radius: 20px;
+        background: var(--composer);
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.36);
+        pointer-events: auto;
+      }
+
+      .composer textarea {
+        width: 100%;
+        min-height: 58px;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        outline: 0;
+        padding: 14px 16px 4px;
+        resize: none;
+      }
+
+      .composer textarea::placeholder {
+        color: #858893;
+      }
+
+      .composer-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 10px 10px;
+      }
+
+      .composer-left,
+      .composer-right {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .text-select {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        gap: 6px;
+        border: 0;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: #d0d3df;
+        font-size: 13px;
+        font-weight: 620;
+        padding: 0 3px;
+      }
+
+      .context-link {
+        color: var(--muted);
+      }
+
+      .icon-button,
+      .icon-ghost,
+      .send-button,
+      .button,
+      .mode-option,
+      .compact-source {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--line);
+        background: var(--raised);
+        color: var(--text);
+      }
+
+      .icon-button {
+        width: 31px;
+        height: 31px;
+        flex: 0 0 auto;
+        border-radius: var(--radius);
+        padding: 0;
+      }
+
+      .icon-ghost {
+        width: 26px;
+        height: 26px;
+        flex: 0 0 auto;
+        border-color: transparent;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--muted);
+        padding: 0;
+      }
+
+      .send-button {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 auto;
+        border-color: rgba(36, 211, 196, 0.35);
+        border-radius: 999px;
+        background: var(--primary);
+        color: var(--primary-fg);
+        font-size: 18px;
+        font-weight: 760;
+        padding: 0;
+      }
+
+      .send-button.danger {
+        border-color: rgba(255, 107, 107, 0.32);
+        background: rgba(255, 107, 107, 0.12);
+        color: #ffc1c1;
+      }
+
+      .button {
+        min-height: 34px;
+        gap: 7px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        font-weight: 620;
+        padding: 0 12px;
+      }
+
+      .button.primary {
+        border-color: rgba(36, 211, 196, 0.35);
+        background: var(--primary);
+        color: var(--primary-fg);
+      }
+
+      .button.ghost {
+        border-color: transparent;
+        background: transparent;
+        color: var(--muted);
+      }
+
+      .sheet-scrim {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        background: rgba(0, 0, 0, 0.34);
+      }
+
+      .sheet {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 6;
+        display: grid;
+        width: min(var(--sheet-width), 52vw);
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        border-left: 1px solid var(--line);
+        background: #0b0b0c;
+        box-shadow: -28px 0 80px rgba(0, 0, 0, 0.36);
+      }
+
+      .sheet-head {
+        display: flex;
+        min-height: 62px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line-soft);
+        padding: 0 18px;
+      }
+
+      .sheet-title {
+        display: grid;
+        gap: 4px;
+      }
+
+      .sheet-title h2 {
+        font-size: 17px;
+        font-weight: 720;
+      }
+
+      .sheet-title p {
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .sheet-body {
+        display: grid;
+        align-content: start;
+        gap: 17px;
+        min-height: 0;
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .sheet-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        border-top: 1px solid var(--line-soft);
+        padding: 14px 18px;
+      }
+
+      .section {
+        display: grid;
+        gap: 10px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .section h3 {
+        font-size: 14px;
+        font-weight: 680;
+      }
+
+      .section-note {
+        color: var(--faint);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .source-list {
+        display: grid;
+        max-height: 156px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        overflow-y: auto;
+        scrollbar-color: var(--line-strong) transparent;
+        scrollbar-width: thin;
+      }
+
+      .compact-source {
+        display: grid;
+        min-height: 38px;
+        grid-template-columns: 22px minmax(0, 1fr) auto;
+        justify-content: stretch;
+        gap: 10px;
+        border-width: 0 0 1px;
+        border-color: var(--line-soft);
+        border-radius: 0;
+        background: rgba(255, 255, 255, 0.018);
+        padding: 0 10px;
+      }
+
+      .compact-source:last-child {
+        border-bottom: 0;
+      }
+
+      .compact-source.disabled {
+        color: var(--disabled);
+      }
+
+      .source-box {
+        display: grid;
+        width: 15px;
+        height: 15px;
+        place-items: center;
+        border: 1px solid rgba(36, 211, 196, 0.35);
+        border-radius: 4px;
+        background: rgba(36, 211, 196, 0.12);
+        color: var(--primary);
+        font-size: 10px;
+      }
+
+      .source-box.empty {
+        border-color: var(--line-strong);
+        background: transparent;
+        color: transparent;
+      }
+
+      .source-name {
+        overflow: hidden;
+        color: var(--body);
+        font-size: 13px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .source-status {
+        color: var(--faint);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .mode-list {
+        display: grid;
+        gap: 7px;
+      }
+
+      .mode-option {
+        display: grid;
+        min-height: 58px;
+        grid-template-columns: 18px minmax(0, 1fr);
+        justify-content: stretch;
+        gap: 10px;
+        border-color: var(--line-soft);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.02);
+        padding: 10px 12px;
+        text-align: left;
+      }
+
+      .mode-option.active {
+        border-color: rgba(36, 211, 196, 0.22);
+        background: rgba(36, 211, 196, 0.075);
+      }
+
+      .radio-dot {
+        width: 12px;
+        height: 12px;
+        margin-top: 3px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+      }
+
+      .mode-option.active .radio-dot {
+        border: 3px solid var(--primary);
+      }
+
+      .mode-copy {
+        display: grid;
+        gap: 3px;
+      }
+
+      .mode-copy strong {
+        font-size: 13px;
+        font-weight: 670;
+      }
+
+      .mode-copy span {
+        color: var(--faint);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .option-row {
+        display: flex;
+        min-height: 48px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .option-row:last-child {
+        border-bottom: 0;
+      }
+
+      .option-copy {
+        display: grid;
+        gap: 3px;
+      }
+
+      .option-copy strong {
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .option-copy span {
+        color: var(--faint);
+        font-size: 12px;
+      }
+
+      .switch {
+        position: relative;
+        width: 35px;
+        height: 20px;
+        flex: 0 0 auto;
+        border: 1px solid rgba(36, 211, 196, 0.35);
+        border-radius: 999px;
+        background: rgba(36, 211, 196, 0.16);
+      }
+
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: var(--primary);
+      }
+
+      .textarea-field {
+        min-height: 96px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: #0c0d0f;
+        color: var(--body);
+        outline: 0;
+        padding: 11px;
+        resize: vertical;
+      }
+
+      .snapshot-meta {
+        display: grid;
+        gap: 8px;
+        border-bottom: 1px solid var(--line-soft);
+        padding-bottom: 14px;
+      }
+
+      .snapshot-row {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr);
+        gap: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .snapshot-row strong {
+        color: var(--faint);
+        font-weight: 620;
+      }
+
+      .citation-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .citation-card {
+        display: grid;
+        gap: 6px;
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius);
+        background: rgba(255, 255, 255, 0.024);
+        padding: 10px 11px;
+      }
+
+      .citation-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .citation-card h3 {
+        overflow: hidden;
+        font-size: 13px;
+        font-weight: 690;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .score {
+        color: var(--faint);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .citation-meta {
+        overflow: hidden;
+        color: var(--faint);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .excerpt {
+        display: -webkit-box;
+        overflow: hidden;
+        color: var(--body);
+        font-size: 12px;
+        line-height: 1.55;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      .ghost-page {
+        opacity: 0.48;
+      }
+
+      .typing {
+        display: inline-flex;
+        gap: 4px;
+        vertical-align: middle;
+      }
+
+      .typing span {
+        width: 5px;
+        height: 5px;
+        border-radius: 999px;
+        background: var(--faint);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+
+      .typing span:nth-child(2) {
+        animation-delay: 0.16s;
+      }
+
+      .typing span:nth-child(3) {
+        animation-delay: 0.32s;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.34;
+        }
+
+        50% {
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 980px) {
+        body {
+          padding: 14px;
+        }
+
+        .frame {
+          height: 820px;
+        }
+
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar,
+        .sessions-panel {
+          display: none;
+        }
+
+        .chat-stage {
+          grid-template-columns: 1fr;
+        }
+
+        .sheet {
+          width: min(92vw, var(--sheet-width));
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="preview">
+      <div class="state-title">
+        <h1>State A: Sessions Expanded</h1>
+        <span>窄 sessions panel + 固定宽度 chat column</span>
+      </div>
+
+      <section class="frame" aria-label="Global chat sessions expanded">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="brand-mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+            <nav class="nav" aria-label="Preview navigation">
+              <div class="nav-item"><span class="nav-dot">D</span>Overview</div>
+              <div class="nav-item active"><span class="nav-dot">C</span>Global chat</div>
+              <div class="nav-item"><span class="nav-dot">S</span>Sources</div>
+              <div class="nav-item"><span class="nav-dot">M</span>Models</div>
+            </nav>
+          </aside>
+
+          <section class="main">
+            <header class="topbar">Console / <strong>Global chat</strong></header>
+
+            <div class="chat-stage">
+              <aside class="sessions-panel" aria-label="Chat sessions">
+                <div class="sessions-head">
+                  <h2>Chats</h2>
+                  <button class="icon-ghost" type="button" title="Collapse sessions">◧</button>
+                </div>
+
+                <div class="session-actions">
+                  <button class="new-chat" type="button">+ New chat</button>
+                  <button class="context-action" type="button">⚙ Context settings</button>
+                </div>
+
+                <p class="session-section-label">Chat</p>
+
+                <div class="session-list">
+                  <article class="session-row active">
+                    <strong>Widget embed question</strong>
+                    <button class="icon-ghost archive" type="button" title="Archive">⌫</button>
+                  </article>
+                  <article class="session-row">
+                    <strong>Plain model test</strong>
+                    <button class="icon-ghost archive" type="button" title="Archive">⌫</button>
+                  </article>
+                  <article class="session-row">
+                    <strong>Source indexing check</strong>
+                    <button class="icon-ghost archive" type="button" title="Archive">⌫</button>
+                  </article>
+                  <article class="session-row">
+                    <strong>Follow-up rewrite test</strong>
+                    <button class="icon-ghost archive" type="button" title="Archive">⌫</button>
+                  </article>
+                </div>
+              </aside>
+
+              <section class="thread" aria-label="Chat thread">
+                <header class="thread-header">
+                  <div class="thread-header-inner">
+                    <h2>Widget embed question</h2>
+                  </div>
+                </header>
+
+                <div class="thread-scroll">
+                  <div class="chat-column">
+                    <article class="message user">
+                      <div class="user-bubble">如何在静态文档站点中嵌入挂件？</div>
+                      <div class="user-meta">
+                        <span>OpenAI / gpt-4.1-mini · 17:09</span>
+                        <span class="user-tools">
+                          <button class="icon-ghost" type="button" title="Restart">↩</button>
+                          <button class="icon-ghost" type="button" title="Copy">⧉</button>
+                        </span>
+                      </div>
+                    </article>
+
+                    <article class="message assistant">
+                      <div class="assistant-body">
+                        <p>将挂件脚本添加到宿主页面，并传入对应的项目标识符。</p>
+                        <p>如果站点是静态文档站点，优先把脚本放在公共 layout 或全局模板里，避免每个页面重复维护。</p>
+                      </div>
+                      <button class="source-summary" type="button">
+                        <span class="source-dot">3</span>
+                        <span>source items</span>
+                      </button>
+                    </article>
+
+                    <article class="message user">
+                      <div class="user-bubble">如果没有选择 source，会发生什么？</div>
+                      <div class="user-meta">
+                        <span>Google AI / gemini-2.5-flash · 17:13</span>
+                        <span class="user-tools">
+                          <button class="icon-ghost" type="button" title="Restart">↩</button>
+                          <button class="icon-ghost" type="button" title="Copy">⧉</button>
+                        </span>
+                      </div>
+                    </article>
+
+                    <article class="message assistant">
+                      <div class="assistant-body">
+                        <p>不会走 RAG。Global chat 只有在请求显式传入 sources 时才会检索，未选择 source 时会退化为普通 LLM chat。</p>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                <div class="composer-dock">
+                  <section class="composer" aria-label="Message composer">
+                    <textarea placeholder="Ask TadaAsk..."></textarea>
+                    <div class="composer-bar">
+                      <div class="composer-left">
+                        <button class="text-select" type="button">OpenAI / gpt-4.1-mini ⌄</button>
+                        <button class="text-select" type="button">Medium ⌄</button>
+                        <button class="text-select context-link" type="button">2 sources selected</button>
+                      </div>
+                      <div class="composer-right">
+                        <button class="send-button" type="button" title="Send">↑</button>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State B: Sessions Collapsed</h1>
+        <span>chat column 宽度不变，只在新的 content 区域居中</span>
+      </div>
+
+      <section class="frame" aria-label="Global chat sessions collapsed">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="brand-mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+            <nav class="nav" aria-label="Preview navigation">
+              <div class="nav-item active"><span class="nav-dot">C</span>Global chat</div>
+              <div class="nav-item"><span class="nav-dot">S</span>Sources</div>
+            </nav>
+          </aside>
+
+          <section class="main">
+            <header class="topbar">Console / <strong>Global chat</strong></header>
+
+            <div class="chat-stage collapsed">
+              <section class="thread" aria-label="Chat thread">
+                <header class="thread-header">
+                  <div class="thread-header-inner">
+                    <button class="icon-ghost" type="button" title="New chat">□</button>
+                    <button class="icon-ghost" type="button" title="Open sessions">☰</button>
+                    <h2>Widget embed question</h2>
+                    <button class="icon-ghost" type="button" title="Context settings">⚙</button>
+                  </div>
+                </header>
+
+                <div class="thread-scroll">
+                  <div class="chat-column">
+                    <article class="message user">
+                      <div class="user-bubble">怎么确认这次回答真的用了知识库？</div>
+                      <div class="user-meta">
+                        <span>OpenAI / gpt-4.1-mini · 17:18</span>
+                        <span class="user-tools">
+                          <button class="icon-ghost" type="button">↩</button>
+                          <button class="icon-ghost" type="button">⧉</button>
+                        </span>
+                      </div>
+                    </article>
+
+                    <article class="message assistant">
+                      <div class="assistant-body">
+                        <p>回答完成后查看 assistant message 下方的 source item 摘要。如果有 RAG 快照，会显示引用来源数量，点击后可在右侧 citations sheet 中查看具体条目。</p>
+                      </div>
+                      <button class="source-summary" type="button">
+                        <span class="source-dot">2</span>
+                        <span>source items</span>
+                      </button>
+                    </article>
+                  </div>
+                </div>
+
+                <div class="composer-dock">
+                  <section class="composer">
+                    <textarea placeholder="Ask TadaAsk..."></textarea>
+                    <div class="composer-bar">
+                      <div class="composer-left">
+                        <button class="text-select" type="button">Google AI / gemini-2.5-flash ⌄</button>
+                        <button class="text-select" type="button">Low ⌄</button>
+                        <button class="text-select context-link" type="button">2 sources selected</button>
+                      </div>
+                      <button class="send-button" type="button">↑</button>
+                    </div>
+                  </section>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <div class="state-title">
+        <h1>State C: Context Settings Sheet</h1>
+        <span>更宽 sheet + compact source list + RAG mode 说明</span>
+      </div>
+
+      <section class="frame" aria-label="Context settings sheet">
+        <div class="shell ghost-page">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="brand-mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+          </aside>
+          <section class="main">
+            <header class="topbar">Console / <strong>Global chat</strong></header>
+            <div class="chat-stage collapsed">
+              <section class="thread">
+                <header class="thread-header">
+                  <div class="thread-header-inner">
+                    <button class="icon-ghost" type="button">□</button>
+                    <button class="icon-ghost" type="button">☰</button>
+                    <h2>Widget embed question</h2>
+                    <button class="icon-ghost" type="button">⚙</button>
+                  </div>
+                </header>
+                <div class="thread-scroll">
+                  <div class="chat-column">
+                    <article class="message assistant">
+                      <div class="assistant-body">
+                        <p>Context settings change the next request. Empty sources means plain LLM chat.</p>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+                <div class="composer-dock">
+                  <section class="composer">
+                    <textarea placeholder="Ask TadaAsk..."></textarea>
+                    <div class="composer-bar">
+                      <div class="composer-left">
+                        <button class="text-select" type="button">OpenAI / gpt-4.1-mini ⌄</button>
+                        <button class="text-select" type="button">Medium ⌄</button>
+                        <button class="text-select context-link" type="button">2 sources selected</button>
+                      </div>
+                      <button class="send-button" type="button">↑</button>
+                    </div>
+                  </section>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+
+        <div class="sheet-scrim"></div>
+        <aside class="sheet" aria-label="Context settings">
+          <header class="sheet-head">
+            <div class="sheet-title">
+              <h2>Context settings</h2>
+              <p>Applied to the next global chat request</p>
+            </div>
+            <button class="icon-button" type="button">×</button>
+          </header>
+
+          <div class="sheet-body">
+            <section class="section">
+              <div class="section-head">
+                <div>
+                  <h3>Sources</h3>
+                  <p class="section-note">Only indexed sources can be selected.</p>
+                </div>
+                <span class="section-note">2 selected</span>
+              </div>
+
+              <div class="source-list">
+                <button class="compact-source" type="button">
+                  <span class="source-box">✓</span>
+                  <span class="source-name">Product docs</span>
+                  <span class="source-status">24 items</span>
+                </button>
+                <button class="compact-source" type="button">
+                  <span class="source-box">✓</span>
+                  <span class="source-name">Frontend notes</span>
+                  <span class="source-status">8 items</span>
+                </button>
+                <button class="compact-source" type="button">
+                  <span class="source-box empty">-</span>
+                  <span class="source-name">Release notes archive</span>
+                  <span class="source-status">16 items</span>
+                </button>
+                <button class="compact-source" type="button">
+                  <span class="source-box empty">-</span>
+                  <span class="source-name">Widget install FAQ</span>
+                  <span class="source-status">11 items</span>
+                </button>
+                <button class="compact-source" type="button">
+                  <span class="source-box empty">-</span>
+                  <span class="source-name">Backend source map</span>
+                  <span class="source-status">7 items</span>
+                </button>
+                <button class="compact-source" type="button">
+                  <span class="source-box empty">-</span>
+                  <span class="source-name">API reference notes</span>
+                  <span class="source-status">31 items</span>
+                </button>
+                <button class="compact-source disabled" type="button">
+                  <span class="source-box empty">-</span>
+                  <span class="source-name">Draft crawl</span>
+                  <span class="source-status">processing</span>
+                </button>
+              </div>
+            </section>
+
+            <section class="section">
+              <h3>RAG mode</h3>
+              <div class="mode-list">
+                <button class="mode-option" type="button">
+                  <span class="radio-dot"></span>
+                  <span class="mode-copy">
+                    <strong>Fast</strong>
+                    <span>raw FTS + raw vector → RRF rank → rerank when enabled.</span>
+                  </span>
+                </button>
+                <button class="mode-option active" type="button">
+                  <span class="radio-dot"></span>
+                  <span class="mode-copy">
+                    <strong>Adaptive</strong>
+                    <span>Start from raw query and expand only when candidate quality is low.</span>
+                  </span>
+                </button>
+                <button class="mode-option" type="button">
+                  <span class="radio-dot"></span>
+                  <span class="mode-copy">
+                    <strong>Full</strong>
+                    <span>raw FTS + raw vector + query expansion → RRF rank → optional rerank.</span>
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            <section class="section">
+              <article class="option-row">
+                <span class="option-copy">
+                  <strong>Rerank results</strong>
+                  <span>Reorder candidates before building context.</span>
+                </span>
+                <span class="switch"></span>
+              </article>
+              <article class="option-row">
+                <span class="option-copy">
+                  <strong>Rewrite follow-up question</strong>
+                  <span>Build a standalone search query from recent messages.</span>
+                </span>
+                <span class="switch"></span>
+              </article>
+            </section>
+
+            <section class="section">
+              <h3>Admin instructions</h3>
+              <p class="section-note">Optional request-level system prompt.</p>
+              <textarea class="textarea-field">回答时优先给出简洁步骤。涉及当前知识库内容时必须使用引用编号。</textarea>
+            </section>
+          </div>
+
+          <footer class="sheet-footer">
+            <button class="button ghost" type="button">Reset</button>
+            <button class="button primary" type="button">Apply</button>
+          </footer>
+        </aside>
+      </section>
+
+      <div class="state-title">
+        <h1>State D: Citations Sheet</h1>
+        <span>非 card summary + 更紧凑 citation rows</span>
+      </div>
+
+      <section class="frame" aria-label="Citations sheet">
+        <div class="shell ghost-page">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="brand-mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+          </aside>
+          <section class="main">
+            <header class="topbar">Console / <strong>Global chat</strong></header>
+            <div class="chat-stage collapsed">
+              <section class="thread">
+                <header class="thread-header">
+                  <div class="thread-header-inner">
+                    <h2>Widget embed question</h2>
+                  </div>
+                </header>
+                <div class="thread-scroll">
+                  <div class="chat-column">
+                    <article class="message assistant">
+                      <div class="assistant-body">
+                        <p>将挂件脚本添加到宿主页面，并传入对应的项目标识符。</p>
+                      </div>
+                      <button class="source-summary" type="button">
+                        <span class="source-dot">3</span>
+                        <span>source items</span>
+                      </button>
+                    </article>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+
+        <div class="sheet-scrim"></div>
+        <aside class="sheet" aria-label="Citations">
+          <header class="sheet-head">
+            <div class="sheet-title">
+              <h2>Citations</h2>
+              <p>Retrieved context for this assistant answer</p>
+            </div>
+            <button class="icon-button" type="button">×</button>
+          </header>
+
+          <div class="sheet-body">
+            <section class="snapshot-meta" aria-label="Snapshot summary">
+              <div class="snapshot-row">
+                <strong>Query</strong>
+                <span>如何在静态文档站点中嵌入挂件？</span>
+              </div>
+              <div class="snapshot-row">
+                <strong>Standalone</strong>
+                <span>如何嵌入 TadaAsk widget?</span>
+              </div>
+              <div class="snapshot-row">
+                <strong>Context</strong>
+                <span>3 source items used in answer context</span>
+              </div>
+            </section>
+
+            <section class="citation-list">
+              <article class="citation-card">
+                <div class="citation-top">
+                  <h3>[1] frontend-ui-scope-constraints.md</h3>
+                  <span class="score">0.92</span>
+                </div>
+                <p class="citation-meta">Frontend notes · Widget UI boundary · used</p>
+                <p class="excerpt">Widget public API 尚未最终确定。MVP 阶段样式自定义主要通过 CSS tokens 完成。</p>
+              </article>
+
+              <article class="citation-card">
+                <div class="citation-top">
+                  <h3>[2] widget-install.md</h3>
+                  <span class="score">0.87</span>
+                </div>
+                <p class="citation-meta">Product docs · https://example.com/docs/widget-install</p>
+                <p class="excerpt">Embed the script on the host page and pass the project identifier.</p>
+              </article>
+
+              <article class="citation-card">
+                <div class="citation-top">
+                  <h3>[3] deploy-checklist.pdf</h3>
+                  <span class="score">0.81</span>
+                </div>
+                <p class="citation-meta">Product docs · page 4 · Static site installation</p>
+                <p class="excerpt">Put the widget snippet in a shared layout so every generated page can load the assistant.</p>
+              </article>
+            </section>
+          </div>
+        </aside>
+      </section>
+
+      <div class="state-title">
+        <h1>State E: Streaming</h1>
+        <span>composer 覆盖 messages，stop 替代 send</span>
+      </div>
+
+      <section class="frame" aria-label="Streaming global chat">
+        <div class="shell">
+          <aside class="sidebar">
+            <div class="brand">
+              <div class="brand-mark">T</div>
+              <strong>TadaAsk</strong>
+            </div>
+            <nav class="nav">
+              <div class="nav-item active"><span class="nav-dot">C</span>Global chat</div>
+            </nav>
+          </aside>
+
+          <section class="main">
+            <header class="topbar">Console / <strong>Global chat</strong></header>
+
+            <div class="chat-stage collapsed">
+              <section class="thread">
+                <header class="thread-header">
+                  <div class="thread-header-inner">
+                    <button class="icon-ghost" type="button">□</button>
+                    <button class="icon-ghost" type="button">☰</button>
+                    <h2>Source indexing check</h2>
+                    <button class="icon-ghost" type="button">⚙</button>
+                  </div>
+                </header>
+
+                <div class="thread-scroll">
+                  <div class="chat-column">
+                    <article class="message user">
+                      <div class="user-bubble">请根据当前选择的 sources 总结 widget 嵌入流程。</div>
+                      <div class="user-meta">
+                        <span>OpenAI / gpt-4.1-mini · 17:26</span>
+                      </div>
+                    </article>
+                    <article class="message assistant">
+                      <div class="assistant-body">
+                        <p>
+                          可以先确认项目标识符，然后把 widget 脚本放到站点的公共模板中。接下来需要
+                          <span class="typing"><span></span><span></span><span></span></span>
+                        </p>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+
+                <div class="composer-dock">
+                  <section class="composer">
+                    <textarea disabled>请根据当前选择的 sources 总结 widget 嵌入流程。</textarea>
+                    <div class="composer-bar">
+                      <div class="composer-left">
+                        <button class="text-select" type="button">OpenAI / gpt-4.1-mini ⌄</button>
+                        <button class="text-select" type="button">Medium ⌄</button>
+                        <button class="text-select context-link" type="button">2 sources selected</button>
+                      </div>
+                      <button class="send-button danger" type="button" title="Stop">■</button>
+                    </div>
+                  </section>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
