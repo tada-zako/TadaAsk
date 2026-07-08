@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { Database, Settings2 } from "@lucide/vue";
+import { Settings2, FileText, Globe2 } from "@lucide/vue";
+import { storeToRefs } from "pinia";
+import { useI18n } from "vue-i18n";
 
+import { useGlobalChatStore } from "@/console/stores/global-chat";
+import { useSourceStore } from "@/console/stores/source";
 import { Button } from "@/shared/components/ui/button";
 import { Checkbox } from "@/shared/components/ui/checkbox";
 import { Label } from "@/shared/components/ui/label";
@@ -13,6 +17,36 @@ import {
 } from "@/shared/components/ui/sheet";
 import { Switch } from "@/shared/components/ui/switch";
 import { Textarea } from "@/shared/components/ui/textarea";
+
+const { compact = false } = defineProps<{
+  compact?: boolean;
+}>();
+
+const { t, te } = useI18n();
+const globalChatStore = useGlobalChatStore();
+const sourceStore = useSourceStore();
+const { adminSystemPrompt, ragOptions, selectedSourceCount } =
+  storeToRefs(globalChatStore);
+const { isLoading, sources } = storeToRefs(sourceStore);
+
+// 通过 store action 修改 RAG 模式
+function setRagMode(mode: "fast" | "adaptive" | "full") {
+  globalChatStore.setRagMode(mode);
+}
+
+function setSourceSelected(sourceUid: string, value: unknown) {
+  globalChatStore.setSourceSelected(sourceUid, Boolean(value));
+}
+
+function sourceTypeLabel(sourceType: string): string {
+  const key = `sources.service.sourceType.${sourceType}`;
+  return te(key) ? t(key) : sourceType;
+}
+
+function sourceStatusLabel(status: string): string {
+  const key = `sources.service.sourceStatus.${status}`;
+  return te(key) ? t(key) : status;
+}
 </script>
 
 <template>
@@ -20,12 +54,18 @@ import { Textarea } from "@/shared/components/ui/textarea";
     <SheetTrigger as-child>
       <Button
         type="button"
-        aria-label="Open context settings"
-        variant="outline"
-        class="h-9 justify-start gap-2 rounded-(--console-radius-lg) border-(--line-soft) bg-transparent text-[13px] font-medium text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
+        :aria-label="t('chat.context.openAria')"
+        :title="compact ? t('chat.context.title') : undefined"
+        :variant="compact ? 'ghost' : 'outline'"
+        class="gap-2 text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
+        :class="
+          compact
+            ? 'size-8 rounded-(--console-radius-md) px-0'
+            : 'h-9 justify-start rounded-(--console-radius-lg) border-(--line-soft) bg-transparent text-[13px] font-medium'
+        "
       >
         <Settings2 class="size-4" />
-        Context settings
+        <span v-if="!compact">{{ t("chat.context.title") }}</span>
       </Button>
     </SheetTrigger>
 
@@ -33,7 +73,9 @@ import { Textarea } from "@/shared/components/ui/textarea";
       class="!right-0 !w-[min(600px,100dvw)] !max-w-[100dvw] min-w-0 gap-0 overflow-hidden border-(--line) bg-[#0d0e10] p-0 sm:max-w-none"
     >
       <SheetHeader class="border-b border-(--line-soft) px-5 py-4">
-        <SheetTitle class="text-[15px]">Context settings</SheetTitle>
+        <SheetTitle class="text-[15px]">{{
+          t("chat.context.title")
+        }}</SheetTitle>
       </SheetHeader>
 
       <div
@@ -41,105 +83,74 @@ import { Textarea } from "@/shared/components/ui/textarea";
       >
         <!-- 知识库来源选择 -->
         <section class="grid gap-3">
+          <!-- sub header -->
           <div class="flex items-start justify-between gap-3">
             <div>
               <h2 class="text-[13px] font-semibold text-(--text-strong)">
-                Sources
+                {{ t("chat.context.sources.title") }}
               </h2>
               <p class="mt-1 text-xs leading-5 text-(--text-faint)">
-                Leave empty to send a normal LLM chat request.
+                {{ t("chat.context.sources.help") }}
               </p>
             </div>
             <span
               class="rounded-full border border-(--line-soft) px-2 py-1 text-[11px] text-(--text-muted)"
             >
-              2 selected
+              {{
+                t("chat.context.sources.selected", {
+                  count: selectedSourceCount,
+                })
+              }}
             </span>
           </div>
 
+          <!-- selector -->
           <div
             class="console-scrollbar max-h-43 overflow-y-auto rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft)"
           >
-            <label
-              class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px]"
+            <p
+              v-if="isLoading"
+              class="px-3 py-3 text-[12px] text-(--text-faint)"
             >
-              <Checkbox
-                :default-value="true"
-                aria-label="Select Product docs"
-              />
-              <span class="min-w-0">
-                <span class="block truncate font-medium text-(--text-strong)">
-                  Product docs
-                </span>
-                <span class="block truncate text-[11px] text-(--text-faint)">
-                  128 source items
-                </span>
-              </span>
-              <Database class="size-3.5 text-(--text-disabled)" />
-            </label>
-
-            <label
-              class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px]"
+              {{ t("chat.context.sources.loading") }}
+            </p>
+            <p
+              v-else-if="sources.length === 0"
+              class="px-3 py-3 text-[12px] leading-5 text-(--text-faint)"
             >
-              <Checkbox
-                :default-value="true"
-                aria-label="Select Frontend notes"
-              />
-              <span class="min-w-0">
-                <span class="block truncate font-medium text-(--text-strong)">
-                  Frontend notes
+              {{ t("chat.context.sources.empty") }}
+            </p>
+            <template v-else>
+              <label
+                v-for="source in sources"
+                :key="source.uid"
+                class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px]"
+              >
+                <Checkbox
+                  :aria-label="
+                    t('chat.context.sources.selectAria', {
+                      name: source.sourceName,
+                    })
+                  "
+                  :model-value="globalChatStore.isSourceSelected(source.uid)"
+                  @update:model-value="setSourceSelected(source.uid, $event)"
+                />
+                <span class="min-w-0">
+                  <span class="block truncate font-medium text-(--text-strong)">
+                    {{ source.sourceName }}
+                  </span>
+                  <span class="block truncate text-[11px] text-(--text-faint)">
+                    {{ sourceTypeLabel(source.sourceType) }} ·
+                    {{ sourceStatusLabel(source.status) }}
+                  </span>
                 </span>
-                <span class="block truncate text-[11px] text-(--text-faint)">
-                  42 source items
-                </span>
-              </span>
-              <Database class="size-3.5 text-(--text-disabled)" />
-            </label>
-
-            <label
-              class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px]"
-            >
-              <Checkbox aria-label="Select Widget integration" />
-              <span class="min-w-0">
-                <span class="block truncate font-medium text-(--text-body)">
-                  Widget integration
-                </span>
-                <span class="block truncate text-[11px] text-(--text-faint)">
-                  76 source items
-                </span>
-              </span>
-              <Database class="size-3.5 text-(--text-disabled)" />
-            </label>
-
-            <label
-              class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px]"
-            >
-              <Checkbox aria-label="Select API reference" />
-              <span class="min-w-0">
-                <span class="block truncate font-medium text-(--text-body)">
-                  API reference
-                </span>
-                <span class="block truncate text-[11px] text-(--text-faint)">
-                  213 source items
-                </span>
-              </span>
-              <Database class="size-3.5 text-(--text-disabled)" />
-            </label>
-
-            <label
-              class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 text-[13px]"
-            >
-              <Checkbox aria-label="Select Support archive" />
-              <span class="min-w-0">
-                <span class="block truncate font-medium text-(--text-body)">
-                  Support archive
-                </span>
-                <span class="block truncate text-[11px] text-(--text-faint)">
-                  305 source items
-                </span>
-              </span>
-              <Database class="size-3.5 text-(--text-disabled)" />
-            </label>
+                <Globe2
+                  v-if="source.sourceType === 'web_crawl'"
+                  class="size-3.5 text-(--text-disabled)"
+                />
+                <FileText v-else class="size-3.5 text-(--text-disabled)" />
+              </label>
+            </template>
           </div>
         </section>
 
@@ -147,50 +158,89 @@ import { Textarea } from "@/shared/components/ui/textarea";
         <section class="grid gap-3 border-t border-(--line-soft) pt-4">
           <div>
             <h2 class="text-[13px] font-semibold text-(--text-strong)">
-              RAG mode
+              {{ t("chat.context.ragMode.title") }}
             </h2>
             <p class="mt-1 text-xs leading-5 text-(--text-faint)">
-              Controls how much retrieval work is done before answering.
+              {{ t("chat.context.ragMode.help") }}
             </p>
           </div>
 
           <div class="grid gap-2">
             <button
               type="button"
-              aria-label="Use fast RAG mode"
-              class="border-primary/35 bg-primary/10 grid gap-1 rounded-(--console-radius-lg) border px-3 py-2.5 text-left"
+              :aria-label="t('chat.context.ragMode.fastAria')"
+              class="grid gap-1 rounded-(--console-radius-lg) border px-3 py-2.5 text-left"
+              :class="
+                ragOptions.mode === 'fast'
+                  ? 'border-primary/35 bg-primary/10'
+                  : 'border-(--line-soft) bg-(--surface-panel-soft)'
+              "
+              @click="setRagMode('fast')"
             >
-              <span class="text-primary text-[13px] font-semibold">Fast</span>
+              <span
+                class="text-[13px] font-semibold"
+                :class="
+                  ragOptions.mode === 'fast'
+                    ? 'text-primary'
+                    : 'text-(--text-strong)'
+                "
+              >
+                {{ t("chat.context.ragMode.fast") }}
+              </span>
               <span class="text-xs leading-5 text-(--text-muted)">
-                raw FTS + raw vector -> RRF rank -> rerank when enabled.
+                {{ t("chat.context.ragMode.fastHelp") }}
               </span>
             </button>
 
             <button
               type="button"
-              aria-label="Use adaptive RAG mode"
-              class="grid gap-1 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) px-3 py-2.5 text-left"
+              :aria-label="t('chat.context.ragMode.adaptiveAria')"
+              class="grid gap-1 rounded-(--console-radius-lg) border px-3 py-2.5 text-left"
+              :class="
+                ragOptions.mode === 'adaptive'
+                  ? 'border-primary/35 bg-primary/10'
+                  : 'border-(--line-soft) bg-(--surface-panel-soft)'
+              "
+              @click="setRagMode('adaptive')"
             >
-              <span class="text-[13px] font-semibold text-(--text-strong)">
-                Adaptive
+              <span
+                class="text-[13px] font-semibold"
+                :class="
+                  ragOptions.mode === 'adaptive'
+                    ? 'text-primary'
+                    : 'text-(--text-strong)'
+                "
+              >
+                {{ t("chat.context.ragMode.adaptive") }}
               </span>
               <span class="text-xs leading-5 text-(--text-faint)">
-                Start from raw query and expand only when candidate quality is
-                low.
+                {{ t("chat.context.ragMode.adaptiveHelp") }}
               </span>
             </button>
 
             <button
               type="button"
-              aria-label="Use full RAG mode"
-              class="grid gap-1 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) px-3 py-2.5 text-left"
+              :aria-label="t('chat.context.ragMode.fullAria')"
+              class="grid gap-1 rounded-(--console-radius-lg) border px-3 py-2.5 text-left"
+              :class="
+                ragOptions.mode === 'full'
+                  ? 'border-primary/35 bg-primary/10'
+                  : 'border-(--line-soft) bg-(--surface-panel-soft)'
+              "
+              @click="setRagMode('full')"
             >
-              <span class="text-[13px] font-semibold text-(--text-strong)">
-                Full
+              <span
+                class="text-[13px] font-semibold"
+                :class="
+                  ragOptions.mode === 'full'
+                    ? 'text-primary'
+                    : 'text-(--text-strong)'
+                "
+              >
+                {{ t("chat.context.ragMode.full") }}
               </span>
               <span class="text-xs leading-5 text-(--text-faint)">
-                raw FTS + raw vector + query expansion -> RRF rank -> optional
-                rerank.
+                {{ t("chat.context.ragMode.fullHelp") }}
               </span>
             </button>
           </div>
@@ -202,14 +252,19 @@ import { Textarea } from "@/shared/components/ui/textarea";
             class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) p-3"
           >
             <div>
-              <Label class="text-[13px]">Rerank retrieved items</Label>
+              <Label class="text-[13px]">
+                {{ t("chat.context.options.rerank") }}
+              </Label>
               <p class="mt-1 text-xs leading-5 text-(--text-faint)">
-                Improves order when the selected provider supports rerank.
+                {{ t("chat.context.options.rerankHelp") }}
               </p>
             </div>
             <Switch
-              :default-value="true"
-              aria-label="Enable rerank retrieved items"
+              :model-value="ragOptions.rerankEnabled"
+              :aria-label="t('chat.context.options.rerankAria')"
+              @update:model-value="
+                globalChatStore.setRerankEnabled(Boolean($event))
+              "
             />
           </div>
 
@@ -217,14 +272,19 @@ import { Textarea } from "@/shared/components/ui/textarea";
             class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) p-3"
           >
             <div>
-              <Label class="text-[13px]">Standalone query rewrite</Label>
+              <Label class="text-[13px]">
+                {{ t("chat.context.options.standalone") }}
+              </Label>
               <p class="mt-1 text-xs leading-5 text-(--text-faint)">
-                Rewrite follow-up questions before retrieval.
+                {{ t("chat.context.options.standaloneHelp") }}
               </p>
             </div>
             <Switch
-              :default-value="true"
-              aria-label="Enable standalone query rewrite"
+              :model-value="ragOptions.standaloneEnabled"
+              :aria-label="t('chat.context.options.standaloneAria')"
+              @update:model-value="
+                globalChatStore.setStandaloneEnabled(Boolean($event))
+              "
             />
           </div>
         </section>
@@ -236,16 +296,18 @@ import { Textarea } from "@/shared/components/ui/textarea";
               for="admin-system-prompt"
               class="text-[13px] font-semibold text-(--text-strong)"
             >
-              Admin system prompt
+              {{ t("chat.context.prompt.title") }}
             </Label>
             <p class="mt-1 text-xs leading-5 text-(--text-faint)">
-              Administrator-customized system prompt.
+              {{ t("chat.context.prompt.help") }}
             </p>
           </div>
           <Textarea
             id="admin-system-prompt"
             class="min-h-28 border-(--line-soft) bg-(--surface-base) text-sm"
-            default-value="Answer as an internal admin assistant. Prefer concise steps and call out when no source context was used."
+            :model-value="adminSystemPrompt"
+            :placeholder="t('chat.context.prompt.placeholder')"
+            @update:model-value="globalChatStore.setAdminSystemPrompt"
           />
         </section>
       </div>
