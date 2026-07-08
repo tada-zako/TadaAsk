@@ -2,15 +2,23 @@ import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 
 import {
+  buildAdminChatRequest,
+  cancelChatGeneration,
   createDefaultRagOptions,
   deleteChatSession,
   listGlobalChatSessions,
   loadChatMessages,
   revertChatMessage,
+  streamGlobalChatEvents,
+  toMessageViewModel,
   toMessageViewModels,
+  toSessionViewModel,
   toSessionViewModels,
+  type ChatMessageRead,
   type ChatMessageViewModel,
+  type ChatSessionRead,
   type ChatSessionViewModel,
+  type ChatStreamEvent,
   type HybridSearchRequest,
   type SearchMode,
   type ThinkingLevel,
@@ -43,10 +51,12 @@ export interface ChatModelProviderGroup {
 
 const chatStoreErrorKeys = {
   bootstrap: "chat.service.errors.bootstrap",
+  cancelGeneration: "chat.service.errors.cancelGeneration",
   deleteSession: "chat.service.errors.deleteSession",
   loadMessages: "chat.service.errors.loadMessages",
   loadSessions: "chat.service.errors.loadSessions",
   revertMessage: "chat.service.errors.revertMessage",
+  streamGlobal: "chat.service.errors.streamGlobal",
 };
 
 export const useGlobalChatStore = defineStore("console-global-chat", () => {
@@ -77,7 +87,14 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
   const isLoadingSessions = ref(false);
   const isLoadingMessages = ref(false);
   const isMutating = ref(false);
+  // ---- SSE streaming 状态 ----
+  const isStreaming = ref(false);
+  const isCancelling = ref(false);
   const errorMessage = ref<string | null>(null);
+  const activeGenerationUid = ref<string | null>(null);
+  const streamingSessionUid = ref<string | null>(null);
+  const streamingAssistantMessageUid = ref<string | null>(null);
+  let streamAbortController: AbortController | null = null;
 
   // ---- 派生状态 ----
   const activeSession = computed(
@@ -149,7 +166,8 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     () =>
       Boolean(draft.value.trim()) &&
       Boolean(selectedProviderUid.value) &&
-      Boolean(selectedModelUid.value),
+      Boolean(selectedModelUid.value) &&
+      !isStreaming.value,
   );
 
   // ---- Actions ----
@@ -189,11 +207,19 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
   }
 
   async function selectSession(sessionUid: string) {
+    if (isStreaming.value) {
+      return;
+    }
+
     activeSessionUid.value = sessionUid;
     await loadMessages(sessionUid);
   }
 
   function startNewSession() {
+    if (isStreaming.value) {
+      return;
+    }
+
     activeSessionUid.value = null;
     messages.value = [];
     draft.value = "";
@@ -221,6 +247,10 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
   }
 
   async function deleteSession(sessionUid: string) {
+    if (isStreaming.value) {
+      return;
+    }
+
     await withMutation(chatStoreError("deleteSession"), async () => {
       await deleteChatSession(sessionUid);
       sessions.value = sessions.value.filter(
@@ -239,6 +269,10 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
   }
 
   async function restartFromMessage(messageUid: string) {
+    if (isStreaming.value) {
+      return;
+    }
+
     const sessionUid = activeSessionUid.value;
     const targetMessage = messages.value.find(
       (message) => message.uid === messageUid,
@@ -254,6 +288,108 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
       await loadMessages(sessionUid);
       await loadSessions({ silent: true });
     });
+  }
+
+  // 发送消息 → 构建请求 → 开启 SSE stream → 逐事件更新 UI
+  async function sendMessage() {
+    if (isStreaming.value) {
+      return;
+    }
+
+    const message = draft.value.trim();
+    const providerUid = selectedProviderUid.value;
+    const modelUid = selectedModelUid.value;
+
+    if (!message || !providerUid || !modelUid) {
+      return;
+    }
+
+    const request = buildAdminChatRequest({
+      message,
+      chatSessionUid: activeSessionUid.value,
+      providerUid,
+      modelUid,
+      adminSystemPrompt: adminSystemPrompt.value,
+      thinking: thinking.value,
+      sourceUids: selectedSourceUids.value,
+      ragOptions: ragOptions.value,
+    });
+
+    const controller = new AbortController();
+    streamAbortController = controller;
+    isStreaming.value = true;
+    isCancelling.value = false;
+    activeGenerationUid.value = null;
+    streamingSessionUid.value = activeSessionUid.value;
+    streamingAssistantMessageUid.value = null;
+    errorMessage.value = null;
+    draft.value = "";
+
+    let generationStarted = false;
+
+    try {
+      const stream = await streamGlobalChatEvents(request, controller.signal);
+
+      for await (const event of stream) {
+        if (controller.signal.aborted) {
+          break;
+        }
+
+        if (event.event === "generation_start") {
+          generationStarted = true;
+        }
+
+        applyChatStreamEvent(event);
+      }
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        errorMessage.value = getErrorMessage(
+          error,
+          chatStoreError("streamGlobal"),
+        );
+
+        if (!generationStarted && !draft.value) {
+          draft.value = message;
+        }
+
+        await refreshActiveMessagesAfterStreamError();
+      }
+    } finally {
+      if (streamAbortController === controller) {
+        clearStreamingState();
+      }
+    }
+  }
+
+  async function cancelGeneration() {
+    if (!isStreaming.value || isCancelling.value) {
+      return;
+    }
+
+    const sessionUid = streamingSessionUid.value ?? activeSessionUid.value;
+    const generationUid = activeGenerationUid.value;
+
+    if (!sessionUid || !generationUid) {
+      streamAbortController?.abort();
+      clearStreamingState();
+      return;
+    }
+
+    isCancelling.value = true;
+    errorMessage.value = null;
+
+    try {
+      const response = await cancelChatGeneration(sessionUid, generationUid);
+      if (!response.cancelled) {
+        isCancelling.value = false;
+      }
+    } catch (error) {
+      isCancelling.value = false;
+      errorMessage.value = getErrorMessage(
+        error,
+        chatStoreError("cancelGeneration"),
+      );
+    }
   }
 
   function setProviderModel(providerUid: string, modelUid: string) {
@@ -318,6 +454,140 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     const firstOption = modelOptions.value[0];
     selectedProviderUid.value = firstOption?.providerUid ?? null;
     selectedModelUid.value = firstOption?.modelUid ?? null;
+  }
+
+  // SSE 事件分发：按 event 类型路由到对应的 state 更新函数
+  function applyChatStreamEvent(event: ChatStreamEvent) {
+    switch (event.event) {
+      case "session_ready":
+        applySessionReady(event.session);
+        break;
+      case "session_title_updated":
+        upsertSession(event.session);
+        break;
+      case "generation_start":
+        applyGenerationStart(event);
+        break;
+      case "delta":
+        appendMessageDelta(event.messageUid, event.delta);
+        break;
+      case "cancelled":
+        appendMessageDelta(event.messageUid, event.delta);
+        activeGenerationUid.value = null;
+        streamingAssistantMessageUid.value = null;
+        isCancelling.value = false;
+        break;
+      case "message_done":
+        upsertMessage(event.message);
+        activeGenerationUid.value = null;
+        streamingAssistantMessageUid.value = null;
+        isCancelling.value = false;
+        break;
+      case "error":
+        throw new Error(event.message);
+    }
+  }
+
+  function applySessionReady(session: ChatSessionRead) {
+    upsertSession(session);
+    activeSessionUid.value = session.uid;
+    streamingSessionUid.value = session.uid;
+  }
+
+  function applyGenerationStart(
+    event: Extract<ChatStreamEvent, { event: "generation_start" }>,
+  ) {
+    activeGenerationUid.value = event.generationUid;
+    activeSessionUid.value = event.sessionUid;
+    streamingSessionUid.value = event.sessionUid;
+    streamingAssistantMessageUid.value = event.assistantMessage.uid;
+
+    upsertMessage(event.userMessage);
+    upsertMessage(event.assistantMessage);
+  }
+
+  function upsertSession(session: ChatSessionRead) {
+    const viewModel = toSessionViewModel(session);
+    const exists = sessions.value.some((item) => item.uid === session.uid);
+    const nextSessions = exists
+      ? sessions.value.map((item) =>
+          item.uid === session.uid ? viewModel : item,
+        )
+      : [viewModel, ...sessions.value];
+
+    sessions.value = nextSessions.sort(compareSessionsByUpdatedAt);
+  }
+
+  function upsertMessage(message: ChatMessageRead) {
+    const viewModel = toMessageViewModel(message);
+    const exists = messages.value.some((item) => item.uid === message.uid);
+
+    messages.value = (
+      exists
+        ? messages.value.map((item) =>
+            item.uid === message.uid ? viewModel : item,
+          )
+        : [...messages.value, viewModel]
+    ).sort(compareMessagesBySequence);
+
+    updateMessagePageBounds(viewModel.sequence);
+  }
+
+  function appendMessageDelta(messageUid: string, delta: string) {
+    if (!delta) {
+      return;
+    }
+
+    messages.value = messages.value.map((message) => {
+      if (message.uid !== messageUid) {
+        return message;
+      }
+
+      const nextContent = `${message.content}${delta}`;
+      return {
+        ...message,
+        content: nextContent,
+        rawMessage: {
+          ...message.rawMessage,
+          message: nextContent,
+        },
+      };
+    });
+  }
+
+  // stream 出错后重新拉取消息，保留原始错误信息不被覆盖
+  async function refreshActiveMessagesAfterStreamError() {
+    const sessionUid = activeSessionUid.value;
+    const currentErrorMessage = errorMessage.value;
+
+    if (!sessionUid) {
+      return;
+    }
+
+    try {
+      const page = await loadChatMessages(sessionUid, {
+        limit: 80,
+        includeInternal: false,
+      });
+      messages.value = toMessageViewModels(page.messages);
+      hasMoreBefore.value = page.hasMoreBefore;
+      hasMoreAfter.value = page.hasMoreAfter;
+      oldestSequence.value = page.oldestSequence ?? null;
+      newestSequence.value = page.newestSequence ?? null;
+    } catch {
+      // 保留原始 stream 错误，避免二次刷新错误覆盖用户真正需要看到的信息。
+    } finally {
+      errorMessage.value = currentErrorMessage;
+    }
+  }
+
+  function clearStreamingState() {
+    streamAbortController = null;
+    isStreaming.value = false;
+    isCancelling.value = false;
+    activeGenerationUid.value = null;
+    streamingSessionUid.value = null;
+    streamingAssistantMessageUid.value = null;
   }
 
   // ---- 异步状态包装器：统一 loading / error 管理 ----
@@ -401,12 +671,25 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     newestSequence.value = null;
   }
 
+  function updateMessagePageBounds(sequence: number) {
+    oldestSequence.value =
+      oldestSequence.value == null
+        ? sequence
+        : Math.min(oldestSequence.value, sequence);
+    newestSequence.value =
+      newestSequence.value == null
+        ? sequence
+        : Math.max(newestSequence.value, sequence);
+  }
+
   // ---- 对外暴露 ----
   return {
     activeSession,
     activeSessionUid,
+    activeGenerationUid,
     adminSystemPrompt,
     bootstrap,
+    cancelGeneration,
     canSend,
     deleteSession,
     draft,
@@ -415,9 +698,11 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     hasMoreAfter,
     hasMoreBefore,
     isBootstrapping,
+    isCancelling,
     isLoadingMessages,
     isLoadingSessions,
     isMutating,
+    isStreaming,
     isSourceSelected,
     loadMessages,
     loadSessions,
@@ -428,6 +713,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     oldestSequence,
     ragOptions,
     restartFromMessage,
+    sendMessage,
     selectedModelLabel,
     selectedModelOption,
     selectedModelUid,
@@ -444,6 +730,8 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     setStandaloneEnabled,
     setThinking,
     startNewSession,
+    streamingAssistantMessageUid,
+    streamingSessionUid,
     thinking,
     threadTitle,
   };
@@ -453,6 +741,27 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
 
 function chatStoreError(key: keyof typeof chatStoreErrorKeys): string {
   return t(chatStoreErrorKeys[key]);
+}
+
+// ---- 排序比较器 ----
+
+function compareSessionsByUpdatedAt(
+  left: ChatSessionViewModel,
+  right: ChatSessionViewModel,
+): number {
+  return dateValue(right.updatedAt) - dateValue(left.updatedAt);
+}
+
+function compareMessagesBySequence(
+  left: ChatMessageViewModel,
+  right: ChatMessageViewModel,
+): number {
+  return left.sequence - right.sequence;
+}
+
+function dateValue(value: string): number {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 
 function formatProviderDisplayName(name: string): string {
