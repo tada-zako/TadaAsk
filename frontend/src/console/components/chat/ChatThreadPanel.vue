@@ -137,7 +137,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
             aria-label="Select provider and model"
             class="flex h-7 items-center gap-1.5 rounded-(--console-radius-md) px-1.5 text-[13px] text-(--text-body) hover:bg-white/[0.045] hover:text-(--text-strong)"
           >
-            OpenAI / gpt-4.1-mini
+            gpt-4.1-mini
             <ChevronDown class="size-3.5 text-(--text-faint)" />
           </button>
 
@@ -146,7 +146,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
             aria-label="Select thinking level"
             class="flex h-7 items-center gap-1.5 rounded-(--console-radius-md) px-1.5 text-[13px] text-(--text-body) hover:bg-white/[0.045] hover:text-(--text-strong)"
           >
-            5.5 中
+            默认
             <ChevronDown class="size-3.5 text-(--text-faint)" />
           </button>
 
