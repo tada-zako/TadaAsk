@@ -11,6 +11,7 @@ const route = useRoute();
 const router = useRouter();
 const globalChatStore = useGlobalChatStore();
 const { activeSessionUid, isBootstrapping } = storeToRefs(globalChatStore);
+// 左侧会话面板折叠状态，由 ChatSessionsPanel / ChatThreadPanel 双向控制
 const isSessionsPanelCollapsed = ref(false);
 
 // 页面挂载时根据 URL query 初始化 store
@@ -65,10 +66,11 @@ function normalizeSessionQuery(value: unknown): string | null {
 </script>
 
 <template>
-  <!-- 全局聊天视图：左侧会话列表 + 右侧消息线程，fullBleed 全屏布局 -->
+  <!-- 全局聊天视图：sessions 面板绝对定位叠加 + thread 全宽，通过 translate-x 控制显隐 -->
   <section
     class="relative h-[calc(100dvh-var(--console-header-height))] min-h-0 overflow-hidden bg-(--surface-base)"
   >
+    <!-- sessions 面板：绝对定位，折叠时 translate-x 滑出视口 -->
     <ChatSessionsPanel
       :collapsed="isSessionsPanelCollapsed"
       class="absolute top-0 left-0 z-20 h-full w-[228px] transition-transform duration-[880ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none max-[900px]:hidden"

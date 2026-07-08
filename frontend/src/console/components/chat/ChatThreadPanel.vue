@@ -8,6 +8,7 @@ import {
   MessageSquarePlus,
   PanelLeftOpen,
   Undo2,
+  X,
 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
@@ -26,6 +27,7 @@ import {
 } from "@/shared/components/ui/dropdown-menu";
 import { Textarea } from "@/shared/components/ui/textarea";
 
+// sessionsCollapsed: 左侧会话面板是否折叠，影响 rail 偏移量
 const props = withDefaults(
   defineProps<{
     sessionsCollapsed?: boolean;
@@ -47,12 +49,15 @@ const {
   draft,
   errorMessage,
   isBootstrapping,
+  isCancelling,
   isLoadingMessages,
+  isStreaming,
   messages,
   modelOptionGroups,
   selectedModelLabel,
   selectedModelOption,
   selectedSourceCount,
+  streamingAssistantMessageUid,
   thinking,
   threadTitle,
 } = storeToRefs(globalChatStore);
@@ -64,7 +69,7 @@ const thinkingOptions: { value: ThinkingLevel; label: string }[] = [
   { value: "high", label: "High" },
 ];
 
-// new session 页面，composer 保持在 thread view 中间
+// 新会话或无消息时，composer 居中显示而非固定底部
 const isComposerCentered = computed(
   () =>
     !isBootstrapping.value &&
@@ -90,6 +95,16 @@ function restartFromMessage(messageUid: string) {
 
 function copyMessage(content: string) {
   void navigator.clipboard?.writeText(content);
+}
+
+// 发送消息 → store action 触发 SSE stream
+function sendMessage() {
+  void globalChatStore.sendMessage().catch(() => undefined);
+}
+
+// 取消当前正在生成的回复
+function cancelGeneration() {
+  void globalChatStore.cancelGeneration().catch(() => undefined);
 }
 
 function startNewSession() {
@@ -136,6 +151,7 @@ function expandSessions() {
                 type="button"
                 :aria-label="t('chat.sessions.newChatAria')"
                 class="grid size-8 place-items-center rounded-(--console-radius-md) text-(--text-faint) hover:bg-white/[0.045] hover:text-(--text-strong)"
+                :disabled="isStreaming"
                 @click="startNewSession"
               >
                 <MessageSquarePlus class="size-4" />
@@ -206,7 +222,7 @@ function expandSessions() {
             <!-- 用户消息：右对齐 -->
             <template v-if="message.role === 'user'">
               <div
-                class="max-w-[78%] rounded-[1.15rem] border border-(--line-soft) bg-[#1e2024] px-3 py-2 text-[14px] leading-6 whitespace-pre-wrap text-(--text-strong)"
+                class="max-w-[78%] rounded-[1rem] border border-(--line-soft) bg-[#1e2024] px-3 py-1.5 text-[14px] leading-6 whitespace-pre-wrap text-(--text-strong)"
               >
                 {{ message.content }}
               </div>
@@ -221,6 +237,7 @@ function expandSessions() {
                   type="button"
                   :aria-label="t('chat.thread.restartAria')"
                   class="grid size-6 place-items-center rounded-(--console-radius-sm) text-(--text-faint) hover:bg-white/[0.05] hover:text-(--text-strong)"
+                  :disabled="isStreaming"
                   @click="restartFromMessage(message.uid)"
                 >
                   <Undo2 class="size-3.5" />
@@ -241,7 +258,19 @@ function expandSessions() {
               <div
                 class="max-w-[82%] text-[14px] leading-7 whitespace-pre-wrap text-(--text-body)"
               >
-                {{ message.content || " " }}
+                <span
+                  v-if="
+                    !message.content &&
+                    message.uid === streamingAssistantMessageUid
+                  "
+                  class="inline-flex items-center gap-2 text-(--text-faint)"
+                >
+                  <LoaderCircle class="text-primary size-3.5 animate-spin" />
+                  {{ t("chat.thread.thinking") }}
+                </span>
+                <template v-else>
+                  {{ message.content || " " }}
+                </template>
               </div>
               <div v-if="message.citationCount > 0" class="flex">
                 <ChatCitationsSheet :message="message" />
@@ -389,13 +418,27 @@ function expandSessions() {
 
           <!-- 发送按钮 -->
           <Button
+            v-if="!isStreaming"
             type="button"
             :aria-label="t('chat.composer.sendAria')"
             size="icon"
             class="bg-primary text-primary-foreground hover:bg-primary/90 ml-auto size-8 rounded-full disabled:opacity-55"
             :disabled="!canSend"
+            @click="sendMessage"
           >
             <ArrowUp class="size-4" />
+          </Button>
+          <Button
+            v-else
+            type="button"
+            :aria-label="t('chat.composer.cancelAria')"
+            size="icon"
+            class="ml-auto size-8 rounded-full bg-white/[0.08] text-(--text-strong) hover:bg-white/[0.12] disabled:opacity-55"
+            :disabled="isCancelling"
+            @click="cancelGeneration"
+          >
+            <LoaderCircle v-if="isCancelling" class="size-4 animate-spin" />
+            <X v-else class="size-4" />
           </Button>
         </div>
       </div>
@@ -403,6 +446,10 @@ function expandSessions() {
   </section>
 </template>
 
+<!--
+  chat-thread-rail 布局：消息流居中限宽，偏移量随 sessions 面板折叠/展开动态变化。
+  --chat-rail-offset 由 data-sessions-collapsed 控制：展开=228px，折叠=0。
+-->
 <style scoped>
 .chat-thread-panel {
   --chat-sessions-width: 228px;

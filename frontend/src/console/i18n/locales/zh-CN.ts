@@ -442,10 +442,12 @@ export const zhCN: typeof en = {
     service: {
       errors: {
         bootstrap: "无法准备全局对话工作区。",
+        cancelGeneration: "无法取消生成。",
         deleteSession: "无法删除对话。",
         loadMessages: "无法加载对话消息。",
         loadSessions: "无法加载对话列表。",
         revertMessage: "无法从该消息重新开始。",
+        streamGlobal: "无法流式生成对话回复。",
       },
     },
     thread: {
@@ -454,6 +456,7 @@ export const zhCN: typeof en = {
       loading: "正在加载对话...",
       newChat: "准备好了，随时开始",
       restartAria: "从这条消息重新开始",
+      thinking: "正在思考...",
     },
     sessions: {
       collapseAria: "收起对话列表",
@@ -474,6 +477,7 @@ export const zhCN: typeof en = {
       selectModelAria: "选择提供商和模型",
       selectThinkingAria: "选择 thinking 档位",
       selectedSources: "已选 {count} 个数据源",
+      cancelAria: "停止生成",
       sendAria: "发送消息",
     },
     context: {

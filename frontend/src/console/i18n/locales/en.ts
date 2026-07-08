@@ -460,10 +460,12 @@ export const en = {
     service: {
       errors: {
         bootstrap: "Failed to prepare global chat workspace.",
+        cancelGeneration: "Failed to cancel generation.",
         deleteSession: "Failed to delete chat session.",
         loadMessages: "Failed to load chat messages.",
         loadSessions: "Failed to load chat sessions.",
         revertMessage: "Failed to restart from this message.",
+        streamGlobal: "Failed to stream chat response.",
       },
     },
     thread: {
@@ -472,6 +474,7 @@ export const en = {
       loading: "Loading chat...",
       newChat: "Ready to start at any time",
       restartAria: "Restart from this message",
+      thinking: "Thinking...",
     },
     sessions: {
       collapseAria: "Collapse sessions",
@@ -492,6 +495,7 @@ export const en = {
       selectModelAria: "Select provider and model",
       selectThinkingAria: "Select thinking level",
       selectedSources: "{count} sources selected",
+      cancelAria: "Stop generation",
       sendAria: "Send message",
     },
     context: {
