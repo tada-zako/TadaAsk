@@ -1,7 +1,7 @@
 from typing import Protocol, runtime_checkable
 from dataclasses import dataclass
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .utils import FTSTokenizer
@@ -121,6 +121,8 @@ class SQLiteFTSProvider:
         """执行 FTS 搜索，返回匹配的文档 ID 列表"""
         if not fts_query.strip():
             return []
+        if not source_item_ids:
+            return []
 
         rows = await session.execute(
             text(
@@ -138,15 +140,15 @@ class SQLiteFTSProvider:
                 ORDER BY bm25_score ASC
                 LIMIT :limit
                 """
-            ),
+            ).bindparams(bindparam("source_item_ids", expanding=True)),
             {
                 "query": fts_query,
                 "limit": limit,
-                "source_item_ids": tuple(source_item_ids),
+                "source_item_ids": source_item_ids,
             },
         )
 
-        return [FTSResult(chunk_id=row.rowid, score=row.bm25_score) for row in rows]
+        return [FTSResult(chunk_id=row.chunk_id, score=row.bm25_score) for row in rows]
 
     async def index_document(
         self, session: AsyncSession, *, doc_id: int, content: str
