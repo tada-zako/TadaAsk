@@ -1,5 +1,7 @@
 import { client } from "./client";
+import { parseSseStream } from "@/shared/api/sse";
 import type { components } from "@/shared/api/generated/schema";
+import type { ChatStreamEvent } from "@/shared/types/chat-stream";
 
 /** OpenAPI 生成类型别名 */
 export type AdminRagChatRequest = components["schemas"]["AdminRAGChatRequest"];
@@ -15,6 +17,7 @@ export type RAGSnapshot = components["schemas"]["RAGSnapshot"];
 export type RAGSnapshotItem = components["schemas"]["RAGSnapshotItem"];
 export type SearchMode = components["schemas"]["SearchMode"];
 export type ThinkingLevel = components["schemas"]["ThinkingLevel"];
+export type { ChatStreamEvent };
 
 export type ListChatSessionsQuery = {
   limit?: number;
@@ -104,3 +107,10 @@ export const adminChatApi = {
       signal,
     }),
 };
+
+/** 将 Admin chat SSE ReadableStream 解析为业务事件。 */
+export async function* parseAdminChatEventStream(
+  stream: ReadableStream<Uint8Array>,
+): AsyncGenerator<ChatStreamEvent, void, unknown> {
+  yield* parseSseStream<ChatStreamEvent>(stream);
+}

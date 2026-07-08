@@ -1,4 +1,4 @@
-import { adminChatApi } from "@/console/api/chat";
+import { adminChatApi, parseAdminChatEventStream } from "@/console/api/chat";
 import type {
   AdminChatCancelResponse,
   AdminChatRevertResponse,
@@ -6,17 +6,20 @@ import type {
   ChatMessageRead,
   ChatMessagesPage,
   ChatSessionRead,
+  ChatStreamEvent,
   HybridSearchRequest,
   RAGSnapshotItem,
   SearchMode,
   ThinkingLevel,
 } from "@/console/api/chat";
+import { translate as t } from "@/console/i18n";
 import { unwrapApiData } from "@/console/lib/api-result";
 
 export type {
   AdminRagChatRequest,
   ChatMessageRead,
   ChatSessionRead,
+  ChatStreamEvent,
   HybridSearchRequest,
   RAGSnapshotItem,
   SearchMode,
@@ -77,12 +80,13 @@ export const DEFAULT_RAG_OPTIONS: HybridSearchRequest = {
   standaloneEnabled: false,
 };
 
-const chatErrors = {
-  cancelGeneration: "Failed to cancel generation.",
-  deleteSession: "Failed to delete chat session.",
-  listMessages: "Failed to load chat messages.",
-  listSessions: "Failed to load chat sessions.",
-  revertMessage: "Failed to restart from this message.",
+const chatErrorKeys = {
+  cancelGeneration: "chat.service.errors.cancelGeneration",
+  deleteSession: "chat.service.errors.deleteSession",
+  listMessages: "chat.service.errors.loadMessages",
+  listSessions: "chat.service.errors.loadSessions",
+  revertMessage: "chat.service.errors.revertMessage",
+  streamGlobal: "chat.service.errors.streamGlobal",
 };
 
 export function createDefaultRagOptions(): HybridSearchRequest {
@@ -106,7 +110,7 @@ export async function listGlobalChatSessions(input: {
   offset?: number;
 }): Promise<ChatSessionRead[]> {
   const { data, error } = await adminChatApi.listGlobalSessions(input);
-  return unwrapApiData(data, error, chatErrors.listSessions);
+  return unwrapApiData(data, error, chatError("listSessions"));
 }
 
 export async function loadChatMessages(
@@ -122,12 +126,12 @@ export async function loadChatMessages(
     chatSessionUid,
     input,
   );
-  return unwrapApiData(data, error, chatErrors.listMessages);
+  return unwrapApiData(data, error, chatError("listMessages"));
 }
 
 export async function deleteChatSession(chatSessionUid: string): Promise<void> {
   const { data, error } = await adminChatApi.deleteSession(chatSessionUid);
-  unwrapApiData(data, error, chatErrors.deleteSession);
+  unwrapApiData(data, error, chatError("deleteSession"));
 }
 
 export async function revertChatMessage(
@@ -138,7 +142,7 @@ export async function revertChatMessage(
     chatSessionUid,
     messageUid,
   );
-  return unwrapApiData(data, error, chatErrors.revertMessage);
+  return unwrapApiData(data, error, chatError("revertMessage"));
 }
 
 export async function cancelChatGeneration(
@@ -149,7 +153,22 @@ export async function cancelChatGeneration(
     chatSessionUid,
     generationUid,
   );
-  return unwrapApiData(data, error, chatErrors.cancelGeneration);
+  return unwrapApiData(data, error, chatError("cancelGeneration"));
+}
+
+// 发起 SSE stream → 解析为 ChatStreamEvent 异步生成器
+export async function streamGlobalChatEvents(
+  request: AdminRagChatRequest,
+  signal?: AbortSignal,
+): Promise<AsyncGenerator<ChatStreamEvent, void, unknown>> {
+  const { data, error } = await adminChatApi.streamGlobal(request, signal);
+  const stream = unwrapApiData(
+    data ?? undefined,
+    error,
+    chatError("streamGlobal"),
+  );
+
+  return parseAdminChatEventStream(stream as ReadableStream<Uint8Array>);
 }
 
 export function buildAdminChatRequest(
@@ -174,7 +193,7 @@ export function toSessionViewModel(
 ): ChatSessionViewModel {
   return {
     uid: session.uid,
-    title: session.title || "New chat",
+    title: session.title || t("chat.sessions.newChat"),
     provider: session.provider,
     model: session.model,
     createdAt: session.createdAt,
@@ -226,6 +245,11 @@ function uniqueNonEmpty(values: string[]): string[] {
   return Array.from(
     new Set(values.map((value) => value.trim()).filter(Boolean)),
   );
+}
+
+// 从 i18n 获取错误文案，避免 service 层硬编码英文字符串
+function chatError(key: keyof typeof chatErrorKeys): string {
+  return t(chatErrorKeys[key]);
 }
 
 function normalizeOptionalText(value: string): string | null {
