@@ -48,6 +48,8 @@ const router = createRouter({
           path: "chat",
           name: "chat",
           component: () => import("./views/chat/ChatView.vue"),
+          // fullBleed: 使用全屏无边距布局，由页面自行管理滚动
+          meta: { fullBleed: true },
         },
         {
           path: "sources",

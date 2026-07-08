@@ -48,6 +48,7 @@ const projectInitial = computed(
   () => selectedProject.value?.name.charAt(0) ?? "+",
 );
 const isProjectNavActive = computed(() => route.path.startsWith("/project"));
+const isChatActive = computed(() => route.path.startsWith("/chat"));
 const isSourcesActive = computed(() => route.path.startsWith("/sources"));
 const isProviderModelActive = computed(() =>
   route.path.startsWith("/provider-model"),
@@ -120,6 +121,10 @@ async function openProjectChild(child: "ask" | "settings") {
     name: child === "ask" ? "project-ask" : "project-settings",
     params: { projectUid: selectedProject.value.uid },
   });
+}
+
+async function openChat() {
+  await router.push({ name: "chat" });
 }
 
 async function openSources() {
@@ -312,7 +317,9 @@ function getProjectUidFromRoute(): string | null {
         <!-- 全局 chat item -->
         <a
           class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
+          :class="isChatActive ? 'console-nav-link-active' : ''"
           href="#"
+          @click.prevent="openChat"
         >
           <MessageSquare class="size-4" />
           <span class="max-[1180px]:hidden">{{ t("shell.sidebar.chat") }}</span>
