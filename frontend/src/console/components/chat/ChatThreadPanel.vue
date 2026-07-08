@@ -22,14 +22,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
 import { Textarea } from "@/shared/components/ui/textarea";
 
-const { sessionsCollapsed = false } = defineProps<{
-  sessionsCollapsed?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    sessionsCollapsed?: boolean;
+  }>(),
+  {
+    sessionsCollapsed: false,
+  },
+);
 
 const emit = defineEmits<{
   expandSessions: [];
@@ -99,38 +103,66 @@ function expandSessions() {
 
 <template>
   <!-- 聊天消息线程面板：展示对话消息列表与底部输入区域 -->
-  <section class="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
+  <section
+    class="chat-thread-panel relative flex min-h-0 min-w-0 flex-col overflow-hidden"
+    :data-sessions-collapsed="props.sessionsCollapsed"
+  >
     <!-- 顶部标题栏 -->
     <header class="shrink-0 px-6 py-1.5">
-      <div class="mx-auto flex h-9 w-[min(820px,calc(100%-2rem))] items-center">
-        <div
-          v-if="sessionsCollapsed"
-          class="mr-2 flex shrink-0 items-center gap-1"
+      <div class="relative h-9">
+        <Transition
+          enter-active-class="transition-opacity duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition-opacity duration-120 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
         >
-          <button
-            type="button"
-            :aria-label="t('chat.sessions.expandAria')"
-            class="grid size-8 place-items-center rounded-(--console-radius-md) text-(--text-faint) hover:bg-white/[0.045] hover:text-(--text-strong)"
-            @click="expandSessions"
+          <div
+            v-if="props.sessionsCollapsed"
+            key="collapsed-header"
+            class="absolute inset-0 flex h-9 w-full items-center"
           >
-            <PanelLeftOpen class="size-4" />
-          </button>
-          <button
-            type="button"
-            :aria-label="t('chat.sessions.newChatAria')"
-            class="grid size-8 place-items-center rounded-(--console-radius-md) text-(--text-faint) hover:bg-white/[0.045] hover:text-(--text-strong)"
-            @click="startNewSession"
+            <div class="mr-2 flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                :aria-label="t('chat.sessions.expandAria')"
+                class="grid size-8 place-items-center rounded-(--console-radius-md) text-(--text-faint) hover:bg-white/[0.045] hover:text-(--text-strong)"
+                @click="expandSessions"
+              >
+                <PanelLeftOpen class="size-4" />
+              </button>
+              <button
+                type="button"
+                :aria-label="t('chat.sessions.newChatAria')"
+                class="grid size-8 place-items-center rounded-(--console-radius-md) text-(--text-faint) hover:bg-white/[0.045] hover:text-(--text-strong)"
+                @click="startNewSession"
+              >
+                <MessageSquarePlus class="size-4" />
+              </button>
+              <ChatContextSettingsSheet compact />
+            </div>
+            <h1
+              v-if="threadTitle"
+              class="min-w-0 truncate text-[15px] font-semibold text-(--text-strong)"
+            >
+              {{ threadTitle }}
+            </h1>
+          </div>
+
+          <div
+            v-else
+            key="expanded-header"
+            class="chat-thread-rail absolute inset-y-0 left-0 flex h-9 items-center"
           >
-            <MessageSquarePlus class="size-4" />
-          </button>
-          <ChatContextSettingsSheet compact />
-        </div>
-        <h1
-          v-if="threadTitle"
-          class="truncate text-[15px] font-semibold text-(--text-strong)"
-        >
-          {{ threadTitle }}
-        </h1>
+            <h1
+              v-if="threadTitle"
+              class="truncate text-[15px] font-semibold text-(--text-strong)"
+            >
+              {{ threadTitle }}
+            </h1>
+          </div>
+        </Transition>
       </div>
     </header>
 
@@ -139,7 +171,7 @@ function expandSessions() {
       :class="isComposerCentered ? 'pb-8' : 'pb-42'"
     >
       <!-- 消息列表 -->
-      <div class="mx-auto grid w-[min(820px,calc(100%-2rem))] gap-8">
+      <div class="chat-thread-rail grid gap-8">
         <!-- 加载中 -->
         <div
           v-if="isBootstrapping || isLoadingMessages"
@@ -246,7 +278,7 @@ function expandSessions() {
       "
     >
       <div
-        class="pointer-events-auto mx-auto w-[min(820px,calc(100%-2rem))] rounded-[1.35rem] border border-(--line-strong) bg-[#24262b] p-2 shadow-[0_22px_80px_rgba(0,0,0,0.42)]"
+        class="chat-thread-rail pointer-events-auto rounded-[1.35rem] border border-(--line-strong) bg-[#24262b] p-2 shadow-[0_22px_80px_rgba(0,0,0,0.42)]"
       >
         <Textarea
           v-model="draft"
@@ -370,3 +402,44 @@ function expandSessions() {
     </div>
   </section>
 </template>
+
+<style scoped>
+.chat-thread-panel {
+  --chat-sessions-width: 228px;
+  --chat-rail-gutter: 2rem;
+  --chat-rail-max-width: 820px;
+  --chat-rail-offset: var(--chat-sessions-width);
+  --chat-rail-width: min(
+    var(--chat-rail-max-width),
+    calc(100% - var(--chat-sessions-width) - var(--chat-rail-gutter))
+  );
+  --chat-rail-left: calc(
+    var(--chat-rail-offset) +
+      (100% - var(--chat-rail-offset) - var(--chat-rail-width)) / 2
+  );
+}
+
+.chat-thread-panel[data-sessions-collapsed="true"] {
+  --chat-rail-offset: 0px;
+}
+
+.chat-thread-rail {
+  width: var(--chat-rail-width);
+  margin-left: var(--chat-rail-left);
+  transition: margin-left 880ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: margin-left;
+}
+
+@media (max-width: 900px) {
+  .chat-thread-panel {
+    --chat-sessions-width: 0px;
+    --chat-rail-offset: 0px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-thread-rail {
+    transition: none;
+  }
+}
+</style>
