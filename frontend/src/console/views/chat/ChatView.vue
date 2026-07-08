@@ -1,14 +1,87 @@
 <script setup lang="ts">
+import { onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { storeToRefs } from "pinia";
+
 import ChatSessionsPanel from "@/console/components/chat/ChatSessionsPanel.vue";
 import ChatThreadPanel from "@/console/components/chat/ChatThreadPanel.vue";
+import { useGlobalChatStore } from "@/console/stores/global-chat";
+
+const route = useRoute();
+const router = useRouter();
+const globalChatStore = useGlobalChatStore();
+const { activeSessionUid, isBootstrapping } = storeToRefs(globalChatStore);
+const isSessionsPanelCollapsed = ref(false);
+
+// 页面挂载时根据 URL query 初始化 store
+onMounted(() => {
+  void globalChatStore.bootstrap(getRouteSessionUid()).catch(() => undefined);
+});
+
+// URL query 变化 → 同步到 store（切换/新建 session）
+watch(
+  () => route.query.sessionUid,
+  (value) => {
+    if (isBootstrapping.value) {
+      return;
+    }
+
+    const sessionUid = normalizeSessionQuery(value);
+    if (sessionUid && sessionUid !== activeSessionUid.value) {
+      void globalChatStore.selectSession(sessionUid).catch(() => undefined);
+      return;
+    }
+
+    if (!sessionUid && activeSessionUid.value) {
+      globalChatStore.startNewSession();
+    }
+  },
+);
+
+// store 中 activeSessionUid 变化 → 同步到 URL query
+watch(activeSessionUid, (sessionUid) => {
+  if (getRouteSessionUid() === sessionUid) {
+    return;
+  }
+
+  void router.replace({
+    name: "chat",
+    query: sessionUid ? { sessionUid } : {},
+  });
+});
+
+function getRouteSessionUid(): string | null {
+  return normalizeSessionQuery(route.query.sessionUid);
+}
+
+// 规范化 query 参数：支持 string / string[] 两种形式
+function normalizeSessionQuery(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    return typeof value[0] === "string" && value[0] ? value[0] : null;
+  }
+
+  return typeof value === "string" && value ? value : null;
+}
 </script>
 
 <template>
   <!-- 全局聊天视图：左侧会话列表 + 右侧消息线程，fullBleed 全屏布局 -->
   <section
-    class="grid h-[calc(100dvh-var(--console-header-height))] min-h-0 grid-cols-[228px_minmax(0,1fr)] overflow-hidden bg-(--surface-base) max-[900px]:grid-cols-1"
+    class="grid h-[calc(100dvh-var(--console-header-height))] min-h-0 overflow-hidden bg-(--surface-base) max-[900px]:grid-cols-1"
+    :class="
+      isSessionsPanelCollapsed
+        ? 'grid-cols-1'
+        : 'grid-cols-[228px_minmax(0,1fr)]'
+    "
   >
-    <ChatSessionsPanel class="max-[900px]:hidden" />
-    <ChatThreadPanel />
+    <ChatSessionsPanel
+      v-if="!isSessionsPanelCollapsed"
+      class="max-[900px]:hidden"
+      @collapse="isSessionsPanelCollapsed = true"
+    />
+    <ChatThreadPanel
+      :sessions-collapsed="isSessionsPanelCollapsed"
+      @expand-sessions="isSessionsPanelCollapsed = false"
+    />
   </section>
 </template>
