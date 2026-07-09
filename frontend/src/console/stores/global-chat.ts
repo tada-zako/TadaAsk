@@ -33,6 +33,11 @@ type LoadOptions = {
   silent?: boolean;
 };
 
+// 每次分页加载消息条数上限
+const MESSAGE_PAGE_LIMIT = 30;
+// 新会话（尚未创建）对应的草稿 key
+const NEW_CHAT_DRAFT_KEY = "__new_chat__";
+
 export interface ChatModelOption {
   providerUid: string;
   providerName: string;
@@ -67,7 +72,8 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
   const sessions = ref<ChatSessionViewModel[]>([]);
   const activeSessionUid = ref<string | null>(null);
   const messages = ref<ChatMessageViewModel[]>([]);
-  const draft = ref("");
+  // 按 session uid 隔离草稿，支持多会话切换时保留各自的未发送内容
+  const draftBySessionKey = ref<Record<string, string>>({});
 
   // ---- 用户配置：模型 / thinking / source / RAG / system prompt ----
   const selectedProviderUid = ref<string | null>(null);
@@ -86,6 +92,8 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
   const isBootstrapping = ref(false);
   const isLoadingSessions = ref(false);
   const isLoadingMessages = ref(false);
+  // 加载更早消息（向上滚动分页）的 loading 状态
+  const isLoadingOlderMessages = ref(false);
   const isMutating = ref(false);
   // ---- SSE streaming 状态 ----
   const isStreaming = ref(false);
@@ -94,6 +102,8 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
   const activeGenerationUid = ref<string | null>(null);
   const streamingSessionUid = ref<string | null>(null);
   const streamingAssistantMessageUid = ref<string | null>(null);
+  // 被用户取消生成的 assistant 消息 uid 列表，UI 上标记「已停止」
+  const cancelledMessageUids = ref<string[]>([]);
   let streamAbortController: AbortController | null = null;
 
   // ---- 派生状态 ----
@@ -106,6 +116,21 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
 
   const threadTitle = computed(() => activeSession.value?.title);
   const selectedSourceCount = computed(() => selectedSourceUids.value.length);
+  // 当前会话对应的草稿 key：已存在会话用 uid，新会话用固定 key
+  const draftSessionKey = computed(
+    () => activeSessionUid.value ?? NEW_CHAT_DRAFT_KEY,
+  );
+
+  // 支持读写的草稿 computed，get/set 读写 draftBySessionKey
+  const draft = computed({
+    get: () => draftBySessionKey.value[draftSessionKey.value] ?? "",
+    set: (value: string) => {
+      draftBySessionKey.value = {
+        ...draftBySessionKey.value,
+        [draftSessionKey.value]: value,
+      };
+    },
+  });
 
   const modelOptions = computed<ChatModelOption[]>(() =>
     providerModelStore.enabledProviders.flatMap((provider) =>
@@ -212,7 +237,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     }
 
     activeSessionUid.value = sessionUid;
-    await loadMessages(sessionUid);
+    await loadInitialMessages(sessionUid);
   }
 
   function startNewSession() {
@@ -222,11 +247,15 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
 
     activeSessionUid.value = null;
     messages.value = [];
-    draft.value = "";
     resetMessagePage();
   }
 
   async function loadMessages(sessionUid = activeSessionUid.value) {
+    await loadInitialMessages(sessionUid);
+  }
+
+  // 首次加载消息列表（替换当前全部消息）
+  async function loadInitialMessages(sessionUid = activeSessionUid.value) {
     if (!sessionUid) {
       messages.value = [];
       resetMessagePage();
@@ -235,7 +264,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
 
     await withLoadingMessages(chatStoreError("loadMessages"), async () => {
       const page = await loadChatMessages(sessionUid, {
-        limit: 80,
+        limit: MESSAGE_PAGE_LIMIT,
         includeInternal: false,
       });
       messages.value = toMessageViewModels(page.messages);
@@ -244,6 +273,47 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
       oldestSequence.value = page.oldestSequence ?? null;
       newestSequence.value = page.newestSequence ?? null;
     });
+  }
+
+  // 加载更早消息，合并到现有消息列表前面（向上滚动分页）
+  async function loadOlderMessages() {
+    const sessionUid = activeSessionUid.value;
+
+    if (
+      !sessionUid ||
+      isLoadingMessages.value ||
+      isLoadingOlderMessages.value ||
+      !hasMoreBefore.value ||
+      oldestSequence.value == null
+    ) {
+      return false;
+    }
+
+    isLoadingOlderMessages.value = true;
+    errorMessage.value = null;
+
+    try {
+      const page = await loadChatMessages(sessionUid, {
+        limit: MESSAGE_PAGE_LIMIT,
+        beforeSequence: oldestSequence.value,
+        includeInternal: false,
+      });
+      messages.value = mergeMessageViewModels(
+        toMessageViewModels(page.messages),
+        messages.value,
+      );
+      hasMoreBefore.value = page.hasMoreBefore;
+      recalculateMessagePageBounds();
+      return page.messages.length > 0;
+    } catch (error) {
+      errorMessage.value = getErrorMessage(
+        error,
+        chatStoreError("loadMessages"),
+      );
+      throw error;
+    } finally {
+      isLoadingOlderMessages.value = false;
+    }
   }
 
   async function deleteSession(sessionUid: string) {
@@ -473,12 +543,14 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
         break;
       case "cancelled":
         appendMessageDelta(event.messageUid, event.delta);
+        markMessageCancelled(event.messageUid);
         activeGenerationUid.value = null;
         streamingAssistantMessageUid.value = null;
         isCancelling.value = false;
         break;
       case "message_done":
         upsertMessage(event.message);
+        unmarkMessageCancelled(event.message.uid);
         activeGenerationUid.value = null;
         streamingAssistantMessageUid.value = null;
         isCancelling.value = false;
@@ -518,6 +590,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     sessions.value = nextSessions.sort(compareSessionsByUpdatedAt);
   }
 
+  // 更新消息列表
   function upsertMessage(message: ChatMessageRead) {
     const viewModel = toMessageViewModel(message);
     const exists = messages.value.some((item) => item.uid === message.uid);
@@ -555,6 +628,22 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     });
   }
 
+  // 标记消息为「已取消生成」，防重复添加
+  function markMessageCancelled(messageUid: string) {
+    if (cancelledMessageUids.value.includes(messageUid)) {
+      return;
+    }
+
+    cancelledMessageUids.value = [...cancelledMessageUids.value, messageUid];
+  }
+
+  // message_done 时移除取消标记（流式正常结束）
+  function unmarkMessageCancelled(messageUid: string) {
+    cancelledMessageUids.value = cancelledMessageUids.value.filter(
+      (uid) => uid !== messageUid,
+    );
+  }
+
   // stream 出错后重新拉取消息，保留原始错误信息不被覆盖
   async function refreshActiveMessagesAfterStreamError() {
     const sessionUid = activeSessionUid.value;
@@ -566,7 +655,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
 
     try {
       const page = await loadChatMessages(sessionUid, {
-        limit: 80,
+        limit: MESSAGE_PAGE_LIMIT,
         includeInternal: false,
       });
       messages.value = toMessageViewModels(page.messages);
@@ -682,6 +771,12 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
         : Math.max(newestSequence.value, sequence);
   }
 
+  // 合并旧消息后重新计算序列号边界
+  function recalculateMessagePageBounds() {
+    oldestSequence.value = minMessageSequence(messages.value);
+    newestSequence.value = maxMessageSequence(messages.value);
+  }
+
   // ---- 对外暴露 ----
   return {
     activeSession,
@@ -690,6 +785,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     adminSystemPrompt,
     bootstrap,
     cancelGeneration,
+    cancelledMessageUids,
     canSend,
     deleteSession,
     draft,
@@ -700,11 +796,14 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     isBootstrapping,
     isCancelling,
     isLoadingMessages,
+    isLoadingOlderMessages,
     isLoadingSessions,
     isMutating,
     isStreaming,
     isSourceSelected,
     loadMessages,
+    loadInitialMessages,
+    loadOlderMessages,
     loadSessions,
     messages,
     modelOptionGroups,
@@ -757,6 +856,39 @@ function compareMessagesBySequence(
   right: ChatMessageViewModel,
 ): number {
   return left.sequence - right.sequence;
+}
+
+// 合并新旧消息列表，按 uid 去重，current 优先保留，按 sequence 排序
+function mergeMessageViewModels(
+  incoming: ChatMessageViewModel[],
+  current: ChatMessageViewModel[],
+): ChatMessageViewModel[] {
+  const byUid = new Map<string, ChatMessageViewModel>();
+
+  // current 放前面，incoming 放后面，确保同 uid 时保留 current
+  for (const message of [...current, ...incoming]) {
+    byUid.set(message.uid, message);
+  }
+
+  return Array.from(byUid.values()).sort(compareMessagesBySequence);
+}
+
+// 消息列表中最小 sequence 值
+function minMessageSequence(messages: ChatMessageViewModel[]): number | null {
+  if (!messages.length) {
+    return null;
+  }
+
+  return Math.min(...messages.map((message) => message.sequence));
+}
+
+// 消息列表中最大 sequence 值
+function maxMessageSequence(messages: ChatMessageViewModel[]): number | null {
+  if (!messages.length) {
+    return null;
+  }
+
+  return Math.max(...messages.map((message) => message.sequence));
 }
 
 function dateValue(value: string): number {
