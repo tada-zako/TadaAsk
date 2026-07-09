@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { Archive, PanelLeft, MessageSquarePlus } from "@lucide/vue";
+import {
+  Archive,
+  LoaderCircle,
+  MessageSquarePlus,
+  PanelLeft,
+} from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 
 import ChatContextSettingsSheet from "./ChatContextSettingsSheet.vue";
-import { useGlobalChatStore } from "@/console/stores/global-chat";
+import { useGlobalChatStore } from "@/console/stores/global-chat.ts";
 import { Button } from "@/shared/components/ui/button";
 
 const emit = defineEmits<{
@@ -22,13 +27,8 @@ withDefaults(
 
 const { t } = useI18n();
 const globalChatStore = useGlobalChatStore();
-const {
-  activeSessionUid,
-  isLoadingSessions,
-  isMutating,
-  isStreaming,
-  sessions,
-} = storeToRefs(globalChatStore);
+const { activeSessionUid, isLoadingSessions, isMutating, sessions } =
+  storeToRefs(globalChatStore);
 
 function openSession(sessionUid: string) {
   void globalChatStore.selectSession(sessionUid).catch(() => undefined);
@@ -85,7 +85,6 @@ function collapseSessions() {
           type="button"
           :aria-label="t('chat.sessions.newChatAria')"
           class="h-9 justify-start gap-2 rounded-(--console-radius-lg) bg-(--surface-hover) text-[13px] font-semibold text-(--text-strong) hover:bg-[#24272d]"
-          :disabled="isStreaming"
           @click="startNewSession"
         >
           <MessageSquarePlus class="size-4" />
@@ -141,7 +140,6 @@ function collapseSessions() {
                 t('chat.sessions.openSessionAria', { title: session.title })
               "
               class="min-w-0 px-2.5 py-2 text-left"
-              :disabled="isStreaming"
               :class="
                 activeSessionUid === session.uid
                   ? 'text-[13px] font-semibold text-(--text-strong)'
@@ -151,17 +149,30 @@ function collapseSessions() {
             >
               <span class="block truncate">{{ session.title }}</span>
             </button>
-            <button
-              type="button"
-              :aria-label="
-                t('chat.sessions.deleteSessionAria', { title: session.title })
-              "
-              class="mr-1 grid size-7 place-items-center rounded-(--console-radius-sm) text-(--text-disabled) opacity-0 transition group-hover:opacity-80 hover:bg-white/[0.05] hover:text-(--text-muted)"
-              :disabled="isMutating || isStreaming"
-              @click="deleteSession(session.uid, session.title)"
-            >
-              <Archive class="size-3.5" />
-            </button>
+            <div class="mr-1 flex items-center gap-1">
+              <LoaderCircle
+                v-if="globalChatStore.isSessionStreaming(session.uid)"
+                class="text-primary size-3.5 animate-spin"
+                :class="
+                  globalChatStore.isSessionCancelling(session.uid)
+                    ? 'opacity-55'
+                    : 'opacity-85'
+                "
+              />
+              <button
+                type="button"
+                :aria-label="
+                  t('chat.sessions.deleteSessionAria', { title: session.title })
+                "
+                class="grid size-7 place-items-center rounded-(--console-radius-sm) text-(--text-disabled) opacity-0 transition group-hover:opacity-80 hover:bg-white/[0.05] hover:text-(--text-muted) disabled:cursor-not-allowed disabled:opacity-30"
+                :disabled="
+                  isMutating || globalChatStore.isSessionStreaming(session.uid)
+                "
+                @click="deleteSession(session.uid, session.title)"
+              >
+                <Archive class="size-3.5" />
+              </button>
+            </div>
           </div>
         </template>
       </nav>

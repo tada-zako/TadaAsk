@@ -10,7 +10,7 @@ import { useGlobalChatStore } from "@/console/stores/global-chat";
 const route = useRoute();
 const router = useRouter();
 const globalChatStore = useGlobalChatStore();
-const { activeSessionUid, isBootstrapping } = storeToRefs(globalChatStore);
+const { activeRouteSessionUid, isBootstrapping } = storeToRefs(globalChatStore);
 // 左侧会话面板折叠状态，由 ChatSessionsPanel / ChatThreadPanel 双向控制
 const isSessionsPanelCollapsed = ref(false);
 
@@ -28,19 +28,19 @@ watch(
     }
 
     const sessionUid = normalizeSessionQuery(value);
-    if (sessionUid && sessionUid !== activeSessionUid.value) {
+    if (sessionUid && sessionUid !== activeRouteSessionUid.value) {
       void globalChatStore.selectSession(sessionUid).catch(() => undefined);
       return;
     }
 
-    if (!sessionUid && activeSessionUid.value) {
+    if (!sessionUid && activeRouteSessionUid.value) {
       globalChatStore.startNewSession();
     }
   },
 );
 
-// store 中 activeSessionUid 变化 → 同步到 URL query
-watch(activeSessionUid, (sessionUid) => {
+// store 中真实 active session uid 变化 → 同步到 URL query
+watch(activeRouteSessionUid, (sessionUid) => {
   if (getRouteSessionUid() === sessionUid) {
     return;
   }

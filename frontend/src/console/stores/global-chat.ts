@@ -135,6 +135,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
   );
 
   const activeRouteSessionUid = computed(() =>
+    // 对于 temp session 不触发 route 更新
     activeSessionUid.value && !isTemporarySessionKey(activeSessionUid.value)
       ? activeSessionUid.value
       : null,

@@ -15,14 +15,15 @@ import {
   MessageSquarePlus,
   PanelLeftOpen,
   Undo2,
-  X,
+  Square,
+  Check,
 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 
 import ChatCitationsSheet from "./ChatCitationsSheet.vue";
 import ChatContextSettingsSheet from "./ChatContextSettingsSheet.vue";
-import { useGlobalChatStore } from "@/console/stores/global-chat";
+import { useGlobalChatStore } from "@/console/stores/global-chat.ts";
 import type { ThinkingLevel } from "@/console/services/chat";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -261,28 +262,15 @@ watch(isLoadingMessages, (loading, previousLoading) => {
 });
 
 // 消息内容/引用数量变化时，若钉在底部则自动跟随滚动（流式输出场景）
-watch(
-  () =>
-    // 监听组合内容，确保流式输出时监听到变化
-    // messages.value
-    //   .map(
-    //     (message) =>
-    //       `${message.uid}:${message.content.length}:${message.citationCount}`,
-    //   )
-    //   .join("|"),
-    {
-      // 只监听最后一条消息的变化，避免遍历整个 messages
-      const lastMsg = messages.value[messages.value.length - 1];
-      if (!lastMsg) return "";
-      // 仅监听最后一条消息的 ID、长度和引用数
-      return `${lastMsg.uid}:${lastMsg.content.length}:${lastMsg.citationCount}`;
-    },
-  () => {
-    if (!isLoadingOlderMessages.value && isPinnedToBottom.value) {
-      void scrollToBottom();
-    }
-  },
-);
+watch(messages, () => {
+  if (
+    !isLoadingOlderMessages.value &&
+    !isPreservingOlderScroll &&
+    isPinnedToBottom.value
+  ) {
+    void scrollToBottom();
+  }
+});
 
 onMounted(() => {
   void scrollToBottom();
@@ -330,7 +318,6 @@ onBeforeUnmount(() => {
                 type="button"
                 :aria-label="t('chat.sessions.newChatAria')"
                 class="grid size-8 place-items-center rounded-(--console-radius-md) text-(--text-faint) hover:bg-white/[0.045] hover:text-(--text-strong)"
-                :disabled="isStreaming"
                 @click="startNewSession"
               >
                 <MessageSquarePlus class="size-4" />
@@ -438,15 +425,19 @@ onBeforeUnmount(() => {
                   class="grid size-6 place-items-center rounded-(--console-radius-sm) text-(--text-faint) hover:bg-white/[0.05] hover:text-(--text-strong)"
                   @click="copyMessage(message.uid, message.content)"
                 >
-                  <Copy class="size-3.5" />
+                  <Copy
+                    v-if="copiedMessageUid !== message.uid"
+                    class="size-3.5"
+                  />
+                  <Check v-else class="size-3.5" />
                 </button>
                 <!-- 「已复制」提示 -->
-                <span
+                <!-- <span
                   v-if="copiedMessageUid === message.uid"
                   class="text-[11px] text-(--text-muted)"
                 >
                   {{ t("chat.thread.copied") }}
-                </span>
+                </span> -->
               </div>
             </template>
 
@@ -455,6 +446,7 @@ onBeforeUnmount(() => {
               <div
                 class="max-w-[82%] text-[14px] leading-7 whitespace-pre-wrap text-(--text-body)"
               >
+                <!-- 后端 assistant 消息尚未响应时渲染加载信息 -->
                 <span
                   v-if="
                     !message.content &&
@@ -483,24 +475,28 @@ onBeforeUnmount(() => {
                 <div
                   class="flex items-center gap-2 text-(--text-faint) opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100"
                 >
-                  <span>
-                    {{ message.provider }} / {{ message.model }} ·
-                    {{ message.createdLabel }}
-                  </span>
                   <button
                     type="button"
                     :aria-label="t('chat.thread.copyMessageAria')"
                     class="grid size-6 place-items-center rounded-(--console-radius-sm) text-(--text-faint) hover:bg-white/[0.05] hover:text-(--text-strong)"
                     @click="copyMessage(message.uid, message.content)"
                   >
-                    <Copy class="size-3.5" />
+                    <Copy
+                      v-if="copiedMessageUid !== message.uid"
+                      class="size-3.5"
+                    />
+                    <Check v-else class="size-3.5" />
                   </button>
                   <!-- 「已复制」提示 -->
-                  <span
-                    v-if="copiedMessageUid === message.uid"
-                    class="text-[11px] text-(--text-muted)"
+                  <!-- <span
+                  v-if="copiedMessageUid === message.uid"
+                  class="text-[11px] text-(--text-muted)"
                   >
-                    {{ t("chat.thread.copied") }}
+                  {{ t("chat.thread.copied") }}
+                </span> -->
+                  <span>
+                    {{ message.provider }} / {{ message.model }} ·
+                    {{ message.createdLabel }}
                   </span>
                 </div>
               </div>
@@ -670,7 +666,7 @@ onBeforeUnmount(() => {
             @click="cancelGeneration"
           >
             <LoaderCircle v-if="isCancelling" class="size-4 animate-spin" />
-            <X v-else class="size-4" />
+            <Square v-else class="size-3" fill="white" />
           </Button>
         </div>
       </div>
