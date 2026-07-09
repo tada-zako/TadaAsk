@@ -88,6 +88,8 @@ const copiedMessageUid = ref<string | null>(null);
 const isComposerComposing = ref(false);
 // 消息列表是否「钉」在底部，控制流式输出时自动跟随滚动
 const isPinnedToBottom = ref(true);
+// 进入/切换 session 后需要等待消息就绪，再强制定位到底部
+const shouldForceScrollToBottom = ref(false);
 let copiedResetTimer: ReturnType<typeof setTimeout> | null = null;
 // 防止加载旧消息时重复触发
 let isPreservingOlderScroll = false;
@@ -116,6 +118,14 @@ const emptyTitle = computed(() =>
 
 const selectedSourcesLabel = computed(() =>
   t("chat.composer.selectedSources", { count: selectedSourceCount.value }),
+);
+
+const showCenteredError = computed(
+  () => isComposerCentered.value && Boolean(errorMessage.value),
+);
+
+const showTimelineError = computed(
+  () => !isComposerCentered.value && Boolean(errorMessage.value),
 );
 
 // 从指定 user message 重新开始（回退并预填草稿）
@@ -249,20 +259,46 @@ async function scrollToBottom() {
   isPinnedToBottom.value = true;
 }
 
-// 切换会话时重置为底部 pin 状态
-watch(activeSessionUid, () => {
+/** 请求强制滚动到底部 */
+function requestForceScrollToBottom() {
+  shouldForceScrollToBottom.value = true;
   isPinnedToBottom.value = true;
+  void flushForceScrollToBottom();
+}
+
+async function flushForceScrollToBottom() {
+  if (
+    !shouldForceScrollToBottom.value ||
+    isBootstrapping.value ||
+    isLoadingMessages.value ||
+    isPreservingOlderScroll
+  ) {
+    return;
+  }
+
+  await scrollToBottom();
+  shouldForceScrollToBottom.value = false;
+}
+
+// 切换会话时等待消息就绪后滚到底部
+watch(activeSessionUid, () => {
+  requestForceScrollToBottom();
 });
 
-// 消息加载完成后滚动到底部
-watch(isLoadingMessages, (loading, previousLoading) => {
-  if (previousLoading && !loading) {
-    void scrollToBottom();
+// 页面进入或消息加载完成后，补齐从其他页面进入 chat 时的底部定位
+watch([isBootstrapping, isLoadingMessages], () => {
+  if (shouldForceScrollToBottom.value) {
+    void flushForceScrollToBottom();
   }
 });
 
 // 消息内容/引用数量变化时，若钉在底部则自动跟随滚动（流式输出场景）
 watch(messages, () => {
+  if (shouldForceScrollToBottom.value) {
+    void flushForceScrollToBottom();
+    return;
+  }
+
   if (
     !isLoadingOlderMessages.value &&
     !isPreservingOlderScroll &&
@@ -273,7 +309,8 @@ watch(messages, () => {
 });
 
 onMounted(() => {
-  void scrollToBottom();
+  // 进入 /chat 强制进行滚动到底
+  requestForceScrollToBottom();
 });
 
 onBeforeUnmount(() => {
@@ -303,7 +340,7 @@ onBeforeUnmount(() => {
           <div
             v-if="props.sessionsCollapsed"
             key="collapsed-header"
-            class="absolute inset-0 flex h-9 w-full items-center"
+            class="absolute inset-y-0 left-0 z-10 flex h-9 items-center"
           >
             <div class="mr-2 flex shrink-0 items-center gap-1">
               <button
@@ -324,27 +361,19 @@ onBeforeUnmount(() => {
               </button>
               <ChatContextSettingsSheet compact />
             </div>
-            <h1
-              v-if="threadTitle"
-              class="min-w-0 truncate text-[15px] font-semibold text-(--text-strong)"
-            >
-              {{ threadTitle }}
-            </h1>
-          </div>
-
-          <div
-            v-else
-            key="expanded-header"
-            class="chat-thread-rail absolute inset-y-0 left-0 flex h-9 items-center"
-          >
-            <h1
-              v-if="threadTitle"
-              class="truncate text-[15px] font-semibold text-(--text-strong)"
-            >
-              {{ threadTitle }}
-            </h1>
           </div>
         </Transition>
+
+        <div
+          class="chat-thread-rail chat-thread-title-rail pointer-events-none absolute inset-y-0 left-0 flex h-9 items-center"
+        >
+          <h1
+            v-if="threadTitle"
+            class="truncate text-[15px] font-semibold text-(--text-strong)"
+          >
+            {{ threadTitle }}
+          </h1>
+        </div>
       </div>
     </header>
 
@@ -514,7 +543,7 @@ onBeforeUnmount(() => {
 
         <!-- 错误提示 -->
         <div
-          v-if="errorMessage"
+          v-if="showTimelineError"
           class="rounded-(--console-radius-lg) border border-red-400/25 bg-red-400/10 px-3 py-2 text-[13px] text-red-100"
         >
           {{ errorMessage }}
@@ -524,19 +553,25 @@ onBeforeUnmount(() => {
 
     <!-- 底部输入区域：消息输入框 + 模型选择 + thinking 选择 + 发送按钮 -->
     <div
-      class="pointer-events-none absolute inset-x-0"
+      class="pointer-events-none absolute"
       :class="
         isComposerCentered
-          ? 'top-[54%] -translate-y-1/2 px-6'
-          : 'bottom-0 bg-linear-to-t from-(--surface-base) via-(--surface-base)/95 to-transparent px-6 pt-10 pb-5'
+          ? 'inset-x-0 top-[40%] px-6'
+          : 'right-4 bottom-0 left-0 bg-linear-to-t from-(--surface-base) via-(--surface-base)/95 to-transparent px-6 pt-10 pb-5'
       "
     >
+      <div
+        v-if="showCenteredError"
+        class="chat-thread-rail pointer-events-auto mb-3 rounded-(--console-radius-lg) border border-red-400/25 bg-red-400/10 px-3 py-2 text-[13px] text-red-100 shadow-[0_12px_36px_rgba(0,0,0,0.28)]"
+      >
+        {{ errorMessage }}
+      </div>
       <div
         class="chat-thread-rail pointer-events-auto rounded-[1.35rem] border border-(--line-strong) bg-[#24262b] p-2 shadow-[0_22px_80px_rgba(0,0,0,0.42)]"
       >
         <Textarea
           v-model="draft"
-          class="max-h-44 min-h-14 resize-none overflow-y-auto border-0 bg-transparent px-2 pt-2 pb-1 text-[14px] shadow-none focus-visible:ring-0"
+          class="composer-textarea-scrollbar max-h-44 min-h-14 resize-none overflow-y-auto border-0 bg-transparent px-2 pt-2 pb-1 text-[14px] shadow-none focus-visible:ring-0"
           :placeholder="t('chat.composer.placeholder')"
           @compositionstart="isComposerComposing = true"
           @compositionend="isComposerComposing = false"
@@ -703,6 +738,45 @@ onBeforeUnmount(() => {
   margin-left: var(--chat-rail-left);
   transition: margin-left 880ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: margin-left;
+}
+
+.chat-thread-title-rail {
+  transition:
+    margin-left 880ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding-left 880ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.chat-thread-panel[data-sessions-collapsed="true"] .chat-thread-title-rail {
+  padding-left: max(0px, calc(7.5rem - var(--chat-rail-left)));
+}
+
+.console-scrollbar {
+  scrollbar-gutter: stable;
+}
+
+.composer-textarea-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(154, 164, 180, 0.34) transparent;
+}
+
+.composer-textarea-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.composer-textarea-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.composer-textarea-scrollbar::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(154, 164, 180, 0.28);
+  background-clip: padding-box;
+}
+
+.composer-textarea-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(178, 187, 202, 0.46);
+  background-clip: padding-box;
 }
 
 @media (max-width: 900px) {

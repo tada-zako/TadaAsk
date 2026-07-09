@@ -11,6 +11,12 @@ import { useI18n } from "vue-i18n";
 import ChatContextSettingsSheet from "./ChatContextSettingsSheet.vue";
 import { useGlobalChatStore } from "@/console/stores/global-chat.ts";
 import { Button } from "@/shared/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 
 const emit = defineEmits<{
   collapse: [];
@@ -124,56 +130,74 @@ function collapseSessions() {
         </p>
 
         <template v-else>
-          <div
-            v-for="session in sessions"
-            :key="session.uid"
-            class="group grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-(--console-radius-md)"
-            :class="
-              activeSessionUid === session.uid
-                ? 'bg-white/[0.055]'
-                : 'hover:bg-white/[0.035]'
-            "
-          >
-            <button
-              type="button"
-              :aria-label="
-                t('chat.sessions.openSessionAria', { title: session.title })
-              "
-              class="min-w-0 px-2.5 py-2 text-left"
+          <TooltipProvider :delay-duration="800" :skip-delay-duration="400">
+            <div
+              v-for="session in sessions"
+              :key="session.uid"
+              class="group grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-(--console-radius-md)"
               :class="
                 activeSessionUid === session.uid
-                  ? 'text-[13px] font-semibold text-(--text-strong)'
-                  : 'text-[13px] font-medium text-(--text-muted) hover:text-(--text-strong)'
+                  ? 'bg-white/[0.055]'
+                  : 'hover:bg-white/[0.035]'
               "
-              @click="openSession(session.uid)"
             >
-              <span class="block truncate">{{ session.title }}</span>
-            </button>
-            <div class="mr-1 flex items-center gap-1">
-              <LoaderCircle
-                v-if="globalChatStore.isSessionStreaming(session.uid)"
-                class="text-primary size-3.5 animate-spin"
-                :class="
-                  globalChatStore.isSessionCancelling(session.uid)
-                    ? 'opacity-55'
-                    : 'opacity-85'
-                "
-              />
-              <button
-                type="button"
-                :aria-label="
-                  t('chat.sessions.deleteSessionAria', { title: session.title })
-                "
-                class="grid size-7 place-items-center rounded-(--console-radius-sm) text-(--text-disabled) opacity-0 transition group-hover:opacity-80 hover:bg-white/[0.05] hover:text-(--text-muted) disabled:cursor-not-allowed disabled:opacity-30"
-                :disabled="
-                  isMutating || globalChatStore.isSessionStreaming(session.uid)
-                "
-                @click="deleteSession(session.uid, session.title)"
-              >
-                <Archive class="size-3.5" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    :aria-label="
+                      t('chat.sessions.openSessionAria', {
+                        title: session.title,
+                      })
+                    "
+                    class="min-w-0 px-2.5 py-2 text-left"
+                    :class="
+                      activeSessionUid === session.uid
+                        ? 'text-[13px] font-semibold text-(--text-strong)'
+                        : 'text-[13px] font-medium text-(--text-muted) hover:text-(--text-strong)'
+                    "
+                    @click="openSession(session.uid)"
+                  >
+                    <span class="block truncate">{{ session.title }}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  align="center"
+                  class="max-w-72 whitespace-normal"
+                >
+                  {{ session.title }}
+                </TooltipContent>
+              </Tooltip>
+              <div class="mr-1 flex items-center gap-1">
+                <LoaderCircle
+                  v-if="globalChatStore.isSessionStreaming(session.uid)"
+                  class="text-primary size-3.5 animate-spin"
+                  :class="
+                    globalChatStore.isSessionCancelling(session.uid)
+                      ? 'opacity-55'
+                      : 'opacity-85'
+                  "
+                />
+                <button
+                  type="button"
+                  :aria-label="
+                    t('chat.sessions.deleteSessionAria', {
+                      title: session.title,
+                    })
+                  "
+                  class="grid size-7 place-items-center rounded-(--console-radius-sm) text-(--text-disabled) opacity-0 transition group-hover:opacity-80 hover:bg-white/[0.05] hover:text-(--text-muted) disabled:cursor-not-allowed disabled:opacity-30"
+                  :disabled="
+                    isMutating ||
+                    globalChatStore.isSessionStreaming(session.uid)
+                  "
+                  @click="deleteSession(session.uid, session.title)"
+                >
+                  <Archive class="size-3.5" />
+                </button>
+              </div>
             </div>
-          </div>
+          </TooltipProvider>
         </template>
       </nav>
     </div>

@@ -220,7 +220,7 @@ function badgeClass(tone: SourceTone): string {
 </script>
 
 <template>
-  <TooltipProvider>
+  <TooltipProvider :delay-duration="400" :skip-delay-duration="200">
     <!-- source item table 主体 -->
     <section class="console-table-panel">
       <!-- 批操作栏 -->
