@@ -35,6 +35,8 @@ export interface ChatSessionViewModel {
   createdAt: string;
   updatedAt: string;
   updatedLabel: string;
+  // 本地临时会话（尚未同步到服务端）标记
+  isPending?: boolean;
   session: ChatSessionRead;
 }
 
@@ -171,6 +173,7 @@ export async function streamGlobalChatEvents(
   return parseAdminChatEventStream(stream as ReadableStream<Uint8Array>);
 }
 
+/** 构造 admin chat 请求 */
 export function buildAdminChatRequest(
   input: BuildAdminChatRequestInput,
 ): AdminRagChatRequest {
