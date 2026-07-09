@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import {
   ArrowUp,
   ChevronDown,
@@ -27,6 +34,13 @@ import {
 } from "@/shared/components/ui/dropdown-menu";
 import { Textarea } from "@/shared/components/ui/textarea";
 
+// 距离底部阈值：用于判断是否「钉」在底部（自动跟随滚动）
+const BOTTOM_PIN_THRESHOLD = 96;
+// 距离顶部阈值：触发加载更早消息
+const TOP_LOAD_THRESHOLD = 96;
+// 「已复制」提示自动消失延迟
+const COPIED_RESET_DELAY_MS = 1400;
+
 // sessionsCollapsed: 左侧会话面板是否折叠，影响 rail 偏移量
 const props = withDefaults(
   defineProps<{
@@ -46,11 +60,14 @@ const globalChatStore = useGlobalChatStore();
 const {
   activeSessionUid,
   canSend,
+  cancelledMessageUids,
   draft,
   errorMessage,
+  hasMoreBefore,
   isBootstrapping,
   isCancelling,
   isLoadingMessages,
+  isLoadingOlderMessages,
   isStreaming,
   messages,
   modelOptionGroups,
@@ -61,6 +78,18 @@ const {
   thinking,
   threadTitle,
 } = storeToRefs(globalChatStore);
+
+// 消息时间线引用对象
+const timelineRef = ref<HTMLElement | null>(null);
+// 记录当前显示「已复制」提示的消息 uid
+const copiedMessageUid = ref<string | null>(null);
+// IME 组合输入中，阻止 Enter 误发送
+const isComposerComposing = ref(false);
+// 消息列表是否「钉」在底部，控制流式输出时自动跟随滚动
+const isPinnedToBottom = ref(true);
+let copiedResetTimer: ReturnType<typeof setTimeout> | null = null;
+// 防止加载旧消息时重复触发
+let isPreservingOlderScroll = false;
 
 // thinking 档位选项
 const thinkingOptions: { value: ThinkingLevel; label: string }[] = [
@@ -93,8 +122,19 @@ function restartFromMessage(messageUid: string) {
   void globalChatStore.restartFromMessage(messageUid).catch(() => undefined);
 }
 
-function copyMessage(content: string) {
-  void navigator.clipboard?.writeText(content);
+// 复制消息内容到剪贴板，并显示「已复制」提示
+function copyMessage(messageUid: string, content: string) {
+  void navigator.clipboard?.writeText(content).then(() => {
+    copiedMessageUid.value = messageUid;
+    if (copiedResetTimer) {
+      clearTimeout(copiedResetTimer);
+    }
+    // 设置已复制状态归位计时器
+    copiedResetTimer = setTimeout(() => {
+      copiedMessageUid.value = null;
+      copiedResetTimer = null;
+    }, COPIED_RESET_DELAY_MS);
+  });
 }
 
 // 发送消息 → store action 触发 SSE stream
@@ -114,6 +154,145 @@ function startNewSession() {
 function expandSessions() {
   emit("expandSessions");
 }
+
+// 判断消息是否已被用户取消生成
+function isMessageCancelled(messageUid: string) {
+  return cancelledMessageUids.value.includes(messageUid);
+}
+
+// composer Enter 发送：排除 Shift+Enter 换行、IME 组合输入中
+function handleComposerKeydown(event: KeyboardEvent) {
+  if (
+    event.key !== "Enter" ||
+    event.shiftKey ||
+    event.isComposing ||
+    isComposerComposing.value
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  sendMessage();
+}
+
+// 消息列表滚动处理：更新底部 pin 状态 + 顶部触发加载更早消息
+function handleTimelineScroll() {
+  const element = timelineRef.value;
+  if (!element) {
+    return;
+  }
+
+  updatePinnedToBottom();
+
+  // 向上滚动到顶部附近时加载更早消息
+  if (
+    !isPinnedToBottom.value &&
+    element.scrollTop <= TOP_LOAD_THRESHOLD &&
+    hasMoreBefore.value &&
+    !isLoadingMessages.value &&
+    !isLoadingOlderMessages.value
+  ) {
+    void loadOlderMessagesPreservingScroll();
+  }
+}
+
+// 加载更早消息并保持当前滚动位置不变
+async function loadOlderMessagesPreservingScroll() {
+  const element = timelineRef.value;
+  if (!element || isPreservingOlderScroll) {
+    return;
+  }
+
+  isPreservingOlderScroll = true;
+  const previousScrollHeight = element.scrollHeight;
+  const previousScrollTop = element.scrollTop;
+
+  try {
+    const loaded = await globalChatStore.loadOlderMessages();
+    if (!loaded) {
+      return;
+    }
+
+    await nextTick();
+    // 补偿因上方插入旧消息导致的滚动偏移
+    element.scrollTop =
+      element.scrollHeight - previousScrollHeight + previousScrollTop;
+    updatePinnedToBottom();
+  } finally {
+    isPreservingOlderScroll = false;
+  }
+}
+
+// 根据当前滚动位置更新 isPinnedToBottom 状态
+function updatePinnedToBottom() {
+  const element = timelineRef.value;
+  if (!element) {
+    return;
+  }
+
+  // 计算聊天窗口最底部距离当前滚动位置的距离
+  const distanceToBottom =
+    element.scrollHeight - element.scrollTop - element.clientHeight;
+  isPinnedToBottom.value = distanceToBottom <= BOTTOM_PIN_THRESHOLD;
+}
+
+// 滚动到消息列表底部
+async function scrollToBottom() {
+  await nextTick();
+  const element = timelineRef.value;
+  if (!element) {
+    return;
+  }
+
+  element.scrollTop = element.scrollHeight;
+  isPinnedToBottom.value = true;
+}
+
+// 切换会话时重置为底部 pin 状态
+watch(activeSessionUid, () => {
+  isPinnedToBottom.value = true;
+});
+
+// 消息加载完成后滚动到底部
+watch(isLoadingMessages, (loading, previousLoading) => {
+  if (previousLoading && !loading) {
+    void scrollToBottom();
+  }
+});
+
+// 消息内容/引用数量变化时，若钉在底部则自动跟随滚动（流式输出场景）
+watch(
+  () =>
+    // 监听组合内容，确保流式输出时监听到变化
+    // messages.value
+    //   .map(
+    //     (message) =>
+    //       `${message.uid}:${message.content.length}:${message.citationCount}`,
+    //   )
+    //   .join("|"),
+    {
+      // 只监听最后一条消息的变化，避免遍历整个 messages
+      const lastMsg = messages.value[messages.value.length - 1];
+      if (!lastMsg) return "";
+      // 仅监听最后一条消息的 ID、长度和引用数
+      return `${lastMsg.uid}:${lastMsg.content.length}:${lastMsg.citationCount}`;
+    },
+  () => {
+    if (!isLoadingOlderMessages.value && isPinnedToBottom.value) {
+      void scrollToBottom();
+    }
+  },
+);
+
+onMounted(() => {
+  void scrollToBottom();
+});
+
+onBeforeUnmount(() => {
+  if (copiedResetTimer) {
+    clearTimeout(copiedResetTimer);
+  }
+});
 </script>
 
 <template>
@@ -183,8 +362,10 @@ function expandSessions() {
     </header>
 
     <div
+      ref="timelineRef"
       class="console-scrollbar min-h-0 flex-1 overflow-y-auto px-6 pt-5"
       :class="isComposerCentered ? 'pb-8' : 'pb-42'"
+      @scroll="handleTimelineScroll"
     >
       <!-- 消息列表 -->
       <div class="chat-thread-rail grid gap-8">
@@ -209,10 +390,19 @@ function expandSessions() {
 
         <!-- messages list 区域 -->
         <template v-else>
+          <!-- 加载更早消息中的 loading 指示器 -->
+          <div
+            v-if="isLoadingOlderMessages"
+            class="flex items-center justify-center gap-2 py-2 text-[12px] text-(--text-faint)"
+          >
+            <LoaderCircle class="text-primary size-3.5 animate-spin" />
+            {{ t("chat.thread.loadingOlder") }}
+          </div>
+
           <article
             v-for="message in messages"
             :key="message.uid"
-            class="grid gap-2"
+            class="group grid gap-1.5"
             :class="
               message.role === 'user'
                 ? 'justify-items-end'
@@ -227,7 +417,7 @@ function expandSessions() {
                 {{ message.content }}
               </div>
               <div
-                class="flex items-center gap-2 pr-1 text-[12px] text-(--text-faint) opacity-70 transition hover:opacity-100"
+                class="flex min-h-6 items-center gap-2 pr-1 text-[12px] text-(--text-faint) opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100"
               >
                 <span>
                   {{ message.provider }} / {{ message.model }} ·
@@ -246,10 +436,17 @@ function expandSessions() {
                   type="button"
                   :aria-label="t('chat.thread.copyMessageAria')"
                   class="grid size-6 place-items-center rounded-(--console-radius-sm) text-(--text-faint) hover:bg-white/[0.05] hover:text-(--text-strong)"
-                  @click="copyMessage(message.content)"
+                  @click="copyMessage(message.uid, message.content)"
                 >
                   <Copy class="size-3.5" />
                 </button>
+                <!-- 「已复制」提示 -->
+                <span
+                  v-if="copiedMessageUid === message.uid"
+                  class="text-[11px] text-(--text-muted)"
+                >
+                  {{ t("chat.thread.copied") }}
+                </span>
               </div>
             </template>
 
@@ -274,6 +471,38 @@ function expandSessions() {
               </div>
               <div v-if="message.citationCount > 0" class="flex">
                 <ChatCitationsSheet :message="message" />
+              </div>
+              <!-- assistant 消息底部操作栏：取消标记 / 模型信息 / 复制 -->
+              <div class="flex min-h-6 items-center gap-2 text-[12px]">
+                <span
+                  v-if="isMessageCancelled(message.uid)"
+                  class="rounded-full bg-white/[0.045] px-2 py-0.5 text-[11px] text-(--text-faint)"
+                >
+                  {{ t("chat.thread.stopped") }}
+                </span>
+                <div
+                  class="flex items-center gap-2 text-(--text-faint) opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100"
+                >
+                  <span>
+                    {{ message.provider }} / {{ message.model }} ·
+                    {{ message.createdLabel }}
+                  </span>
+                  <button
+                    type="button"
+                    :aria-label="t('chat.thread.copyMessageAria')"
+                    class="grid size-6 place-items-center rounded-(--console-radius-sm) text-(--text-faint) hover:bg-white/[0.05] hover:text-(--text-strong)"
+                    @click="copyMessage(message.uid, message.content)"
+                  >
+                    <Copy class="size-3.5" />
+                  </button>
+                  <!-- 「已复制」提示 -->
+                  <span
+                    v-if="copiedMessageUid === message.uid"
+                    class="text-[11px] text-(--text-muted)"
+                  >
+                    {{ t("chat.thread.copied") }}
+                  </span>
+                </div>
               </div>
             </template>
 
@@ -311,8 +540,11 @@ function expandSessions() {
       >
         <Textarea
           v-model="draft"
-          class="min-h-14 border-0 bg-transparent px-2 pt-2 pb-1 text-[14px] shadow-none focus-visible:ring-0"
+          class="max-h-44 min-h-14 resize-none overflow-y-auto border-0 bg-transparent px-2 pt-2 pb-1 text-[14px] shadow-none focus-visible:ring-0"
           :placeholder="t('chat.composer.placeholder')"
+          @compositionstart="isComposerComposing = true"
+          @compositionend="isComposerComposing = false"
+          @keydown="handleComposerKeydown"
         />
 
         <!-- 模型选择 -->

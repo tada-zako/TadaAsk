@@ -469,11 +469,14 @@ export const en = {
       },
     },
     thread: {
+      copied: "Copied",
       copyMessageAria: "Copy message content",
       emptySession: "No messages in this session",
       loading: "Loading chat...",
+      loadingOlder: "Loading earlier messages...",
       newChat: "Ready to start at any time",
       restartAria: "Restart from this message",
+      stopped: "Stopped",
       thinking: "Thinking...",
     },
     sessions: {

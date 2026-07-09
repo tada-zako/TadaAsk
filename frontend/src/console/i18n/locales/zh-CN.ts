@@ -451,11 +451,14 @@ export const zhCN: typeof en = {
       },
     },
     thread: {
+      copied: "已复制",
       copyMessageAria: "复制消息内容",
       emptySession: "当前对话暂无消息",
       loading: "正在加载对话...",
+      loadingOlder: "正在加载更早的消息...",
       newChat: "准备好了，随时开始",
       restartAria: "从这条消息重新开始",
+      stopped: "已停止",
       thinking: "正在思考...",
     },
     sessions: {
