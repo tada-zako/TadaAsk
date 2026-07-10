@@ -144,7 +144,7 @@ export const zhCN: typeof en = {
         actions: "操作",
       },
       sourceActions: "{name} 数据源操作",
-      openSource: "打开数据源",
+      viewContents: "查看数据内容",
       unbind: "解绑",
       empty: "暂无已关联数据源。",
     },
@@ -458,7 +458,9 @@ export const zhCN: typeof en = {
       loadingOlder: "正在加载更早的消息...",
       newChat: "准备好了，随时开始",
       restartAria: "从这条消息重新开始",
-      stopped: "已停止",
+      scrollToBottom: "回到最新消息",
+      scrollToBottomAria: "滚动到最新消息",
+      stopped: "已中断",
       thinking: "正在思考...",
     },
     markdown: {
@@ -525,6 +527,8 @@ export const zhCN: typeof en = {
         selectAria: "选择 {name}",
         selected: "已选 {count} 个",
         title: "数据源",
+        viewContents: "查看数据内容",
+        viewContentsAria: "查看 {name} 的数据内容",
       },
     },
     citations: {

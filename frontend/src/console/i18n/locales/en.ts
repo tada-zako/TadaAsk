@@ -148,7 +148,7 @@ export const en = {
         actions: "Actions",
       },
       sourceActions: "{name} source actions",
-      openSource: "Open source",
+      viewContents: "View source contents",
       unbind: "Unbind",
       empty: "No linked sources yet.",
     },
@@ -476,7 +476,9 @@ export const en = {
       loadingOlder: "Loading earlier messages...",
       newChat: "Ready to start at any time",
       restartAria: "Restart from this message",
-      stopped: "Stopped",
+      scrollToBottom: "Scroll to latest",
+      scrollToBottomAria: "Scroll to the latest message",
+      stopped: "Interrupted",
       thinking: "Thinking...",
     },
     markdown: {
@@ -544,6 +546,8 @@ export const en = {
         selectAria: "Select {name}",
         selected: "{count} selected",
         title: "Sources",
+        viewContents: "View source contents",
+        viewContentsAria: "View contents of {name}",
       },
     },
     citations: {

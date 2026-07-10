@@ -204,8 +204,8 @@ async function handleDeleteWidget(widgetUid: string) {
 
 async function handleOpenSource(sourceUid: string) {
   await router.push({
-    path: "/sources",
-    query: { sourceUid },
+    name: "source-items",
+    params: { sourceUid },
   });
 }
 

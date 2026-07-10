@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Settings2, FileText, Globe2 } from "@lucide/vue";
+import { ExternalLink, FileText, Globe2, Settings2 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 
 import { useGlobalChatStore } from "@/console/stores/global-chat";
 import { useSourceStore } from "@/console/stores/source";
@@ -17,12 +18,19 @@ import {
 } from "@/shared/components/ui/sheet";
 import { Switch } from "@/shared/components/ui/switch";
 import { Textarea } from "@/shared/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 
 const { compact = false } = defineProps<{
   compact?: boolean;
 }>();
 
 const { t, te } = useI18n();
+const router = useRouter();
 const globalChatStore = useGlobalChatStore();
 const sourceStore = useSourceStore();
 const { adminSystemPrompt, ragOptions, selectedSourceCount } =
@@ -36,6 +44,13 @@ function setRagMode(mode: "fast" | "adaptive" | "full") {
 
 function setSourceSelected(sourceUid: string, value: unknown) {
   globalChatStore.setSourceSelected(sourceUid, Boolean(value));
+}
+
+function openSourceContents(sourceUid: string) {
+  void router.push({
+    name: "source-items",
+    params: { sourceUid },
+  });
 }
 
 function sourceTypeLabel(sourceType: string): string {
@@ -121,35 +136,68 @@ function sourceStatusLabel(status: string): string {
               {{ t("chat.context.sources.empty") }}
             </p>
             <template v-else>
-              <label
-                v-for="source in sources"
-                :key="source.uid"
-                class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px]"
-              >
-                <Checkbox
-                  :aria-label="
-                    t('chat.context.sources.selectAria', {
-                      name: source.sourceName,
-                    })
-                  "
-                  :model-value="globalChatStore.isSourceSelected(source.uid)"
-                  @update:model-value="setSourceSelected(source.uid, $event)"
-                />
-                <span class="min-w-0">
-                  <span class="block truncate font-medium text-(--text-strong)">
-                    {{ source.sourceName }}
-                  </span>
-                  <span class="block truncate text-[11px] text-(--text-faint)">
-                    {{ sourceTypeLabel(source.sourceType) }} ·
-                    {{ sourceStatusLabel(source.status) }}
-                  </span>
-                </span>
-                <Globe2
-                  v-if="source.sourceType === 'web_crawl'"
-                  class="size-3.5 text-(--text-disabled)"
-                />
-                <FileText v-else class="size-3.5 text-(--text-disabled)" />
-              </label>
+              <TooltipProvider :delay-duration="450">
+                <div
+                  v-for="source in sources"
+                  :key="source.uid"
+                  class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px] last:border-b-0 hover:bg-white/[0.025]"
+                >
+                  <Checkbox
+                    :id="`chat-source-${source.uid}`"
+                    :aria-label="
+                      t('chat.context.sources.selectAria', {
+                        name: source.sourceName,
+                      })
+                    "
+                    :model-value="globalChatStore.isSourceSelected(source.uid)"
+                    @update:model-value="setSourceSelected(source.uid, $event)"
+                  />
+                  <Label
+                    :for="`chat-source-${source.uid}`"
+                    class="min-w-0 cursor-pointer"
+                  >
+                    <span
+                      class="block truncate font-medium text-(--text-strong)"
+                    >
+                      {{ source.sourceName }}
+                    </span>
+                    <span
+                      class="block truncate text-[11px] font-normal text-(--text-faint)"
+                    >
+                      {{ sourceTypeLabel(source.sourceType) }} ·
+                      {{ sourceStatusLabel(source.status) }}
+                    </span>
+                  </Label>
+                  <div class="flex items-center gap-1">
+                    <Globe2
+                      v-if="source.sourceType === 'web_crawl'"
+                      class="size-3.5 text-(--text-disabled)"
+                    />
+                    <FileText v-else class="size-3.5 text-(--text-disabled)" />
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          type="button"
+                          :aria-label="
+                            t('chat.context.sources.viewContentsAria', {
+                              name: source.sourceName,
+                            })
+                          "
+                          variant="ghost"
+                          size="icon-sm"
+                          class="ml-0.5 size-7 rounded-(--console-radius-md) text-(--text-faint) hover:bg-white/[0.055] hover:text-(--text-strong)"
+                          @click="openSourceContents(source.uid)"
+                        >
+                          <ExternalLink class="size-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        {{ t("chat.context.sources.viewContents") }}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+              </TooltipProvider>
             </template>
           </div>
         </section>

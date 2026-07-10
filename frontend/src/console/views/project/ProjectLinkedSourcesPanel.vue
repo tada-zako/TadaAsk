@@ -237,7 +237,7 @@ function badgeClass(
               <DropdownMenuContent align="end">
                 <DropdownMenuItem @select="emit('openSource', source.uid)">
                   <ExternalLink class="size-4" />
-                  {{ t("project.sources.openSource") }}
+                  {{ t("project.sources.viewContents") }}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
