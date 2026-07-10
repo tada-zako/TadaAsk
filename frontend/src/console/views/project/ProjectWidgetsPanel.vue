@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { Ellipsis, Pencil, Plus, Trash2 } from "@lucide/vue";
+import { Ellipsis, Pencil, Plus, Trash2, Power } from "@lucide/vue";
 
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -259,6 +259,7 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
                 <DropdownMenuItem
                   @select="toggleWidget(widget, !widget.isEnabled)"
                 >
+                  <Power class="size-4" />
                   {{ widget.enabledActionLabel }}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
