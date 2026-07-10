@@ -19,8 +19,8 @@ import {
 import { useProjectStore } from "@/console/stores/project";
 import { getErrorMessage } from "@/console/lib/api-result";
 
-import ProjectLandingState from "./ProjectLandingState.vue";
-import ProjectOverviewState from "./ProjectOverviewState.vue";
+import ProjectLandingState from "@/console/components/project/ProjectLandingState.vue";
+import ProjectOverviewState from "@/console/components/project/ProjectOverviewState.vue";
 
 const route = useRoute();
 const router = useRouter();
