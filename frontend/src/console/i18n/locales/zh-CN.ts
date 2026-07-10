@@ -461,6 +461,10 @@ export const zhCN: typeof en = {
       stopped: "已停止",
       thinking: "正在思考...",
     },
+    markdown: {
+      copiedCode: "已复制",
+      copyCode: "复制",
+    },
     sessions: {
       collapseAria: "收起对话列表",
       deleteConfirm: "删除“{title}”？",

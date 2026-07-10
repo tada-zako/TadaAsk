@@ -23,6 +23,7 @@ import { useI18n } from "vue-i18n";
 
 import ChatCitationsSheet from "./ChatCitationsSheet.vue";
 import ChatContextSettingsSheet from "./ChatContextSettingsSheet.vue";
+import ChatMarkdownRenderer from "./ChatMarkdownRenderer.vue";
 import { useGlobalChatStore } from "@/console/stores/global-chat.ts";
 import type { ThinkingLevel } from "@/console/services/chat";
 import { Button } from "@/shared/components/ui/button";
@@ -472,9 +473,7 @@ onBeforeUnmount(() => {
 
             <!-- AI 回复消息：左对齐，含引用来源 -->
             <template v-else-if="message.role === 'assistant'">
-              <div
-                class="max-w-[82%] text-[14px] leading-7 whitespace-pre-wrap text-(--text-body)"
-              >
+              <div class="max-w-[82%] text-[14px] leading-7 text-(--text-body)">
                 <!-- 后端 assistant 消息尚未响应时渲染加载信息 -->
                 <span
                   v-if="
@@ -486,9 +485,11 @@ onBeforeUnmount(() => {
                   <LoaderCircle class="text-primary size-3.5 animate-spin" />
                   {{ t("chat.thread.thinking") }}
                 </span>
-                <template v-else>
-                  {{ message.content || " " }}
-                </template>
+                <ChatMarkdownRenderer
+                  v-else
+                  :content="message.content || ' '"
+                  :streaming="message.uid === streamingAssistantMessageUid"
+                />
               </div>
               <div v-if="message.citationCount > 0" class="flex">
                 <ChatCitationsSheet :message="message" />

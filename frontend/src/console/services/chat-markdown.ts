@@ -1,4 +1,3 @@
-// 聊天消息 Markdown 渲染服务：MarkdownIt + 代码高亮 + KaTeX + XSS 过滤
 import DOMPurify from "dompurify";
 import hljs from "highlight.js/lib/core";
 // 按需注册 highlight.js 语言包，减少打包体积

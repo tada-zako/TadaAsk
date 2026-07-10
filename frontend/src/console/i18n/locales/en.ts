@@ -479,6 +479,10 @@ export const en = {
       stopped: "Stopped",
       thinking: "Thinking...",
     },
+    markdown: {
+      copiedCode: "Copied",
+      copyCode: "Copy",
+    },
     sessions: {
       collapseAria: "Collapse sessions",
       deleteConfirm: 'Delete "{title}"?',
