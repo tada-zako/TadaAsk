@@ -473,7 +473,7 @@ onBeforeUnmount(() => {
 
             <!-- AI 回复消息：左对齐，含引用来源 -->
             <template v-else-if="message.role === 'assistant'">
-              <div class="max-w-[82%] text-[14px] leading-7 text-(--text-body)">
+              <div class="max-w-[92%] text-[14px] leading-7 text-(--text-body)">
                 <!-- 后端 assistant 消息尚未响应时渲染加载信息 -->
                 <span
                   v-if="
