@@ -12,6 +12,7 @@ from .base import (
     ModelResponse,
 )
 from .prompts import (
+    CITATION_MARKER_TEMPLATE,
     DEFAULT_SYSTEM_PROMPT,
     QUERY_EXPAND_SYSTEM_PROMPT,
     QUERY_EXPAND_USER_TEMPLATE,
@@ -31,6 +32,7 @@ __all__ = [
     "StreamedResponse",
     "TextCompleter",
     "StructuredCompleter",
+    "CITATION_MARKER_TEMPLATE",
     "DEFAULT_SYSTEM_PROMPT",
     "QUERY_EXPAND_SYSTEM_PROMPT",
     "QUERY_EXPAND_USER_TEMPLATE",

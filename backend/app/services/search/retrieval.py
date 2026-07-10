@@ -2,7 +2,7 @@ from .hybrid_search import HybridSearchService, SearchSourceRef
 from ..schemas import RAGRetrievalResult
 from ..utils import TokenBudget
 from app.rag import StandaloneQueryRewriter
-from app.providers import Message, StructuredCompleter
+from app.providers import CITATION_MARKER_TEMPLATE, Message, StructuredCompleter
 from app.db.models import ChatMessage
 from app.db.schemas import HybridSearchOptions, RAGSnapshotItem, RAGSnapshot
 from app.core.constants import ChatMessageRole
@@ -137,15 +137,18 @@ class RAGRetrievalService:
         for index, result in enumerate(search_results):
             """
             构建的 blocks 示例：
-            [1] Document Title / Section Header
+            [[citation:1]] Document Title / Section Header
             Document content...
-            [2] Document2 Title / Section Header
+            [[citation:2]] Document2 Title / Section Header
             Document2 content...
             ...
             """
             citation_id = index + 1
             title = result.title or result.filename
-            header = f"[{citation_id}] {title}"
+            citation_marker = CITATION_MARKER_TEMPLATE.format(
+                citation_id=citation_id
+            )
+            header = f"{citation_marker} {title}"
             if result.section_header:
                 header += f" / {result.section_header}"
 
