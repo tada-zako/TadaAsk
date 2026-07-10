@@ -484,6 +484,7 @@ export const en = {
     markdown: {
       copiedCode: "Copied",
       copyCode: "Copy",
+      openCitationAria: "Open citation {id}",
     },
     sessions: {
       collapseAria: "Collapse sessions",

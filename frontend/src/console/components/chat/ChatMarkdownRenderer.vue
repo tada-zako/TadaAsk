@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 
 import { renderChatMarkdown } from "@/console/services/chat-markdown";
+import type { RAGSnapshotItem } from "@/console/services/chat";
 
 import "katex/dist/katex.min.css";
 import "./chat-markdown.css";
@@ -13,12 +14,19 @@ const props = withDefaults(
     content?: string;
     /** 是否为流式输出中（用于 CSS 控制光标闪烁等样式） */
     streaming?: boolean;
+    /** 当前 message 的 RAG snapshot items */
+    citationItems?: RAGSnapshotItem[];
   }>(),
   {
+    citationItems: () => [],
     content: "",
     streaming: false,
   },
 );
+
+const emit = defineEmits<{
+  openCitation: [citationId: number];
+}>();
 
 const { t } = useI18n();
 
@@ -30,20 +38,37 @@ let copiedResetTimer: ReturnType<typeof setTimeout> | null = null;
 /** 将 Markdown 转为安全 HTML */
 const renderedHtml = computed(() =>
   renderChatMarkdown(props.content, {
+    citationAriaLabel: (citationId) =>
+      t("chat.markdown.openCitationAria", { id: citationId }),
+    citationIds: props.citationItems.map((item) => item.citationId),
     copyCodeLabel: t("chat.markdown.copyCode"),
+    streaming: props.streaming,
   }),
 );
 
 const copiedCodeLabel = computed(() => t("chat.markdown.copiedCode"));
 const copyCodeLabel = computed(() => t("chat.markdown.copyCode"));
 
-/** 事件委托：监听容器内代码复制按钮的点击 */
+/** 事件委托：监听容器内代码复制按钮以及 citation 按钮的点击 */
 function handleMarkdownClick(event: MouseEvent) {
   const target = event.target;
   if (!(target instanceof Element)) {
     return;
   }
 
+  // 处理 citation 按钮点击
+  const citationButton = target.closest<HTMLButtonElement>(
+    "button[data-chat-citation-id]",
+  );
+  if (citationButton) {
+    const citationId = Number(citationButton.dataset.chatCitationId);
+    if (Number.isSafeInteger(citationId) && citationId > 0) {
+      emit("openCitation", citationId);
+    }
+    return;
+  }
+
+  // 处理 copy 按钮点击
   const copyButton = target.closest<HTMLButtonElement>(
     "button[data-chat-code-copy]",
   );

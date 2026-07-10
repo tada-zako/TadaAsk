@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ExternalLink, FileText } from "@lucide/vue";
+import { nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 import type {
@@ -15,11 +16,70 @@ import {
   SheetTrigger,
 } from "@/shared/components/ui/sheet";
 
-defineProps<{
-  message: ChatMessageViewModel;
+const props = withDefaults(
+  defineProps<{
+    activeCitationId?: number | null;
+    open?: boolean;
+    message: ChatMessageViewModel;
+  }>(),
+  {
+    activeCitationId: null,
+    open: false,
+  },
+);
+
+const emit = defineEmits<{
+  "update:open": [open: boolean];
 }>();
 
+const citationsContentRef = ref<HTMLElement | null>(null);
+const highlightedCitationId = ref<number | null>(null);
+let highlightResetTimer: ReturnType<typeof setTimeout> | null = null;
+
 const { t } = useI18n();
+
+watch(
+  [() => props.open, () => props.activeCitationId],
+  ([open, citationId]) => {
+    if (open && citationId) {
+      void focusCitation(citationId);
+      return;
+    }
+
+    highlightedCitationId.value = null;
+  },
+  { flush: "post" },
+);
+
+/** Sheet 打开后定位正文 marker 对应的 citation card，并短暂强调。 */
+async function focusCitation(citationId: number) {
+  await nextTick();
+  // SheetContent 通过 Portal 挂载，等待一帧确保卡片节点已经进入 DOM。
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  const card = citationsContentRef.value?.querySelector<HTMLElement>(
+    `[data-citation-card-id="${citationId}"]`,
+  );
+  if (!card) {
+    return;
+  }
+
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  highlightedCitationId.value = citationId;
+
+  if (highlightResetTimer) {
+    clearTimeout(highlightResetTimer);
+  }
+  highlightResetTimer = setTimeout(() => {
+    highlightedCitationId.value = null;
+    highlightResetTimer = null;
+  }, 1600);
+}
+
+onBeforeUnmount(() => {
+  if (highlightResetTimer) {
+    clearTimeout(highlightResetTimer);
+  }
+});
 
 // 引用条目标题：优先 title → filename → originUrl → 回退 ID
 function citationTitle(item: RAGSnapshotItem): string {
@@ -55,7 +115,7 @@ function citationScore(item: RAGSnapshotItem): string {
 </script>
 
 <template>
-  <Sheet>
+  <Sheet :open="open" @update:open="emit('update:open', $event)">
     <!-- 触发按钮：显示引用数量 -->
     <SheetTrigger as-child>
       <Button
@@ -83,6 +143,7 @@ function citationScore(item: RAGSnapshotItem): string {
       </SheetHeader>
 
       <div
+        ref="citationsContentRef"
         class="console-scrollbar grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-5 py-4"
       >
         <!-- 当前消息元信息 -->
@@ -118,7 +179,13 @@ function citationScore(item: RAGSnapshotItem): string {
           <article
             v-for="item in message.citationItems"
             :key="`${item.citationId}-${item.chunkId}`"
-            class="grid gap-2 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) px-3 py-2.5"
+            :data-citation-card-id="item.citationId"
+            class="grid gap-2 rounded-(--console-radius-lg) border bg-(--surface-panel-soft) px-3 py-2.5 transition-[border-color,background-color,box-shadow] duration-300"
+            :class="
+              highlightedCitationId === item.citationId
+                ? 'border-primary/45 bg-primary/[0.07] shadow-[0_0_0_1px_rgba(36,211,196,0.08)]'
+                : 'border-(--line-soft)'
+            "
           >
             <div class="flex items-center gap-2">
               <span

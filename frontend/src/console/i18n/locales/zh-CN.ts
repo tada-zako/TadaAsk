@@ -466,6 +466,7 @@ export const zhCN: typeof en = {
     markdown: {
       copiedCode: "已复制",
       copyCode: "复制",
+      openCitationAria: "打开引用 {id}",
     },
     sessions: {
       collapseAria: "收起对话列表",

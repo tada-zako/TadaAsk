@@ -92,6 +92,9 @@ const {
 const timelineRef = ref<HTMLElement | null>(null);
 // composer 容器引用，用于在页面进入或切换会话后聚焦原生 textarea
 const composerRef = ref<HTMLElement | null>(null);
+// 当前由正文 citation marker 或摘要 chip 打开的引用面板状态
+const citationSheetMessageUid = ref<string | null>(null); // 激活的 citation 面板
+const activeCitationId = ref<number | null>(null); // 用户选中的 citation 对象
 // 记录当前显示「已复制」提示的消息 uid
 const copiedMessageUid = ref<string | null>(null);
 // IME 组合输入中，阻止 Enter 误发送
@@ -187,6 +190,29 @@ function expandSessions() {
 // 判断消息是否已被用户取消生成
 function isMessageCancelled(messageUid: string) {
   return cancelledMessageUids.value.includes(messageUid);
+}
+
+/** citation bottom 点击事件 */
+function openCitation(messageUid: string, citationId: number) {
+  activeCitationId.value = citationId;
+  citationSheetMessageUid.value = messageUid;
+}
+
+/** 打开 sheet 后刷新状态 */
+function handleCitationSheetOpenChange(messageUid: string, open: boolean) {
+  if (open) {
+    if (citationSheetMessageUid.value !== messageUid) {
+      activeCitationId.value = null;
+    }
+    citationSheetMessageUid.value = messageUid;
+    return;
+  }
+
+  if (citationSheetMessageUid.value === messageUid) {
+    // 关闭页面，刷新状态
+    citationSheetMessageUid.value = null;
+    activeCitationId.value = null;
+  }
 }
 
 // composer Enter 发送：排除 Shift+Enter 换行、IME 组合输入中
@@ -320,6 +346,8 @@ async function flushForceScrollToBottom() {
 
 // 切换会话时等待消息就绪后滚到底部
 watch(activeSessionUid, () => {
+  citationSheetMessageUid.value = null;
+  activeCitationId.value = null;
   requestForceScrollToBottom();
   void focusComposer();
 });
@@ -530,12 +558,25 @@ onBeforeUnmount(() => {
                 </span>
                 <ChatMarkdownRenderer
                   v-else
+                  :citation-items="message.citationItems"
                   :content="message.content || ' '"
                   :streaming="message.uid === streamingAssistantMessageUid"
+                  @open-citation="openCitation(message.uid, $event)"
                 />
               </div>
               <div v-if="message.citationCount > 0" class="flex">
-                <ChatCitationsSheet :message="message" />
+                <ChatCitationsSheet
+                  :active-citation-id="
+                    citationSheetMessageUid === message.uid
+                      ? activeCitationId
+                      : null
+                  "
+                  :message="message"
+                  :open="citationSheetMessageUid === message.uid"
+                  @update:open="
+                    handleCitationSheetOpenChange(message.uid, $event)
+                  "
+                />
               </div>
               <!-- assistant 消息底部操作栏：模型信息 / 复制 -->
               <div class="flex min-h-6 items-center gap-2 text-[12px]">
