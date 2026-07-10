@@ -3,6 +3,7 @@ import type { components } from "@/shared/api/generated/schema";
 /** OpenAPI 生成类型别名 */
 export type ChatMessageRead = components["schemas"]["ChatMessageRead"];
 export type ChatSessionRead = components["schemas"]["ChatSessionRead"];
+export type RAGSnapshot = components["schemas"]["RAGSnapshot"];
 
 /**
  * Chat SSE 事件联合类型
@@ -23,6 +24,11 @@ export type ChatStreamEvent =
       sessionUid: string;
       userMessage: ChatMessageRead;
       assistantMessage: ChatMessageRead;
+    }
+  | {
+      event: "rag_ready";
+      messageUid: string;
+      ragSnapshot: RAGSnapshot;
     }
   | {
       event: "delta";

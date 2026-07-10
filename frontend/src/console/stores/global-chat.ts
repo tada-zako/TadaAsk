@@ -718,6 +718,9 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
         return sessionKey;
       case "generation_start":
         return applyGenerationStart(sessionKey, event);
+      case "rag_ready":
+        applyRagReady(sessionKey, event);
+        return sessionKey;
       case "delta":
         appendMessageDelta(sessionKey, event.messageUid, event.delta);
         return sessionKey;
@@ -790,6 +793,44 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
         messages: nextMessages,
         oldestSequence: minMessageSequence(nextMessages),
         newestSequence: maxMessageSequence(nextMessages),
+      };
+    });
+  }
+
+  /** 在首个 delta 前将 RAG snapshot 写入 optimistic assistant message。 */
+  function applyRagReady(
+    sessionKey: ChatSessionKey,
+    event: Extract<ChatStreamEvent, { event: "rag_ready" }>,
+  ) {
+    updateTimeline(sessionKey, (current) => {
+      const targetIndex = resolveDeltaMessageIndex(
+        current.messages,
+        sessionKey,
+        event.messageUid,
+      );
+
+      if (targetIndex < 0) {
+        return current;
+      }
+
+      const targetMessage = current.messages[targetIndex];
+      const citationItems = event.ragSnapshot.items ?? [];
+      const nextMessages = current.messages.slice();
+      nextMessages[targetIndex] = {
+        ...targetMessage,
+        citationItems,
+        citationCount: citationItems.length,
+        usedCitationCount: citationItems.filter((item) => item.usedInContext)
+          .length,
+        rawMessage: {
+          ...targetMessage.rawMessage,
+          ragSnapshot: event.ragSnapshot,
+        },
+      };
+
+      return {
+        ...current,
+        messages: nextMessages,
       };
     });
   }
