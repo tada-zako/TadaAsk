@@ -12,11 +12,23 @@ import MarkdownIt from "markdown-it";
 export interface RenderChatMarkdownOptions {
   /** 代码块复制按钮的文案（支持 i18n） */
   copyCodeLabel: string;
+  /** 当前 assistant message 中真实存在的 citation id */
+  citationIds?: readonly number[];
+  /** citation 按钮的无障碍文案 */
+  citationAriaLabel?: (citationId: number) => string;
+  /** 流式阶段隐藏尚未闭合的 citation 尾部片段 */
+  streaming?: boolean;
 }
 
 /** markdown-it 渲染时的环境变量 */
 interface ChatMarkdownEnv {
   copyCodeLabel?: string;
+  citationIds?: ReadonlySet<number>;
+  citationAriaLabel?: (citationId: number) => string;
+}
+
+interface CitationTokenMeta {
+  citationId: number;
 }
 
 interface CodeLanguage {
@@ -82,6 +94,9 @@ const LANGUAGE_ALIASES: Record<string, CodeLanguage> = {
 const PROTECTED_INLINE_PATTERN =
   /(`+)([\s\S]*?)\1|\$\$[\s\S]*?\$\$|\$[^$\n]+?\$|\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]/g;
 
+const CITATION_MARKER_PREFIX = "[[citation:";
+const CITATION_MARKER_PATTERN = /^\[\[citation:([1-9]\d*)\]\]/;
+
 /** 允许的链接协议白名单，防止 javascript: / data: 等危险协议注入 */
 const SAFE_LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 
@@ -96,7 +111,14 @@ export function renderChatMarkdown(
   options: RenderChatMarkdownOptions,
 ): string {
   const renderer = getMarkdownRenderer();
-  const html = renderer.render(content, {
+  const citationIds = new Set(options.citationIds ?? []);
+  const renderContent =
+    options.streaming && citationIds.size > 0
+      ? hideTrailingCitationFragment(content)
+      : content;
+  const html = renderer.render(renderContent, {
+    citationAriaLabel: options.citationAriaLabel,
+    citationIds,
     copyCodeLabel: options.copyCodeLabel,
   } satisfies ChatMarkdownEnv);
 
@@ -104,6 +126,7 @@ export function renderChatMarkdown(
   return DOMPurify.sanitize(html, {
     ADD_ATTR: [
       "aria-label",
+      "data-chat-citation-id",
       "data-chat-code-copy",
       "data-chat-code-lang",
       "data-copied",
@@ -152,12 +175,111 @@ function getMarkdownRenderer(): MarkdownIt {
   });
 
   configureLlmMarkdownNormalization(renderer);
+  configureCitations(renderer);
   configureLinks(renderer);
   configureImages(renderer);
   configureCodeBlocks(renderer);
 
   markdownRenderer = renderer;
   return renderer;
+}
+
+/**
+ * 只将 snapshot 中真实存在的 [[citation:N]] 转换为交互 token。
+ * code、math 与 link 内部由 markdown-it 自身的 token 边界隔离。
+ *
+ * 自定义的 markdown-it parse/render 规则；
+ * parse 部分规则:
+ *   识别 [[citation:xxx]] 类型文本，并解析为
+ *   [
+ *     ...  // 先前解析的内容
+ *     {
+ *        { type: 'chat_citation', tag: 'button', meta: { citationId: 42 } },
+ *     }
+ *     ...
+ *   ]
+ *   的中间态
+ *
+ * render 部分规则：
+ *  识别 type 为 'chat_citation' 的 token，
+ *  并最终渲染为 <button>xxx</button> 的 DOM
+ */
+function configureCitations(renderer: MarkdownIt) {
+  // 在 markdown-it 处理 []() link 规则之前解析
+  renderer.inline.ruler.before("link", "chat_citation", (state, silent) => {
+    // markdown-it 运行时提供 linkLevel，但当前 @types/markdown-it 未声明该字段。
+    const linkLevel = (state as typeof state & { linkLevel: number }).linkLevel;
+    if (linkLevel > 0) {
+      // 跳过嵌套在 [] 中的 [] token 解析
+      return false;
+    }
+
+    const match = CITATION_MARKER_PATTERN.exec(state.src.slice(state.pos));
+    if (!match) {
+      return false;
+    }
+
+    const citationId = Number(match[1]);
+    const env = state.env as ChatMarkdownEnv;
+    if (!env.citationIds?.has(citationId)) {
+      return false;
+    }
+
+    if (!silent) {
+      const token = state.push("chat_citation", "button", 0);
+      token.meta = { citationId } satisfies CitationTokenMeta;
+    }
+
+    // 推进 parse 进度
+    state.pos += match[0].length;
+    return true;
+  });
+
+  // 增加 citation button
+  renderer.renderer.rules.chat_citation = (tokens, idx, _options, env) => {
+    const { citationId } = tokens[idx].meta as CitationTokenMeta;
+    const chatEnv = env as ChatMarkdownEnv;
+    const ariaLabel =
+      chatEnv.citationAriaLabel?.(citationId) ?? `Open citation ${citationId}`;
+
+    return `<button type="button" class="chat-md-citation" data-chat-citation-id="${citationId}" aria-label="${escapeAttribute(ariaLabel)}"><span aria-hidden="true">${citationId}</span></button>`;
+  };
+}
+
+/**
+ * SSE 可能把 marker 拆到多个 delta；仅在显示层隐藏末尾可继续成为 marker 的片段。
+ * 原始 message content 不会被修改。
+ */
+function hideTrailingCitationFragment(content: string): string {
+  const markerStart = content.lastIndexOf(CITATION_MARKER_PREFIX);
+  if (markerStart >= 0) {
+    const tail = content.slice(markerStart);
+    /**
+     * 匹配 [[citation:123]] 是否生成完整
+     * [[citation:, [[citation:1, [[citation:123 会被匹配成功
+     */
+    if (/^\[\[citation:\d*\]?$/.test(tail)) {
+      return content.slice(0, markerStart);
+    }
+  }
+
+  /**
+   * 处理不完整的 [[citation 前缀
+   * 匹配 [[citation, [[citatio, [[citati ... [ 前缀
+   * 删除整个尾部片段
+   */
+  const maxPartialLength = Math.min(
+    content.length,
+    CITATION_MARKER_PREFIX.length - 1,
+  );
+  for (let length = maxPartialLength; length > 0; length -= 1) {
+    const suffix = content.slice(-length);
+    if (CITATION_MARKER_PREFIX.startsWith(suffix)) {
+      return content.slice(0, -length);
+    }
+  }
+
+  return content;
 }
 
 /**
@@ -208,6 +330,7 @@ function configureLinks(renderer: MarkdownIt) {
     const href = token.attrGet("href");
 
     if (!href || !isSafeLinkHref(href)) {
+      // 覆写不安全 link
       token.attrSet("href", "#");
     }
 

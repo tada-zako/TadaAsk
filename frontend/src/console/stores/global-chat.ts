@@ -818,6 +818,8 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
       const nextMessages = current.messages.slice();
       nextMessages[targetIndex] = {
         ...targetMessage,
+        // 提前挂载 citation 数据;
+        // 允许在 message 传输完成之前查看流式引用 citation
         citationItems,
         citationCount: citationItems.length,
         usedCitationCount: citationItems.filter((item) => item.usedInContext)
