@@ -14,6 +14,7 @@ from ..schemas import (
     SessionReadyData,
     SessionTitleUpdatedData,
     GenerationStartData,
+    RAGReadyData,
     TextDeltaData,
     MessageDoneData,
     ErrorData,
@@ -542,6 +543,21 @@ class ChatOrchestratorService:
                     assistant_message_id=assistant_message.id,
                     new_rag_snapshot=rag_result.snapshot,
                 )
+
+                # snapshot 必须先于文本 delta 到达，前端才能在流式阶段解析 citation。
+                yield RAGReadyData(
+                    message_uid=assistant_message.uid,
+                    rag_snapshot=rag_result.snapshot,
+                )
+
+            # generation 在上下文构建/RAG 检索期间也可能被用户取消。
+            if generation.cancel_event.is_set():
+                yield TextDeltaData(
+                    event="cancelled",
+                    message_uid=assistant_message.uid,
+                    delta="",
+                )
+                return
 
             # 2.3 构建对话上下文
             context = self.context_builder.build_chat_context(

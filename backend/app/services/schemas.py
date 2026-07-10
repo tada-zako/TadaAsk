@@ -57,9 +57,7 @@ class SessionReadyData(BaseModel):
 
 
 class SessionTitleUpdatedData(BaseModel):
-    event: Literal["session_title_updated"] = Field(
-        default="session_title_updated"
-    )
+    event: Literal["session_title_updated"] = Field(default="session_title_updated")
     session: ChatSessionRead
 
     model_config = ConfigDict(
@@ -75,6 +73,20 @@ class GenerationStartData(BaseModel):
     session_uid: str
     user_message: ChatMessageRead
     assistant_message: ChatMessageRead
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
+
+
+class RAGReadyData(BaseModel):
+    """RAG snapshot 已就绪；始终先于首个文本 delta 输出。"""
+
+    event: Literal["rag_ready"] = Field(default="rag_ready")
+    message_uid: str
+    rag_snapshot: RAGSnapshot
 
     model_config = ConfigDict(
         alias_generator=to_camel,
@@ -121,6 +133,7 @@ ChatStreamEvent = Union[
     SessionReadyData,
     SessionTitleUpdatedData,
     GenerationStartData,
+    RAGReadyData,
     TextDeltaData,
     MessageDoneData,
     ErrorData,
