@@ -34,7 +34,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/shared/components/ui/dropdown-menu";
+import { Marker, MarkerContent } from "@/shared/components/ui/marker";
 import { Textarea } from "@/shared/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/components/ui/tooltip";
 
 // 距离底部阈值：用于判断是否「钉」在底部（自动跟随滚动）
 const BOTTOM_PIN_THRESHOLD = 96;
@@ -83,6 +90,8 @@ const {
 
 // 消息时间线引用对象
 const timelineRef = ref<HTMLElement | null>(null);
+// composer 容器引用，用于在页面进入或切换会话后聚焦原生 textarea
+const composerRef = ref<HTMLElement | null>(null);
 // 记录当前显示「已复制」提示的消息 uid
 const copiedMessageUid = ref<string | null>(null);
 // IME 组合输入中，阻止 Enter 误发送
@@ -129,6 +138,13 @@ const showTimelineError = computed(
   () => !isComposerCentered.value && Boolean(errorMessage.value),
 );
 
+const showScrollToBottom = computed(
+  () =>
+    !isComposerCentered.value &&
+    messages.value.length > 0 &&
+    !isPinnedToBottom.value,
+);
+
 // 从指定 user message 重新开始（回退并预填草稿）
 function restartFromMessage(messageUid: string) {
   void globalChatStore.restartFromMessage(messageUid).catch(() => undefined);
@@ -161,6 +177,7 @@ function cancelGeneration() {
 
 function startNewSession() {
   globalChatStore.startNewSession();
+  void focusComposer();
 }
 
 function expandSessions() {
@@ -249,15 +266,35 @@ function updatePinnedToBottom() {
 }
 
 // 滚动到消息列表底部
-async function scrollToBottom() {
+async function scrollToBottom(behavior: ScrollBehavior = "auto") {
   await nextTick();
   const element = timelineRef.value;
   if (!element) {
     return;
   }
 
-  element.scrollTop = element.scrollHeight;
+  element.scrollTo({
+    behavior,
+    top: element.scrollHeight,
+  });
   isPinnedToBottom.value = true;
+}
+
+/** 用户主动返回最新消息，使用平滑滚动并恢复自动跟随。 */
+function handleScrollToBottom() {
+  void scrollToBottom("smooth");
+}
+
+/** 聚焦 composer，不让浏览器因此改变 timeline 滚动位置。 */
+async function focusComposer() {
+  if (isBootstrapping.value || isLoadingMessages.value) {
+    return;
+  }
+
+  await nextTick();
+  composerRef.value
+    ?.querySelector<HTMLTextAreaElement>("textarea")
+    ?.focus({ preventScroll: true });
 }
 
 /** 请求强制滚动到底部 */
@@ -284,12 +321,17 @@ async function flushForceScrollToBottom() {
 // 切换会话时等待消息就绪后滚到底部
 watch(activeSessionUid, () => {
   requestForceScrollToBottom();
+  void focusComposer();
 });
 
 // 页面进入或消息加载完成后，补齐从其他页面进入 chat 时的底部定位
-watch([isBootstrapping, isLoadingMessages], () => {
+watch([isBootstrapping, isLoadingMessages], async () => {
   if (shouldForceScrollToBottom.value) {
-    void flushForceScrollToBottom();
+    await flushForceScrollToBottom();
+  }
+
+  if (!isBootstrapping.value && !isLoadingMessages.value) {
+    await focusComposer();
   }
 });
 
@@ -312,6 +354,7 @@ watch(messages, () => {
 onMounted(() => {
   // 进入 /chat 强制进行滚动到底
   requestForceScrollToBottom();
+  void focusComposer();
 });
 
 onBeforeUnmount(() => {
@@ -494,14 +537,8 @@ onBeforeUnmount(() => {
               <div v-if="message.citationCount > 0" class="flex">
                 <ChatCitationsSheet :message="message" />
               </div>
-              <!-- assistant 消息底部操作栏：取消标记 / 模型信息 / 复制 -->
+              <!-- assistant 消息底部操作栏：模型信息 / 复制 -->
               <div class="flex min-h-6 items-center gap-2 text-[12px]">
-                <span
-                  v-if="isMessageCancelled(message.uid)"
-                  class="rounded-full bg-white/[0.045] px-2 py-0.5 text-[11px] text-(--text-faint)"
-                >
-                  {{ t("chat.thread.stopped") }}
-                </span>
                 <div
                   class="flex items-center gap-2 text-(--text-faint) opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100"
                 >
@@ -530,6 +567,14 @@ onBeforeUnmount(() => {
                   </span>
                 </div>
               </div>
+              <!-- cancelled 仅为当前前端运行时状态，后端持久化状态补齐后可直接复用此 Marker。 -->
+              <Marker
+                v-if="isMessageCancelled(message.uid)"
+                variant="separator"
+                class="mt-1 max-w-[92%] gap-2 text-[11px] text-(--text-faint) before:bg-(--line-soft) after:bg-(--line-soft)"
+              >
+                <MarkerContent>{{ t("chat.thread.stopped") }}</MarkerContent>
+              </Marker>
             </template>
 
             <template v-else>
@@ -561,6 +606,40 @@ onBeforeUnmount(() => {
           : 'right-4 bottom-0 left-0 bg-linear-to-t from-(--surface-base) via-(--surface-base)/95 to-transparent px-6 pt-10 pb-5'
       "
     >
+      <Transition
+        enter-active-class="transition duration-180 ease-out motion-reduce:transition-none"
+        enter-from-class="translate-y-1 opacity-0"
+        enter-to-class="translate-y-0 opacity-100"
+        leave-active-class="transition duration-120 ease-in motion-reduce:transition-none"
+        leave-from-class="translate-y-0 opacity-100"
+        leave-to-class="translate-y-1 opacity-0"
+      >
+        <div
+          v-if="showScrollToBottom"
+          class="chat-thread-rail pointer-events-auto mb-3 flex justify-center"
+        >
+          <TooltipProvider :delay-duration="350">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  type="button"
+                  :aria-label="t('chat.thread.scrollToBottomAria')"
+                  variant="outline"
+                  size="icon"
+                  class="size-8 rounded-full border-(--line-strong) bg-[#1b1d21]/95 text-(--text-muted) shadow-[0_10px_28px_rgba(0,0,0,0.34)] backdrop-blur-md hover:bg-[#24272c] hover:text-(--text-strong)"
+                  @click="handleScrollToBottom"
+                >
+                  <ChevronDown class="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {{ t("chat.thread.scrollToBottom") }}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </Transition>
+
       <div
         v-if="showCenteredError"
         class="chat-thread-rail pointer-events-auto mb-3 rounded-(--console-radius-lg) border border-red-400/25 bg-red-400/10 px-3 py-2 text-[13px] text-red-100 shadow-[0_12px_36px_rgba(0,0,0,0.28)]"
@@ -568,6 +647,7 @@ onBeforeUnmount(() => {
         {{ errorMessage }}
       </div>
       <div
+        ref="composerRef"
         class="chat-thread-rail pointer-events-auto rounded-[1.35rem] border border-(--line-strong) bg-[#24262b] p-2 shadow-[0_22px_80px_rgba(0,0,0,0.42)]"
       >
         <Textarea
