@@ -5,9 +5,9 @@ import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import { RotateCw } from "@lucide/vue";
 
-import ProjectDangerZonePanel from "@/console/components/project/ProjectDangerZonePanel.vue";
-import ProjectGeneralSettingsPanel from "@/console/components/project/ProjectGeneralSettingsPanel.vue";
-import ProjectVisitorSettingsPanel from "@/console/components/project/ProjectVisitorSettingsPanel.vue";
+import ProjectDangerZonePanel from "@/console/components/project/settings/ProjectDangerZonePanel.vue";
+import ProjectGeneralSettingsPanel from "@/console/components/project/settings/ProjectGeneralSettingsPanel.vue";
+import ProjectVisitorSettingsPanel from "@/console/components/project/settings/ProjectVisitorSettingsPanel.vue";
 import { useProjectSettingsStore } from "@/console/stores/project-settings";
 import { Button } from "@/shared/components/ui/button";
 
