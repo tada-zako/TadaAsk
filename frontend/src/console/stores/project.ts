@@ -92,6 +92,23 @@ export const useProjectStore = defineStore("console-project", () => {
     errorMessage.value = message;
   }
 
+  // 局部同步项目摘要，供设置页保存后立即刷新侧栏与项目切换器。
+  function upsertProjectOption(project: ProjectOption): void {
+    const exists = projects.value.some((item) => item.uid === project.uid);
+    projects.value = exists
+      ? projects.value.map((item) =>
+          item.uid === project.uid ? project : item,
+        )
+      : [project, ...projects.value];
+  }
+
+  function removeProjectOption(projectUid: string): void {
+    projects.value = projects.value.filter((item) => item.uid !== projectUid);
+    if (selectedProjectUid.value === projectUid) {
+      selectedProjectUid.value = null;
+    }
+  }
+
   // 创建新项目并自动选中，跳转
   async function createProject(
     input: CreateProjectInput,
@@ -138,8 +155,10 @@ export const useProjectStore = defineStore("console-project", () => {
     loadProjects,
     projects,
     refreshProjects,
+    removeProjectOption,
     selectProject,
     selectedProject,
     selectedProjectUid,
+    upsertProjectOption,
   };
 });
