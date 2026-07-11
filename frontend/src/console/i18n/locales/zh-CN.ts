@@ -184,6 +184,14 @@ export const zhCN: typeof en = {
       deleteConfirm: "确认删除这个挂件部署？",
       empty: "暂无挂件部署。",
     },
+    settings: {
+      errors: {
+        saveGeneral: "无法保存项目详情。",
+        saveVisitor: "无法保存访客设置。",
+        deleteProject: "无法删除项目。",
+        invalidValue: "请输入有效值。",
+      },
+    },
     service: {
       errors: {
         loadProjects: "无法加载项目。",

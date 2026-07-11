@@ -33,3 +33,18 @@ const modelValue = useVModel(props, "modelValue", emits, {
     "
   />
 </template>
+
+<style scoped>
+/* 统一移除浏览器原生数字步进器，避免在紧凑输入框中遮挡数值。 */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+</style>

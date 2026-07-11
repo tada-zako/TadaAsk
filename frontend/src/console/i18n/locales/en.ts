@@ -190,6 +190,14 @@ export const en = {
       deleteConfirm: "Delete this widget deployment?",
       empty: "No widget deployments yet.",
     },
+    settings: {
+      errors: {
+        saveGeneral: "Unable to save project details.",
+        saveVisitor: "Unable to save visitor settings.",
+        deleteProject: "Unable to delete project.",
+        invalidValue: "Enter a valid value.",
+      },
+    },
     service: {
       errors: {
         loadProjects: "Unable to load projects.",
