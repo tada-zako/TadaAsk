@@ -48,6 +48,11 @@ const projectInitial = computed(
   () => selectedProject.value?.name.charAt(0) ?? "+",
 );
 const isProjectNavActive = computed(() => route.path.startsWith("/project"));
+// 项目子路由高亮状态
+const isProjectAskActive = computed(() => route.name === "project-ask");
+const isProjectSettingsActive = computed(
+  () => route.name === "project-settings",
+);
 const isChatActive = computed(() => route.path.startsWith("/chat"));
 const isSourcesActive = computed(() => route.path.startsWith("/sources"));
 const isProviderModelActive = computed(() =>
@@ -298,14 +303,24 @@ function getProjectUidFromRoute(): string | null {
             class="ml-7 grid gap-1 border-l border-(--line-soft) pl-2 max-[1180px]:hidden"
           >
             <a
-              class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
+              class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px]"
+              :class="
+                isProjectAskActive
+                  ? 'text-primary before:bg-primary hover:text-primary relative font-semibold before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-0.5 before:rounded-full before:shadow-[0_0_12px_rgba(36,211,196,0.34)]'
+                  : 'text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)'
+              "
               href="#"
               @click.prevent="openProjectChild('ask')"
             >
               {{ t("shell.sidebar.ask") }}
             </a>
             <a
-              class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px] text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
+              class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px]"
+              :class="
+                isProjectSettingsActive
+                  ? 'text-primary before:bg-primary hover:text-primary relative font-semibold before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-0.5 before:rounded-full before:shadow-[0_0_12px_rgba(36,211,196,0.34)]'
+                  : 'text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)'
+              "
               href="#"
               @click.prevent="openProjectChild('settings')"
             >

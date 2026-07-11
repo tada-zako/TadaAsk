@@ -39,10 +39,10 @@ const router = createRouter({
           component: () => import("./views/project/ProjectReservedView.vue"),
         },
         {
-          // 预留页面
+          // 项目设置页
           path: "project/:projectUid/settings",
           name: "project-settings",
-          component: () => import("./views/project/ProjectReservedView.vue"),
+          component: () => import("./views/project/ProjectSettingsView.vue"),
         },
         {
           path: "chat",
