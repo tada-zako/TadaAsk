@@ -269,7 +269,6 @@ async def stream_admin_chat_events(
         )
 
 
-# NOTE TODO: opencode 设计：每个 new session 都会在上下文顶部插入一条“自动聊天会话标签生成”的要求
 @router.post("/project/{project_uid}/chat/stream", response_class=EventSourceResponse)
 async def stream_chat(
     chat_request: Annotated[AdminRAGChatRequest, Depends(get_admin_rag_chat_request)],
@@ -286,6 +285,9 @@ async def stream_chat(
     Project 上下文中的 Admin 流式对话；
     默认使用 project 关联的 sources 进行 RAG 检索，chat_session 关联到 project。
     """
+    # TODO: 考虑到前端 ask view 不是 MVP 阶段业务，暂时不具体修改内部逻辑
+    # 后续为区分 ask/chat 业务范围，可能需要考虑限制 ask 的相关配置设计，
+    # 例如统一通过 project settings 读取设置，并限制模型能力等——以模拟 visitor 请求性能
     async for event in stream_admin_chat_events(
         project=project,
         chat_request=chat_request,
