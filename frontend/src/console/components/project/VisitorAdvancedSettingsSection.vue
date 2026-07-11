@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { ChevronRight } from "@lucide/vue";
 
 import type {
@@ -18,6 +20,7 @@ const props = defineProps<{
   fieldErrors: SettingsFieldErrors;
   disabled: boolean;
 }>();
+const { t } = useI18n();
 const emit = defineEmits<{
   "update:form": [value: ProjectVisitorSettingsForm];
 }>();
@@ -43,59 +46,59 @@ interface FieldDefinition {
 }
 
 // 响应生成参数（max tokens / timeout / temperature / topP）
-const responseFields: FieldDefinition[] = [
+const responseFields = computed<FieldDefinition[]>(() => [
   {
     key: "maxOutputTokens",
-    label: "Max output tokens",
-    help: "Maximum response length.",
+    label: t("project.settings.visitor.advanced.maxOutputTokens"),
+    help: t("project.settings.visitor.advanced.maxOutputTokensHelp"),
   },
   {
     key: "timeout",
-    label: "Request timeout",
-    help: "Maximum model request duration.",
-    suffix: "seconds",
+    label: t("project.settings.visitor.advanced.timeout"),
+    help: t("project.settings.visitor.advanced.timeoutHelp"),
+    suffix: t("project.settings.visitor.advanced.seconds"),
   },
   {
     key: "temperature",
-    label: "Temperature",
-    help: "Lower values keep answers focused.",
+    label: t("project.settings.visitor.advanced.temperature"),
+    help: t("project.settings.visitor.advanced.temperatureHelp"),
     step: "0.1",
   },
   {
     key: "topP",
-    label: "Top P",
-    help: "Usually adjust this or temperature, not both.",
+    label: t("project.settings.visitor.advanced.topP"),
+    help: t("project.settings.visitor.advanced.topPHelp"),
     step: "0.1",
   },
-];
+]);
 // 检索候选参数（全文/向量候选数、重排序数、查询扩展等）
-const retrievalFields: FieldDefinition[] = [
+const retrievalFields = computed<FieldDefinition[]>(() => [
   {
     key: "ftsK",
-    label: "Full-text candidates",
-    help: "Candidates recalled from full-text search.",
+    label: t("project.settings.visitor.advanced.ftsK"),
+    help: t("project.settings.visitor.advanced.ftsKHelp"),
   },
   {
     key: "vectorK",
-    label: "Vector candidates",
-    help: "Candidates recalled from vector search.",
+    label: t("project.settings.visitor.advanced.vectorK"),
+    help: t("project.settings.visitor.advanced.vectorKHelp"),
   },
   {
     key: "rerankK",
-    label: "Rerank candidates",
-    help: "Candidates sent through reranking.",
+    label: t("project.settings.visitor.advanced.rerankK"),
+    help: t("project.settings.visitor.advanced.rerankKHelp"),
   },
   {
     key: "maxAlternativeQueries",
-    label: "Alternative queries",
-    help: "Maximum query variations, from 0 to 10.",
+    label: t("project.settings.visitor.advanced.maxAlternativeQueries"),
+    help: t("project.settings.visitor.advanced.maxAlternativeQueriesHelp"),
   },
   {
     key: "maxKeywords",
-    label: "Maximum keywords",
-    help: "Keywords extracted for expansion, from 0 to 20.",
+    label: t("project.settings.visitor.advanced.maxKeywords"),
+    help: t("project.settings.visitor.advanced.maxKeywordsHelp"),
   },
-];
+]);
 
 function updateField(key: NumericField, value: string | number): void {
   emit("update:form", { ...props.form, [key]: String(value) });
@@ -108,10 +111,12 @@ function updateField(key: NumericField, value: string | number): void {
       type="button"
       class="grid w-full grid-cols-[minmax(0,1fr)_auto_1.25rem] items-center gap-3 px-5 py-4.5 text-left"
     >
-      <strong class="text-base leading-[1.4] font-bold text-(--text-strong)"
-        >Advanced settings</strong
-      >
-      <span class="text-[11px] text-(--text-faint)">Optional tuning</span>
+      <strong class="text-base leading-[1.4] font-bold text-(--text-strong)">{{
+        t("project.settings.visitor.advanced.title")
+      }}</strong>
+      <span class="text-[11px] text-(--text-faint)">{{
+        t("project.settings.visitor.advanced.note")
+      }}</span>
       <ChevronRight
         class="size-4 text-(--text-faint) transition-transform duration-150 group-data-[state=open]:rotate-90"
       />
@@ -124,7 +129,7 @@ function updateField(key: NumericField, value: string | number): void {
           <h4
             class="text-[11px] font-bold tracking-[0.09em] text-(--text-muted) uppercase"
           >
-            Response generation
+            {{ t("project.settings.visitor.advanced.responseGeneration") }}
           </h4>
           <div class="grid grid-cols-2 gap-4 max-[620px]:grid-cols-1">
             <div
@@ -167,7 +172,7 @@ function updateField(key: NumericField, value: string | number): void {
           <h4
             class="text-[11px] font-bold tracking-[0.09em] text-(--text-muted) uppercase"
           >
-            Retrieval candidates
+            {{ t("project.settings.visitor.advanced.retrievalCandidates") }}
           </h4>
           <div class="grid grid-cols-2 gap-4 max-[620px]:grid-cols-1">
             <div

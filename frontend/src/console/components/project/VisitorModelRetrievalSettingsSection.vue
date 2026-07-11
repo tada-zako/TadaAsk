@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { ChevronRight, CircleAlert, X } from "@lucide/vue";
 
 import type { ProviderWithModelsRead } from "@/console/api/provider-model";
@@ -35,6 +36,7 @@ const props = defineProps<{
   fieldErrors: SettingsFieldErrors;
   disabled: boolean;
 }>();
+const { t } = useI18n();
 const emit = defineEmits<{
   "update:form": [value: ProjectVisitorSettingsForm];
 }>();
@@ -74,6 +76,23 @@ const selectedModelName = computed(() => {
 const hasSelection = computed(() =>
   Boolean(props.form.providerUid && props.form.modelUid),
 );
+const searchModes = computed(() => [
+  {
+    value: "fast",
+    title: t("project.settings.visitor.retrieval.modes.fast"),
+    detail: t("project.settings.visitor.retrieval.modes.fastHelp"),
+  },
+  {
+    value: "adaptive",
+    title: t("project.settings.visitor.retrieval.modes.adaptive"),
+    detail: t("project.settings.visitor.retrieval.modes.adaptiveHelp"),
+  },
+  {
+    value: "full",
+    title: t("project.settings.visitor.retrieval.modes.full"),
+    detail: t("project.settings.visitor.retrieval.modes.fullHelp"),
+  },
+]);
 
 function updateForm(patch: Partial<ProjectVisitorSettingsForm>): void {
   emit("update:form", { ...props.form, ...patch });
@@ -90,7 +109,7 @@ function selectModel(providerUid: string, modelUid: string): void {
   <section>
     <header class="px-5 pt-5">
       <h3 class="text-base leading-[1.4] font-bold text-(--text-strong)">
-        Model and instructions
+        {{ t("project.settings.visitor.model.title") }}
       </h3>
     </header>
     <div class="grid gap-5 p-5 pt-4">
@@ -100,10 +119,10 @@ function selectModel(providerUid: string, modelUid: string): void {
         class="grid gap-2.5 rounded-(--console-radius-lg) border p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]"
       >
         <div class="flex items-center justify-between gap-3">
-          <Label>Default provider and model</Label>
+          <Label>{{ t("project.settings.visitor.model.defaultModel") }}</Label>
           <span
             class="text-primary/80 text-[10px] font-semibold tracking-[0.08em] uppercase"
-            >Visitor runtime</span
+            >{{ t("project.settings.visitor.model.runtime") }}</span
           >
         </div>
         <div class="group/model relative">
@@ -127,13 +146,18 @@ function selectModel(providerUid: string, modelUid: string): void {
                   <strong
                     class="truncate text-sm font-semibold text-(--text-strong)"
                     >{{
-                      selectedModelName ?? "No default model configured"
+                      selectedModelName ??
+                      t("project.settings.visitor.model.notConfigured")
                     }}</strong
                   >
                   <span class="truncate text-xs text-(--text-faint)">{{
                     hasSelection
-                      ? `${selectedProviderName ?? "Unknown provider"} · enabled model`
-                      : "Select a provider and model for visitor chat"
+                      ? t("project.settings.visitor.model.enabledModel", {
+                          provider:
+                            selectedProviderName ??
+                            t("project.settings.visitor.model.unknownProvider"),
+                        })
+                      : t("project.settings.visitor.model.selectPrompt")
                   }}</span>
                 </span>
               </button>
@@ -167,7 +191,9 @@ function selectModel(providerUid: string, modelUid: string): void {
                 v-if="enabledProviders.length === 0"
                 disabled
                 class="px-2.5 py-2 text-xs text-(--text-faint)"
-                >No enabled models available</DropdownMenuItem
+                >{{
+                  t("project.settings.visitor.model.noModels")
+                }}</DropdownMenuItem
               >
             </DropdownMenuContent>
           </DropdownMenu>
@@ -190,8 +216,7 @@ function selectModel(providerUid: string, modelUid: string): void {
           </button>
         </div>
         <p class="text-xs leading-5 text-(--text-faint)">
-          Select an enabled model. Clear the selection to leave visitor chat
-          unconfigured.
+          {{ t("project.settings.visitor.model.help") }}
         </p>
       </div>
 
@@ -200,10 +225,9 @@ function selectModel(providerUid: string, modelUid: string): void {
         class="grid grid-cols-[minmax(0,1fr)_11.5rem] items-center gap-5 max-[620px]:grid-cols-1 max-[620px]:gap-2"
       >
         <div class="grid gap-1">
-          <Label>Thinking level</Label>
+          <Label>{{ t("project.settings.visitor.model.thinking") }}</Label>
           <p class="text-xs leading-5 text-(--text-faint)">
-            Choose whether the model uses additional reasoning before
-            responding.
+            {{ t("project.settings.visitor.model.thinkingHelp") }}
           </p>
         </div>
         <Select
@@ -222,26 +246,36 @@ function selectModel(providerUid: string, modelUid: string): void {
             ><SelectValue
           /></SelectTrigger>
           <SelectContent
-            ><SelectItem value="off">Off</SelectItem
-            ><SelectItem value="low">Low</SelectItem
-            ><SelectItem value="medium">Medium</SelectItem
-            ><SelectItem value="high">High</SelectItem></SelectContent
+            ><SelectItem value="off">{{
+              t("project.settings.visitor.model.thinkingOff")
+            }}</SelectItem
+            ><SelectItem value="low">{{
+              t("project.settings.visitor.model.thinkingLow")
+            }}</SelectItem
+            ><SelectItem value="medium">{{
+              t("project.settings.visitor.model.thinkingMedium")
+            }}</SelectItem
+            ><SelectItem value="high">{{
+              t("project.settings.visitor.model.thinkingHigh")
+            }}</SelectItem></SelectContent
           >
         </Select>
       </div>
 
       <div class="grid gap-2">
-        <Label for="visitor-system-instructions">System instructions</Label>
+        <Label for="visitor-system-instructions">{{
+          t("project.settings.visitor.model.systemInstructions")
+        }}</Label>
         <Textarea
           id="visitor-system-instructions"
           :model-value="form.systemPrompt"
           :disabled="disabled"
           class="min-h-29 border-(--line) bg-black/20 text-[13px] leading-6 shadow-none"
-          placeholder="Keep answers concise, ground claims in linked sources, and say when the documentation does not contain enough information."
+          :placeholder="t('project.settings.visitor.model.systemPlaceholder')"
           @update:model-value="updateForm({ systemPrompt: String($event) })"
         />
         <p class="text-xs leading-5 text-(--text-faint)">
-          Added after TadaAsk's default safety and grounding instructions.
+          {{ t("project.settings.visitor.model.systemHelp") }}
         </p>
       </div>
     </div>
@@ -251,16 +285,15 @@ function selectModel(providerUid: string, modelUid: string): void {
   <section class="border-t border-(--line-soft)">
     <header class="px-5 pt-5">
       <h3 class="text-base leading-[1.4] font-bold text-(--text-strong)">
-        Knowledge retrieval
+        {{ t("project.settings.visitor.retrieval.title") }}
       </h3>
     </header>
     <div class="grid gap-5 p-5 pt-4">
       <div class="flex items-center justify-between gap-6">
         <div class="grid gap-1">
-          <Label>Use knowledge base</Label>
+          <Label>{{ t("project.settings.visitor.retrieval.enabled") }}</Label>
           <p class="text-xs leading-5 text-(--text-faint)">
-            Retrieve context from linked public sources before generating an
-            answer.
+            {{ t("project.settings.visitor.retrieval.enabledHelp") }}
           </p>
         </div>
         <Switch
@@ -273,10 +306,10 @@ function selectModel(providerUid: string, modelUid: string): void {
       <!-- RAG 搜索模式：Fast(原词检索) / Adaptive(按需扩展) / Full(始终扩展) -->
       <fieldset class="grid gap-2.5" :disabled="disabled">
         <legend class="text-[13px] font-semibold text-(--text-strong)">
-          Search mode
+          {{ t("project.settings.visitor.retrieval.searchMode") }}
         </legend>
         <p class="-mt-1 text-xs leading-5 text-(--text-faint)">
-          Controls how much retrieval work is done before answering.
+          {{ t("project.settings.visitor.retrieval.searchModeHelp") }}
         </p>
         <RadioGroup
           :model-value="form.ragMode"
@@ -288,26 +321,7 @@ function selectModel(providerUid: string, modelUid: string): void {
           "
         >
           <Label
-            v-for="mode in [
-              {
-                value: 'fast',
-                title: 'Fast',
-                detail:
-                  'Use the original query with direct full-text and vector retrieval.',
-              },
-              {
-                value: 'adaptive',
-                title: 'Adaptive',
-                detail:
-                  'Expand the query only when the first candidate set needs improvement.',
-              },
-              {
-                value: 'full',
-                title: 'Full',
-                detail:
-                  'Always expand the query before ranking retrieved candidates.',
-              },
-            ]"
+            v-for="mode in searchModes"
             :key="mode.value"
             :for="`search-mode-${mode.value}`"
             class="has-[[data-state=checked]]:border-primary/40 has-[[data-state=checked]]:bg-primary/[0.075] grid min-h-17 cursor-default grid-cols-[minmax(0,1fr)_1rem] items-center gap-4 rounded-(--console-radius-md) border border-(--line-soft) bg-black/10 px-3.5 py-3 transition-colors"
@@ -332,9 +346,11 @@ function selectModel(providerUid: string, modelUid: string): void {
 
       <div class="flex items-center justify-between gap-6">
         <div class="grid gap-1">
-          <Label for="visitor-results-limit">Results to include</Label>
+          <Label for="visitor-results-limit">{{
+            t("project.settings.visitor.retrieval.results")
+          }}</Label>
           <p class="text-xs leading-5 text-(--text-faint)">
-            Final source chunks supplied to the model.
+            {{ t("project.settings.visitor.retrieval.resultsHelp") }}
           </p>
         </div>
         <div class="grid justify-items-end gap-1">
@@ -353,9 +369,9 @@ function selectModel(providerUid: string, modelUid: string): void {
       </div>
       <div class="flex items-center justify-between gap-6">
         <div class="grid gap-1">
-          <Label>Rerank retrieved results</Label>
+          <Label>{{ t("project.settings.visitor.retrieval.rerank") }}</Label>
           <p class="text-xs leading-5 text-(--text-faint)">
-            Improve final ordering before context is sent to the model.
+            {{ t("project.settings.visitor.retrieval.rerankHelp") }}
           </p>
         </div>
         <Switch
@@ -366,9 +382,9 @@ function selectModel(providerUid: string, modelUid: string): void {
       </div>
       <div class="flex items-center justify-between gap-6">
         <div class="grid gap-1">
-          <Label>Rewrite follow-up questions</Label>
+          <Label>{{ t("project.settings.visitor.retrieval.rewrite") }}</Label>
           <p class="text-xs leading-5 text-(--text-faint)">
-            Convert contextual follow-ups into standalone search queries.
+            {{ t("project.settings.visitor.retrieval.rewriteHelp") }}
           </p>
         </div>
         <Switch
@@ -383,10 +399,9 @@ function selectModel(providerUid: string, modelUid: string): void {
       <div
         class="grid grid-cols-[1rem_minmax(0,1fr)] gap-2 rounded-(--console-radius-md) border border-yellow-300/20 bg-yellow-300/[0.065] px-3 py-2.5 text-xs leading-5 text-yellow-100/85"
       >
-        <CircleAlert class="mt-0.5 size-3.5" /><span
-          >Retrieval requires at least one linked public source with completed
-          content.</span
-        >
+        <CircleAlert class="mt-0.5 size-3.5" /><span>{{
+          t("project.settings.visitor.retrieval.requirement")
+        }}</span>
       </div>
     </div>
   </section>

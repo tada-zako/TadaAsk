@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { LoaderCircle, Trash2, TriangleAlert } from "@lucide/vue";
 
 import {
@@ -22,6 +23,7 @@ const props = defineProps<{
   isDeleting: boolean;
   errorMessage: string | null;
 }>();
+const { t } = useI18n();
 const emit = defineEmits<{ confirm: [] }>();
 // 删除确认：用户必须在输入框中键入完整项目名才能解锁删除按钮
 const open = ref(false);
@@ -41,9 +43,11 @@ watch(open, (value) => {
        删除按钮仅在用户输入与 projectName 完全一致且非删除中时启用 -->
   <section class="console-section">
     <header class="grid gap-1 px-0.5">
-      <h2 class="text-xl leading-[1.35] font-bold text-red-200">Danger zone</h2>
+      <h2 class="text-xl leading-[1.35] font-bold text-red-200">
+        {{ t("project.settings.danger.title") }}
+      </h2>
       <p class="text-xs leading-5 text-(--text-faint)">
-        Irreversible project actions.
+        {{ t("project.settings.danger.note") }}
       </p>
     </header>
 
@@ -52,11 +56,10 @@ watch(open, (value) => {
     >
       <div class="grid gap-1">
         <h3 class="text-[13px] font-semibold text-(--text-strong)">
-          Delete this project
+          {{ t("project.settings.danger.deleteTitle") }}
         </h3>
         <p class="max-w-2xl text-xs leading-5 text-(--text-faint)">
-          Permanently deletes project settings, widgets, project conversations,
-          and source bindings. Shared sources remain available.
+          {{ t("project.settings.danger.deleteHelp") }}
         </p>
         <!-- 删除失败时展示的错误信息，由 store 的 deleteError 传入 -->
         <p v-if="errorMessage" class="mt-1 text-xs text-red-300">
@@ -71,7 +74,8 @@ watch(open, (value) => {
             variant="outline"
             class="border-red-400/30 bg-red-400/8 text-red-200 hover:bg-red-400/12 hover:text-red-100 max-[620px]:w-full"
           >
-            <Trash2 class="size-3.5" /> Delete project
+            <Trash2 class="size-3.5" />
+            {{ t("project.settings.danger.deleteButton") }}
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent
@@ -87,12 +91,17 @@ watch(open, (value) => {
                 class="grid size-8 place-items-center rounded-(--console-radius-md) border border-red-400/25 bg-red-400/8 text-red-300"
                 ><Trash2 class="size-4"
               /></span>
-              Delete {{ projectName }}?
+              {{
+                t("project.settings.danger.dialogTitle", {
+                  project: projectName,
+                })
+              }}
             </AlertDialogTitle>
-            <AlertDialogDescription class="sr-only"
-              >Confirm permanent deletion of the
-              {{ projectName }} project.</AlertDialogDescription
-            >
+            <AlertDialogDescription class="sr-only">{{
+              t("project.settings.danger.dialogDescription", {
+                project: projectName,
+              })
+            }}</AlertDialogDescription>
           </AlertDialogHeader>
           <!-- 弹窗内容区：不可逆警告 + 项目名确认输入 -->
           <div class="grid gap-4 p-5">
@@ -100,13 +109,12 @@ watch(open, (value) => {
               class="grid gap-2 rounded-(--console-radius-md) border border-red-400/20 bg-red-400/8 p-3"
             >
               <strong class="flex items-center gap-2 text-[13px] text-red-100"
-                ><TriangleAlert class="size-4" />This action cannot be
-                undone.</strong
+                ><TriangleAlert class="size-4" />{{
+                  t("project.settings.danger.warning")
+                }}</strong
               >
               <p class="text-xs leading-5 text-red-100/70">
-                Project settings, deployed widgets, project conversations, and
-                source bindings will be deleted. Shared sources will not be
-                removed.
+                {{ t("project.settings.danger.warningDetail") }}
               </p>
             </div>
             <!-- 确认输入：v-model 绑定 confirmation，canDelete 实时计算是否匹配 -->
@@ -114,11 +122,11 @@ watch(open, (value) => {
               <Label
                 for="delete-project-confirmation"
                 class="text-[13px] font-normal text-(--text-body)"
-                >Type
-                <strong class="font-semibold text-(--text-strong)"
-                  >"{{ projectName }}"</strong
-                >
-                to confirm</Label
+                >{{
+                  t("project.settings.danger.confirmation", {
+                    project: projectName,
+                  })
+                }}</Label
               >
               <Input
                 id="delete-project-confirmation"
@@ -135,7 +143,7 @@ watch(open, (value) => {
               type="button"
               :disabled="isDeleting"
               class="border-(--line) bg-transparent"
-              >Cancel</AlertDialogCancel
+              >{{ t("project.settings.danger.cancel") }}</AlertDialogCancel
             >
             <AlertDialogAction
               type="button"
@@ -147,7 +155,11 @@ watch(open, (value) => {
                 v-if="isDeleting"
                 class="size-3.5 animate-spin"
               /><Trash2 v-else class="size-3.5" />
-              {{ isDeleting ? "Deleting…" : "Delete project" }}
+              {{
+                isDeleting
+                  ? t("project.settings.danger.deleting")
+                  : t("project.settings.danger.deleteButton")
+              }}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

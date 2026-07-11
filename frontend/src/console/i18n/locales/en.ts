@@ -191,6 +191,134 @@ export const en = {
       empty: "No widget deployments yet.",
     },
     settings: {
+      page: {
+        title: "Project settings",
+        subtitle:
+          "Manage project identity and configure how the visitor assistant responds, retrieves knowledge, and uses its default model.",
+        unavailableTitle: "Project settings unavailable",
+        unavailableBody: "The requested project could not be loaded.",
+        retry: "Retry",
+      },
+      general: {
+        title: "General",
+        note: "Basic project information used throughout the console.",
+        name: "Project name",
+        nameHelp: "Must be unique. This name appears in the project switcher.",
+        description: "Description",
+        descriptionHelp:
+          "Optional context for admins. It is not included in visitor prompts.",
+        projectId: "Project ID",
+        projectIdHelp:
+          "Stable identifier used by project-scoped APIs and widgets.",
+        copyProjectId: "Copy project ID",
+        unsaved: "Unsaved project changes",
+        synced: "Project details are up to date",
+        saving: "Saving…",
+        save: "Save changes",
+      },
+      visitor: {
+        title: "Visitor assistant",
+        note: "Default response and retrieval behavior for visitor chat.",
+        unsaved: "Unsaved visitor changes",
+        synced: "Visitor settings are up to date",
+        saving: "Saving…",
+        save: "Save changes",
+        model: {
+          title: "Model and instructions",
+          defaultModel: "Default provider and model",
+          runtime: "Visitor runtime",
+          notConfigured: "No default model configured",
+          unknownProvider: "Unknown provider",
+          enabledModel: "{provider} · enabled model",
+          selectPrompt: "Select a provider and model for visitor chat",
+          noModels: "No enabled models available",
+          help: "Select an enabled model. Clear the selection to leave visitor chat unconfigured.",
+          thinking: "Thinking level",
+          thinkingHelp:
+            "Choose whether the model uses additional reasoning before responding.",
+          thinkingOff: "Off",
+          thinkingLow: "Low",
+          thinkingMedium: "Medium",
+          thinkingHigh: "High",
+          systemInstructions: "System instructions",
+          systemPlaceholder:
+            "Keep answers concise, ground claims in linked sources, and say when the documentation does not contain enough information.",
+          systemHelp:
+            "Added after TadaAsk's default safety and grounding instructions.",
+        },
+        retrieval: {
+          title: "Knowledge retrieval",
+          enabled: "Use knowledge base",
+          enabledHelp:
+            "Retrieve context from linked public sources before generating an answer.",
+          searchMode: "Search mode",
+          searchModeHelp:
+            "Controls how much retrieval work is done before answering.",
+          modes: {
+            fast: "Fast",
+            fastHelp:
+              "Use the original query with direct full-text and vector retrieval.",
+            adaptive: "Adaptive",
+            adaptiveHelp:
+              "Expand the query only when the first candidate set needs improvement.",
+            full: "Full",
+            fullHelp:
+              "Always expand the query before ranking retrieved candidates.",
+          },
+          results: "Results to include",
+          resultsHelp: "Final source chunks supplied to the model.",
+          rerank: "Rerank retrieved results",
+          rerankHelp:
+            "Improve final ordering before context is sent to the model.",
+          rewrite: "Rewrite follow-up questions",
+          rewriteHelp:
+            "Convert contextual follow-ups into standalone search queries.",
+          requirement:
+            "Retrieval requires at least one linked public source with completed content.",
+        },
+        advanced: {
+          title: "Advanced settings",
+          note: "Optional tuning",
+          responseGeneration: "Response generation",
+          retrievalCandidates: "Retrieval candidates",
+          seconds: "seconds",
+          maxOutputTokens: "Max output tokens",
+          maxOutputTokensHelp: "Maximum response length.",
+          timeout: "Request timeout",
+          timeoutHelp: "Maximum model request duration.",
+          temperature: "Temperature",
+          temperatureHelp: "Lower values keep answers focused.",
+          topP: "Top P",
+          topPHelp: "Usually adjust this or temperature, not both.",
+          ftsK: "Full-text candidates",
+          ftsKHelp: "Candidates recalled from full-text search.",
+          vectorK: "Vector candidates",
+          vectorKHelp: "Candidates recalled from vector search.",
+          rerankK: "Rerank candidates",
+          rerankKHelp: "Candidates sent through reranking.",
+          maxAlternativeQueries: "Alternative queries",
+          maxAlternativeQueriesHelp: "Maximum query variations, from 0 to 10.",
+          maxKeywords: "Maximum keywords",
+          maxKeywordsHelp: "Keywords extracted for expansion, from 0 to 20.",
+        },
+      },
+      danger: {
+        title: "Danger zone",
+        note: "Irreversible project actions.",
+        deleteTitle: "Delete this project",
+        deleteHelp:
+          "Permanently deletes project settings, widgets, project conversations, and source bindings. Shared sources remain available.",
+        deleteButton: "Delete project",
+        dialogTitle: "Delete {project}?",
+        dialogDescription:
+          "Confirm permanent deletion of the {project} project.",
+        warning: "This action cannot be undone.",
+        warningDetail:
+          "Project settings, deployed widgets, project conversations, and source bindings will be deleted. Shared sources will not be removed.",
+        confirmation: 'Type "{project}" to confirm',
+        cancel: "Cancel",
+        deleting: "Deleting…",
+      },
       errors: {
         saveGeneral: "Unable to save project details.",
         saveVisitor: "Unable to save visitor settings.",

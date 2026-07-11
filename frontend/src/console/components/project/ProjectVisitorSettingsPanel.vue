@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { LoaderCircle } from "@lucide/vue";
+import { useI18n } from "vue-i18n";
 
 import type { ProviderWithModelsRead } from "@/console/api/provider-model";
 import type {
@@ -20,6 +21,7 @@ const props = defineProps<{
   isDirty: boolean;
   isSaving: boolean;
 }>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   save: [];
@@ -32,10 +34,10 @@ const emit = defineEmits<{
   <section class="console-section">
     <header class="grid gap-1 px-0.5">
       <h2 class="text-xl leading-[1.35] font-bold text-(--text-strong)">
-        Visitor assistant
+        {{ t("project.settings.visitor.title") }}
       </h2>
       <p class="text-xs leading-5 text-(--text-faint)">
-        Default response and retrieval behavior for visitor chat.
+        {{ t("project.settings.visitor.note") }}
       </p>
     </header>
 
@@ -75,8 +77,8 @@ const emit = defineEmits<{
           ></span>
           {{
             isDirty
-              ? "Unsaved visitor changes"
-              : "Visitor settings are up to date"
+              ? t("project.settings.visitor.unsaved")
+              : t("project.settings.visitor.synced")
           }}
         </span>
         <Button
@@ -86,7 +88,11 @@ const emit = defineEmits<{
           @click="emit('save')"
         >
           <LoaderCircle v-if="isSaving" class="size-3.5 animate-spin" />
-          {{ isSaving ? "Saving…" : "Save changes" }}
+          {{
+            isSaving
+              ? t("project.settings.visitor.saving")
+              : t("project.settings.visitor.save")
+          }}
         </Button>
       </footer>
     </section>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
 import { RotateCw } from "@lucide/vue";
 
@@ -12,6 +13,7 @@ import { Button } from "@/shared/components/ui/button";
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const settingsStore = useProjectSettingsStore();
 // 将 store 中所有响应式状态解构为 ref，模板中直接使用而不需要通过 store.xxx
 const {
@@ -104,12 +106,16 @@ async function redirectToProjectLanding(): Promise<void> {
     class="console-page max-w-[56.25rem]"
   >
     <section class="console-panel grid justify-items-start gap-3 p-6">
-      <h1 class="console-panel-title">Project settings unavailable</h1>
+      <h1 class="console-panel-title">
+        {{ t("project.settings.page.unavailableTitle") }}
+      </h1>
       <p class="console-panel-note">
-        {{ loadError ?? "The requested project could not be loaded." }}
+        {{ loadError ?? t("project.settings.page.unavailableBody") }}
       </p>
       <Button type="button" variant="outline" @click="retryLoad"
-        ><RotateCw class="size-3.5" />Retry</Button
+        ><RotateCw class="size-3.5" />{{
+          t("project.settings.page.retry")
+        }}</Button
       >
     </section>
   </section>
@@ -121,11 +127,10 @@ async function redirectToProjectLanding(): Promise<void> {
       <h1
         class="text-[clamp(1.95rem,2.7vw,2.25rem)] leading-[1.12] font-bold text-(--text-strong)"
       >
-        Project settings
+        {{ t("project.settings.page.title") }}
       </h1>
       <p class="console-page-subtitle max-w-[43.75rem]">
-        Manage project identity and configure how the visitor assistant
-        responds, retrieves knowledge, and uses its default model.
+        {{ t("project.settings.page.subtitle") }}
       </p>
     </header>
 

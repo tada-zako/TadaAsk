@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Check, Copy, LoaderCircle } from "@lucide/vue";
 
 import type {
@@ -19,6 +20,7 @@ const props = defineProps<{
   isDirty: boolean;
   isSaving: boolean;
 }>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   save: [];
@@ -49,18 +51,20 @@ async function copyProjectUid(): Promise<void> {
   <section class="console-section">
     <header class="grid gap-1 px-0.5">
       <h2 class="text-xl leading-[1.35] font-bold text-(--text-strong)">
-        General
+        {{ t("project.settings.general.title") }}
       </h2>
       <p class="text-xs leading-5 text-(--text-faint)">
-        Basic project information used throughout the console.
+        {{ t("project.settings.general.note") }}
       </p>
     </header>
 
     <section class="console-panel overflow-hidden">
       <div class="grid gap-5 p-5">
         <div class="grid gap-2">
-          <Label for="project-settings-name" class="text-[13px] font-semibold"
-            >Project name</Label
+          <Label
+            for="project-settings-name"
+            class="text-[13px] font-semibold"
+            >{{ t("project.settings.general.name") }}</Label
           >
           <Input
             id="project-settings-name"
@@ -74,7 +78,7 @@ async function copyProjectUid(): Promise<void> {
             {{ fieldErrors.name }}
           </p>
           <p v-else class="text-xs leading-5 text-(--text-faint)">
-            Must be unique. This name appears in the project switcher.
+            {{ t("project.settings.general.nameHelp") }}
           </p>
         </div>
 
@@ -82,7 +86,7 @@ async function copyProjectUid(): Promise<void> {
           <Label
             for="project-settings-description"
             class="text-[13px] font-semibold"
-            >Description</Label
+            >{{ t("project.settings.general.description") }}</Label
           >
           <Textarea
             id="project-settings-description"
@@ -92,14 +96,14 @@ async function copyProjectUid(): Promise<void> {
             @update:model-value="updateForm({ description: String($event) })"
           />
           <p class="text-xs leading-5 text-(--text-faint)">
-            Optional context for admins. It is not included in visitor prompts.
+            {{ t("project.settings.general.descriptionHelp") }}
           </p>
         </div>
 
         <div class="grid gap-2">
-          <Label for="project-settings-id" class="text-[13px] font-semibold"
-            >Project ID</Label
-          >
+          <Label for="project-settings-id" class="text-[13px] font-semibold">{{
+            t("project.settings.general.projectId")
+          }}</Label>
           <div class="flex min-w-0">
             <Input
               id="project-settings-id"
@@ -109,6 +113,7 @@ async function copyProjectUid(): Promise<void> {
             />
             <Button
               type="button"
+              :aria-label="t('project.settings.general.copyProjectId')"
               variant="outline"
               class="h-10 w-15 rounded-l-none border-l-0 border-(--line) bg-(--surface-raised) px-3 text-xs text-(--text-muted)"
               @click="copyProjectUid"
@@ -118,7 +123,7 @@ async function copyProjectUid(): Promise<void> {
             </Button>
           </div>
           <p class="text-xs leading-5 text-(--text-faint)">
-            Stable identifier used by project-scoped APIs and widgets.
+            {{ t("project.settings.general.projectIdHelp") }}
           </p>
         </div>
 
@@ -142,8 +147,8 @@ async function copyProjectUid(): Promise<void> {
           ></span>
           {{
             isDirty
-              ? "Unsaved project changes"
-              : "Project details are up to date"
+              ? t("project.settings.general.unsaved")
+              : t("project.settings.general.synced")
           }}
         </span>
         <Button
@@ -153,7 +158,11 @@ async function copyProjectUid(): Promise<void> {
           @click="emit('save')"
         >
           <LoaderCircle v-if="isSaving" class="size-3.5 animate-spin" />
-          {{ isSaving ? "Saving…" : "Save changes" }}
+          {{
+            isSaving
+              ? t("project.settings.general.saving")
+              : t("project.settings.general.save")
+          }}
         </Button>
       </footer>
     </section>
