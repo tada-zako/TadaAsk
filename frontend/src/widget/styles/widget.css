@@ -361,6 +361,29 @@ svg {
   color: var(--tada-widget-foreground);
   font-size: 14px;
   line-height: 1.55;
+  scrollbar-color: color-mix(in srgb, var(--tada-widget-muted) 36%, transparent)
+    transparent;
+  scrollbar-width: thin;
+}
+
+.widget-composer textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.widget-composer textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.widget-composer textarea::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tada-widget-muted) 34%, transparent)
+    padding-box;
+}
+
+.widget-composer textarea:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--tada-widget-muted) 52%, transparent)
+    padding-box;
 }
 
 .composer-compact textarea {
