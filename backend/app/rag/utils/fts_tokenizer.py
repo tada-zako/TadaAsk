@@ -13,7 +13,6 @@ _PUNCT_ONLY_RE = re.compile(r"^[\s\W_]+$")  # 纯标点 / 空白 token
 _SPECIAL_EN_RE = re.compile(
     r"[_.\-]"
 )  # 含特殊字符的英文 token（路径、版本号等，不加 * 后缀）
-_FTS5_UNSAFE_RE = re.compile(r'["()\^]')  # FTS5 MATCH 语法保留字符，需清除
 
 # 长查询阈值
 # 字符数快速预检：超过此值直接走 extract_tags，跳过全量 jieba 分词
@@ -47,9 +46,19 @@ def _get_stop_words(input_file: str | None = None) -> set[str]:
     return stop_words
 
 
-def _sanitize_fts5(token: str) -> str:
-    """清除 FTS5 MATCH 表达式中的语法保留字符，防止构造无效查询"""
-    return _FTS5_UNSAFE_RE.sub("", token)
+def _quote_fts5_token(token: str, *, prefix: bool = False) -> str:
+    """将用户 token 编码为 FTS5 字面量，避免标点被解释为 MATCH 语法；
+    Args:
+        prefix: 是否启用 prefix 查询；如果 token 存在 _SPECIAL_EN_RE 特殊字符，不添加 suffix
+    """
+    normalized = token.strip()
+    if not normalized:
+        return ""
+
+    # FTS5 字符串使用双引号包裹，内部双引号通过重复一次转义。
+    escaped = normalized.replace('"', '""')
+    suffix = "*" if prefix else ""
+    return f'"{escaped}"{suffix}'
 
 
 @runtime_checkable
@@ -137,7 +146,7 @@ class JiebaFTSTokenizer:
 
         文本处理策略：
             1. 字符数快速预检（>_FAST_CHECK_CHARS）→ 跳过全量分词，直接走 extract_tags
-            2. 正常分词路径：中文 jieba + 停用词过滤；英文小写 + FTS5 特殊字符清理
+            2. 正常分词路径：中文 jieba + 停用词过滤；英文小写并编码为 FTS5 字面量
             3. 分词后 token 数超过 MAX_QUERY_TOKENS → 降级到 extract_tags 路径
             4. MATCH 表达式连接策略（由 _build_match_expr 决定）：
                 ≤2 tokens               → AND（精确匹配）
@@ -168,7 +177,7 @@ class JiebaFTSTokenizer:
         中英文混合分词，返回 (cn_tokens, en_tokens)
 
         - cn_tokens：jieba 分词结果，已过滤停用词和纯标点
-        - en_tokens：小写化、已清理 FTS5 特殊字符，未添加 * 后缀
+        - en_tokens：小写化的原始 token，未添加 MATCH 引号或 * 后缀
           (* 后缀在 _build_match_expr 中统一处理，保持 token 语义干净)
         """
         cn_tokens: list[str] = []
@@ -188,9 +197,9 @@ class JiebaFTSTokenizer:
                     and not _PUNCT_ONLY_RE.match(t)
                 )
             else:
-                # 英文文本处理：小写化 + FTS5 特殊字符清理 + 停用词过滤 + 纯标点过滤
+                # 英文文本处理：小写化 + 停用词过滤 + 纯标点过滤
                 for raw in part.lower().split():
-                    token = _sanitize_fts5(raw)
+                    token = raw.strip()
                     if (
                         token
                         and not _PUNCT_ONLY_RE.match(token)
@@ -222,7 +231,7 @@ class JiebaFTSTokenizer:
                     continue
                 # 只处理英文部分
                 for raw in part.lower().split():
-                    token = _sanitize_fts5(raw)
+                    token = raw.strip()
                     if (
                         token
                         and not _PUNCT_ONLY_RE.match(token)
@@ -230,8 +239,10 @@ class JiebaFTSTokenizer:
                     ):
                         en_tokens.append(token)
 
-        # 英文 token 添加 * 后缀支持前缀匹配
-        en_tokens = [t if _SPECIAL_EN_RE.search(t) else f"{t}*" for t in en_tokens]
+        # 所有 token 都作为 FTS5 字面量；普通英文词额外启用前缀匹配。
+        en_tokens = [
+            _quote_fts5_token(t, prefix=not _SPECIAL_EN_RE.search(t)) for t in en_tokens
+        ]
 
         topK = max(3, MAX_QUERY_TOKENS - len(en_tokens))  # 中文关键词检索数量
         chinese_text = "".join(CHINESE_RE.findall(text))
@@ -239,6 +250,7 @@ class JiebaFTSTokenizer:
             jieba.analyse.extract_tags(chinese_text, topK=topK) if chinese_text else []
         )  # type: ignore
 
+        cn_keywords = [_quote_fts5_token(t) for t in cn_keywords]
         keywords = list(dict.fromkeys(cn_keywords + en_tokens))
         return " OR ".join(keywords) if keywords else ""
 
@@ -250,16 +262,20 @@ class JiebaFTSTokenizer:
         - 英文 token：含特殊字符（路径、版本号）保留原样；其余加 * 支持前缀匹配
         - AND/OR 策略：≤2 tokens 或 ≤5 且每词长度 >3 时用 AND，其余用 OR
         """
-        en_expr = [t if _SPECIAL_EN_RE.search(t) else f"{t}*" for t in en_tokens]
+        raw_tokens = list(dict.fromkeys(cn_tokens + en_tokens))
+        cn_expr = [_quote_fts5_token(t) for t in cn_tokens]
+        en_expr = [
+            _quote_fts5_token(t, prefix=not _SPECIAL_EN_RE.search(t)) for t in en_tokens
+        ]
         # 去重保序，中文在前（通常更具区分性）
-        expr_tokens = list(dict.fromkeys(cn_tokens + en_expr))
+        expr_tokens = list(dict.fromkeys(cn_expr + en_expr))
         if not expr_tokens:
             return ""
 
-        n = len(expr_tokens)
+        n = len(raw_tokens)
         if n <= 2:
             return " AND ".join(expr_tokens)
-        if n <= 5 and all(len(t.rstrip("*")) > 3 for t in expr_tokens):
+        if n <= 5 and all(len(t) > 3 for t in raw_tokens):
             return " AND ".join(expr_tokens)
         return " OR ".join(expr_tokens)
 
@@ -274,11 +290,9 @@ class JiebaFTSTokenizer:
             if CHINESE_RE.search(t):
                 cn_tokens.append(t)
             else:
-                token = _sanitize_fts5(t.lower())
+                token = t.lower().strip()
                 if token and not _PUNCT_ONLY_RE.match(token):
-                    en_tokens.append(
-                        token if _SPECIAL_EN_RE.search(token) else f"{token}*"
-                    )
+                    en_tokens.append(token)
 
         # 构建 MATCH 表达式
         return self._build_match_expr(cn_tokens, en_tokens)
