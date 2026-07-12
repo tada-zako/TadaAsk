@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.responses import PlainTextResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from loguru import logger
 
 from app.db.models import Project, ProjectWidget
 from app.utils import normalize_origin
@@ -35,6 +36,7 @@ class WidgetScopedCORSMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """中间件入口函数，处理 CORS 逻辑"""
+        # logger.debug(f"触发 custom middleware 处理: {scope.get('path')}")
         if scope["type"] != "http":  # 只处理 HTTP 请求
             await self.app(scope, receive, send)
             return
@@ -80,20 +82,28 @@ class WidgetScopedCORSMiddleware:
         except ValueError:
             return False
 
-        # 查询数据库，判断 origin 是否属于对应 widget 的 site_origin
+        # 先读取部署配置，再用普通 Python 值比较，避免 Result 被重复消费。
         stmt = (
-            select(ProjectWidget.id)
+            select(ProjectWidget.site_origin)
             .join(Project, Project.id == ProjectWidget.project_id)
             .where(
                 Project.uid == project_uid,
                 ProjectWidget.uid == widget_uid,
-                ProjectWidget.site_origin == normalized_origin,
                 ProjectWidget.is_enabled.is_(True),
             )
         )
         async with self.session_factory() as session:
-            result = await session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+            configured_origin = await session.scalar(stmt)
+
+        # 文本比较；请求 origin 和允许 origin 是否一致
+        is_allowed = configured_origin == normalized_origin
+        logger.debug(
+            "Widget CORS Origin 校验: request_origin={}, configured_origin={}, allowed={}",
+            normalized_origin,
+            configured_origin,
+            is_allowed,
+        )
+        return is_allowed
 
     async def preflight_response(
         self, *, match: re.Match, request_headers: Headers
@@ -116,6 +126,7 @@ class WidgetScopedCORSMiddleware:
             widget_uid=match.group("widget_uid"),
             request_origin=requested_origin,
         ):
+            # logger.debug("preflight 请求 CORS 通过")
             preflight_headers["Access-Control-Allow-Origin"] = requested_origin
         else:
             failures.append("origin")
@@ -126,6 +137,7 @@ class WidgetScopedCORSMiddleware:
 
         if failures:
             # 失败响应
+            # logger.debug("preflight 请求 CORS 失败")
             failure_text = "Disallowed CORS " + ", ".join(failures)
             return PlainTextResponse(
                 failure_text, status_code=400, headers=preflight_headers
@@ -183,4 +195,5 @@ class WidgetScopedCORSMiddleware:
     @staticmethod
     def allow_explicit_origin(headers: MutableHeaders, origin: str) -> None:
         headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Expose-Headers"] = "Retry-After"
         headers.add_vary_header("Origin")
