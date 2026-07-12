@@ -1,4 +1,6 @@
 import { createApiClient } from "@/shared/api/create-client";
 
-/** Visitor Widget 专属 API client。 */
-export const client = createApiClient();
+/** 每个 Web Component 实例持有独立 client，避免多个部署地址相互污染。 */
+export function createWidgetApiClient(baseUrl: string) {
+  return createApiClient({ baseUrl });
+}
