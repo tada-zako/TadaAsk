@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { toRef } from "vue";
+import { ref, toRef } from "vue";
 
 import { useWidgetChat } from "./composables/use-widget-chat";
-import { useWidgetShell } from "./composables/use-widget-shell";
 import WidgetLauncher from "./components/WidgetLauncher.vue";
 import WidgetPanel from "./components/WidgetPanel.vue";
 
@@ -30,7 +29,8 @@ const props = withDefaults(
   },
 );
 
-const shell = useWidgetShell(); // 记录 message panel 的状态
+// Panel 显隐不影响 chat composable，关闭时 SSE 仍会继续消费。
+const isOpen = ref(false);
 const chat = useWidgetChat({
   apiBaseUrl: toRef(props, "apiBaseUrl"),
   projectUid: toRef(props, "projectUid"),
@@ -44,16 +44,16 @@ const chat = useWidgetChat({
     :class="[
       `launcher-${launcherPosition}`,
       `panel-${panelAlign}`,
-      { 'panel-open': shell.isOpen.value },
+      { 'panel-open': isOpen },
     ]"
   >
     <WidgetLauncher
-      v-show="!shell.isOpen.value"
+      v-show="!isOpen"
       :label="`Open ${title}`"
-      @open="shell.open"
+      @open="isOpen = true"
     />
     <WidgetPanel
-      v-show="shell.isOpen.value"
+      v-show="isOpen"
       :title="title"
       :logo-url="logoUrl"
       :placeholder="placeholder"
@@ -63,7 +63,7 @@ const chat = useWidgetChat({
       :can-send="chat.canSend.value"
       :error-message="chat.errorMessage.value"
       @update:draft="chat.draft.value = $event"
-      @close="shell.close"
+      @close="isOpen = false"
       @new-chat="chat.startNewChat"
       @send="chat.sendMessage"
       @cancel="chat.cancelGeneration"

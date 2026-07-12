@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { MessageSquareText, Plus, X } from "@lucide/vue";
-import { ref, watch } from "vue";
+import { nextTick, ref, watch } from "vue";
 
-import { useWidgetAutoScroll } from "../composables/use-widget-auto-scroll";
 import type { WidgetChatPhase } from "../composables/use-widget-chat";
 import type { WidgetMessageViewModel } from "../services/chat";
 import WidgetComposer from "./WidgetComposer.vue";
@@ -39,7 +38,33 @@ const emit = defineEmits<{
 }>();
 
 const scrollContainer = ref<HTMLElement | null>(null);
-const { handleScroll, scrollToLatest } = useWidgetAutoScroll(scrollContainer);
+const followsOutput = ref(true);
+const BOTTOM_THRESHOLD = 72;
+
+/** 监听滚动事件 */
+function handleScroll() {
+  const element = scrollContainer.value;
+  if (!element) return;
+  followsOutput.value =
+    element.scrollHeight - element.scrollTop - element.clientHeight <=
+    BOTTOM_THRESHOLD;
+}
+
+/** 滚动到最底部 */
+async function scrollToLatest() {
+  if (!followsOutput.value) return;
+  await nextTick();
+  const element = scrollContainer.value;
+  if (element) element.scrollTop = element.scrollHeight;
+}
+
+watch(
+  () => props.messages.length,
+  (messageCount) => {
+    // New Chat 清空消息后，新会话应重新跟随输出。
+    if (messageCount === 0) followsOutput.value = true;
+  },
+);
 
 watch(
   () => [
