@@ -1,0 +1,1457 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TadaAsk Visitor Widget UI Preview</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --page-bg: #08090a;
+        --page-panel: #0d0f11;
+        --page-line: rgba(255, 255, 255, 0.075);
+        --page-text: #f4f4f3;
+        --page-muted: #858990;
+        --widget-bg: #090a0b;
+        --widget-surface: #111316;
+        --widget-surface-raised: #181b1f;
+        --widget-user: #1c2024;
+        --widget-text: #f4f5f3;
+        --widget-body: #d2d4d5;
+        --widget-muted: #92979e;
+        --widget-faint: #626870;
+        --widget-line: rgba(255, 255, 255, 0.09);
+        --widget-line-soft: rgba(255, 255, 255, 0.06);
+        --widget-accent: #24d3c4;
+        --widget-accent-fg: #031110;
+        --widget-accent-soft: rgba(36, 211, 196, 0.1);
+        --widget-danger: #ff7b72;
+        --shadow-widget: 0 34px 100px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(255, 255, 255, 0.03);
+        --radius-sm: 7px;
+        --radius-md: 11px;
+        --radius-lg: 18px;
+        --radius-xl: 24px;
+        --font-body: "Noto Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+        --font-code: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background:
+          radial-gradient(circle at 70% -8%, rgba(36, 211, 196, 0.07), transparent 34rem),
+          var(--page-bg);
+        color: var(--page-text);
+        font-family: var(--font-body);
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      svg {
+        display: block;
+      }
+
+      .preview-shell {
+        display: grid;
+        gap: 62px;
+        width: min(1480px, calc(100% - 36px));
+        margin: 0 auto;
+        padding: 48px 0 92px;
+      }
+
+      .preview-intro {
+        display: grid;
+        gap: 12px;
+        max-width: 760px;
+      }
+
+      .preview-kicker {
+        color: var(--widget-accent);
+        font-size: 11px;
+        font-weight: 760;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .preview-intro h1,
+      .state-heading h2,
+      .preview-intro p,
+      .state-heading p,
+      .host-copy h3,
+      .host-copy p,
+      .welcome h3,
+      .welcome p,
+      .assistant-copy p,
+      .assistant-copy h3,
+      .source-main h4,
+      .source-main p {
+        margin: 0;
+      }
+
+      .preview-intro h1 {
+        font-size: clamp(32px, 5vw, 54px);
+        font-weight: 720;
+        letter-spacing: -0.045em;
+        line-height: 1.04;
+      }
+
+      .preview-intro p {
+        color: var(--page-muted);
+        font-size: 14px;
+        line-height: 1.75;
+      }
+
+      .state {
+        display: grid;
+        gap: 16px;
+      }
+
+      .state-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 0 3px;
+      }
+
+      .state-heading h2 {
+        font-size: 18px;
+        font-weight: 690;
+        letter-spacing: -0.015em;
+      }
+
+      .state-heading p {
+        color: var(--page-muted);
+        font-size: 12px;
+      }
+
+      .stage {
+        position: relative;
+        overflow: hidden;
+        height: 820px;
+        border: 1px solid var(--page-line);
+        border-radius: 22px;
+        background: #e8e7e2;
+        box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+      }
+
+      .host-site {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-rows: 66px minmax(0, 1fr);
+        color: #22272c;
+        font-family: "Aptos", "Segoe UI", sans-serif;
+      }
+
+      .host-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid rgba(21, 27, 32, 0.12);
+        background: rgba(251, 250, 247, 0.88);
+        padding: 0 28px;
+      }
+
+      .host-brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-size: 14px;
+        font-weight: 720;
+      }
+
+      .host-mark {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 9px;
+        background: #233844;
+        color: white;
+        font-family: Georgia, serif;
+        font-size: 16px;
+      }
+
+      .host-nav {
+        display: flex;
+        gap: 24px;
+        color: #697078;
+        font-size: 12px;
+      }
+
+      .host-body {
+        display: grid;
+        grid-template-columns: 210px minmax(0, 1fr);
+        min-height: 0;
+      }
+
+      .host-sidebar {
+        border-right: 1px solid rgba(21, 27, 32, 0.1);
+        background: rgba(247, 246, 242, 0.8);
+        padding: 34px 24px;
+      }
+
+      .host-sidebar strong {
+        display: block;
+        margin-bottom: 18px;
+        color: #293038;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .host-link {
+        min-height: 31px;
+        color: #747a80;
+        font-size: 12px;
+      }
+
+      .host-link.active {
+        color: #223f4c;
+        font-weight: 680;
+      }
+
+      .host-copy {
+        width: min(760px, calc(100% - 80px));
+        padding: 78px 0 100px 64px;
+      }
+
+      .host-copy .host-overline {
+        margin-bottom: 12px;
+        color: #8a7d62;
+        font-size: 11px;
+        font-weight: 720;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .host-copy h3 {
+        max-width: 520px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: 42px;
+        font-weight: 500;
+        letter-spacing: -0.035em;
+        line-height: 1.08;
+      }
+
+      .host-copy p {
+        max-width: 600px;
+        margin-top: 22px;
+        color: #73787c;
+        font-size: 14px;
+        line-height: 1.8;
+      }
+
+      .host-rule {
+        width: min(620px, 90%);
+        height: 1px;
+        margin-top: 34px;
+        background: rgba(31, 37, 42, 0.12);
+      }
+
+      .host-lines {
+        display: grid;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .host-lines span {
+        display: block;
+        height: 8px;
+        border-radius: 999px;
+        background: rgba(37, 42, 47, 0.09);
+      }
+
+      .host-lines span:nth-child(1) { width: 88%; }
+      .host-lines span:nth-child(2) { width: 74%; }
+      .host-lines span:nth-child(3) { width: 81%; }
+
+      .stage::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(90deg, rgba(8, 10, 12, 0.1), rgba(8, 10, 12, 0.28));
+      }
+
+      .widget {
+        position: absolute;
+        z-index: 2;
+        right: 22px;
+        bottom: 22px;
+        display: grid;
+        width: min(980px, calc(100% - 170px));
+        min-width: 0;
+        grid-template-rows: 62px minmax(0, 1fr) 36px;
+        overflow: hidden;
+        border: 1px solid var(--widget-line);
+        border-radius: var(--radius-lg);
+        background:
+          radial-gradient(circle at 82% -15%, rgba(36, 211, 196, 0.06), transparent 26rem),
+          var(--widget-bg);
+        color: var(--widget-text);
+        box-shadow: var(--shadow-widget);
+      }
+
+      /* 空状态保持紧凑；进入对话后由内容撑开，达到上限才滚动。 */
+      .widget-empty {
+        height: 430px;
+      }
+
+      .widget-chat {
+        height: auto;
+        min-height: 560px;
+        max-height: min(700px, calc(100% - 48px));
+      }
+
+      .widget-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--widget-line-soft);
+        padding: 0 17px 0 19px;
+      }
+
+      .widget-brand {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .widget-logo {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 1px solid var(--widget-line);
+        border-radius: 9px;
+        background: var(--widget-surface);
+        color: var(--widget-accent);
+        font-size: 14px;
+        font-weight: 780;
+      }
+
+      .widget-title {
+        overflow: hidden;
+        color: var(--widget-text);
+        font-size: 14px;
+        font-weight: 680;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .widget-footer {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        padding: 0 17px;
+        color: var(--widget-faint);
+        font-size: 10.5px;
+      }
+
+      .powered-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: inherit;
+        text-decoration: none;
+        transition: color 140ms ease;
+      }
+
+      .powered-link:hover,
+      .powered-link:focus-visible {
+        color: var(--widget-muted);
+        outline: none;
+      }
+
+      .powered-mark {
+        display: grid;
+        width: 16px;
+        height: 16px;
+        place-items: center;
+        border-radius: 5px;
+        background: var(--widget-faint);
+        color: var(--widget-bg);
+        font-size: 9px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .icon-button {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--widget-muted);
+        cursor: pointer;
+        transition: background-color 140ms ease, color 140ms ease;
+      }
+
+      .icon-button:hover,
+      .icon-button:focus-visible {
+        background: var(--widget-surface-raised);
+        color: var(--widget-text);
+        outline: none;
+      }
+
+      .icon-button svg {
+        width: 17px;
+        height: 17px;
+      }
+
+      .widget-body {
+        position: relative;
+        min-height: 0;
+      }
+
+      .empty-layout {
+        display: grid;
+        height: 100%;
+        min-height: 0;
+        place-items: center;
+        padding: 32px 48px 48px;
+      }
+
+      .empty-center {
+        display: grid;
+        width: min(690px, 100%);
+        gap: 30px;
+        transform: translateY(-18px);
+      }
+
+      .welcome {
+        display: grid;
+        justify-items: center;
+        gap: 10px;
+        text-align: center;
+      }
+
+      .welcome-mark {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        margin-bottom: 4px;
+        place-items: center;
+        border: 1px solid rgba(36, 211, 196, 0.2);
+        border-radius: 14px;
+        /* background: var(--widget-accent-soft); */
+        color: var(--widget-accent);
+      }
+
+      .welcome-mark svg {
+        width: 21px;
+        height: 21px;
+      }
+
+      .welcome h3 {
+        font-size: 25px;
+        font-weight: 690;
+        letter-spacing: -0.035em;
+      }
+
+      .welcome p {
+        color: var(--widget-muted);
+        font-size: 13px;
+      }
+
+      .composer {
+        display: grid;
+        min-height: 116px;
+        overflow: hidden;
+        border: 1px solid var(--widget-line);
+        border-radius: var(--radius-lg);
+        background: var(--widget-surface-raised);
+        box-shadow: 0 18px 54px rgba(0, 0, 0, 0.22);
+      }
+
+      .composer textarea {
+        width: 100%;
+        min-height: 68px;
+        resize: none;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--widget-text);
+        padding: 18px 20px 7px;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .composer textarea::placeholder {
+        color: var(--widget-faint);
+      }
+
+      .composer-footer {
+        display: flex;
+        min-height: 47px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 5px 10px 10px 18px;
+      }
+
+      .composer-hint {
+        color: var(--widget-faint);
+        font-size: 11px;
+      }
+
+      .send-button {
+        display: grid;
+        width: 35px;
+        height: 35px;
+        flex: 0 0 auto;
+        place-items: center;
+        border: 0;
+        border-radius: 999px;
+        background: var(--widget-accent);
+        color: var(--widget-accent-fg);
+        cursor: pointer;
+        transition: filter 140ms ease, transform 140ms ease;
+      }
+
+      .send-button:hover {
+        filter: brightness(1.08);
+        transform: translateY(-1px);
+      }
+
+      .send-button svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .thread {
+        display: grid;
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+
+      .messages-scroll {
+        min-height: 0;
+        overflow: auto;
+        padding: 34px 0 158px;
+      }
+
+      .messages {
+        display: grid;
+        width: min(760px, calc(100% - 64px));
+        gap: 26px;
+        margin: 0 auto;
+      }
+
+      .message {
+        display: grid;
+        gap: 9px;
+      }
+
+      .message.user {
+        max-width: 72%;
+        justify-self: end;
+      }
+
+      .user-bubble {
+        border: 1px solid var(--widget-line-soft);
+        border-radius: 18px 18px 5px 18px;
+        background: var(--widget-user);
+        color: var(--widget-text);
+        padding: 9px 13px;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      .assistant-copy {
+        max-width: 94%;
+        color: var(--widget-body);
+        font-size: 13.5px;
+        line-height: 1.82;
+      }
+
+      .assistant-copy p + p {
+        margin-top: 12px;
+      }
+
+      .assistant-copy h3 {
+        margin-top: 18px;
+        margin-bottom: 7px;
+        color: var(--widget-text);
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .assistant-copy ul {
+        display: grid;
+        gap: 6px;
+        margin: 9px 0 0;
+        padding-left: 20px;
+      }
+
+      .assistant-copy li::marker {
+        color: var(--widget-faint);
+      }
+
+      .inline-code {
+        border: 1px solid var(--widget-line-soft);
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.045);
+        color: var(--widget-text);
+        font-family: var(--font-code);
+        font-size: 0.88em;
+        padding: 1px 5px;
+      }
+
+      .citation-token {
+        display: inline-grid;
+        min-width: 19px;
+        height: 19px;
+        place-items: center;
+        margin: 0 2px;
+        border: 1px solid rgba(36, 211, 196, 0.25);
+        border-radius: 999px;
+        background: var(--widget-accent-soft);
+        color: var(--widget-accent);
+        font-size: 10px;
+        font-weight: 760;
+        line-height: 1;
+        vertical-align: 0.12em;
+      }
+
+      .source-toggle {
+        display: inline-flex;
+        width: fit-content;
+        min-height: 30px;
+        align-items: center;
+        gap: 8px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--widget-muted);
+        padding: 0 6px 0 0;
+        font-size: 11px;
+      }
+
+      .source-count {
+        display: grid;
+        width: 20px;
+        height: 20px;
+        place-items: center;
+        border-radius: 999px;
+        background: var(--widget-accent-soft);
+        color: var(--widget-accent);
+        font-size: 10px;
+        font-weight: 760;
+      }
+
+      .source-toggle svg {
+        width: 13px;
+        height: 13px;
+        color: var(--widget-faint);
+      }
+
+      .composer-dock {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 2;
+        pointer-events: none;
+        background: linear-gradient(to top, var(--widget-bg) 38%, rgba(9, 10, 11, 0.88) 68%, transparent);
+        padding: 55px 0 19px;
+      }
+
+      .composer-dock .composer {
+        width: min(760px, calc(100% - 64px));
+        min-height: 104px;
+        margin: 0 auto;
+        pointer-events: auto;
+      }
+
+      .composer-dock .composer textarea {
+        min-height: 59px;
+        padding-top: 15px;
+      }
+
+      .sources-panel {
+        overflow: hidden;
+        width: min(700px, 100%);
+        margin-top: 4px;
+        border: 1px solid var(--widget-line-soft);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.018);
+      }
+
+      .sources-head {
+        display: flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--widget-line-soft);
+        padding: 0 13px;
+      }
+
+      .sources-head strong {
+        color: var(--widget-body);
+        font-size: 11px;
+        font-weight: 680;
+      }
+
+      .sources-head span {
+        color: var(--widget-faint);
+        font-size: 10px;
+      }
+
+      .source-row {
+        position: relative;
+        display: grid;
+        grid-template-columns: 25px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: start;
+        padding: 12px 13px;
+      }
+
+      .source-row + .source-row {
+        border-top: 1px solid var(--widget-line-soft);
+      }
+
+      .source-row.highlighted {
+        background: rgba(36, 211, 196, 0.065);
+        box-shadow: inset 2px 0 var(--widget-accent);
+      }
+
+      .source-index {
+        display: grid;
+        width: 23px;
+        height: 23px;
+        place-items: center;
+        border: 1px solid var(--widget-line);
+        border-radius: 999px;
+        color: var(--widget-muted);
+        font-size: 10px;
+        font-weight: 760;
+      }
+
+      .source-row.highlighted .source-index {
+        border-color: rgba(36, 211, 196, 0.28);
+        background: var(--widget-accent-soft);
+        color: var(--widget-accent);
+      }
+
+      .source-main {
+        min-width: 0;
+      }
+
+      .source-title-line {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .source-title-line svg {
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+        color: var(--widget-faint);
+      }
+
+      .source-main h4 {
+        overflow: hidden;
+        color: var(--widget-text);
+        font-size: 11.5px;
+        font-weight: 680;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .source-meta {
+        margin-top: 4px !important;
+        color: var(--widget-faint);
+        font-size: 9.5px;
+      }
+
+      .source-excerpt {
+        display: -webkit-box;
+        overflow: hidden;
+        margin-top: 6px !important;
+        color: var(--widget-muted);
+        font-size: 10.5px;
+        line-height: 1.55;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      .source-open {
+        display: grid;
+        width: 25px;
+        height: 25px;
+        place-items: center;
+        border-radius: 7px;
+        color: var(--widget-faint);
+      }
+
+      .source-open svg {
+        width: 13px;
+        height: 13px;
+      }
+
+      .streaming .messages-scroll {
+        padding-top: 48px;
+      }
+
+      .stream-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--widget-faint);
+        font-size: 11px;
+      }
+
+      .pulse-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--widget-accent);
+        box-shadow: 0 0 0 4px var(--widget-accent-soft);
+        animation: breathe 1.45s ease-in-out infinite;
+      }
+
+      .typing-caret {
+        display: inline-block;
+        width: 2px;
+        height: 1.05em;
+        margin-left: 3px;
+        background: var(--widget-accent);
+        vertical-align: -0.15em;
+        animation: blink 900ms steps(1) infinite;
+      }
+
+      .stop-button {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--widget-text);
+      }
+
+      .stop-square {
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+        background: currentColor;
+      }
+
+      @keyframes breathe {
+        0%, 100% { opacity: 0.45; }
+        50% { opacity: 1; }
+      }
+
+      @keyframes blink {
+        0%, 45% { opacity: 1; }
+        46%, 100% { opacity: 0; }
+      }
+
+      .state-sources .messages-scroll {
+        padding-top: 25px;
+        padding-bottom: 150px;
+      }
+
+      .state-sources .messages {
+        gap: 17px;
+      }
+
+      .state-sources .message.user {
+        max-width: 65%;
+      }
+
+      .launcher-stage {
+        position: relative;
+        overflow: hidden;
+        height: 230px;
+        border: 1px solid var(--page-line);
+        border-radius: 18px;
+        background:
+          linear-gradient(90deg, rgba(246, 245, 241, 0.96), rgba(229, 231, 230, 0.96)),
+          #ecebe7;
+        color: #263038;
+        box-shadow: 0 18px 54px rgba(0, 0, 0, 0.2);
+      }
+
+      .launcher-stage::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(rgba(31, 40, 46, 0.08), rgba(31, 40, 46, 0.08)) 28px 66px / 34% 8px no-repeat,
+          linear-gradient(rgba(31, 40, 46, 0.06), rgba(31, 40, 46, 0.06)) 28px 88px / 48% 7px no-repeat,
+          linear-gradient(rgba(31, 40, 46, 0.06), rgba(31, 40, 46, 0.06)) 28px 106px / 41% 7px no-repeat;
+      }
+
+      .launcher-stage-head {
+        position: absolute;
+        top: 20px;
+        left: 28px;
+        display: grid;
+        gap: 4px;
+      }
+
+      .launcher-stage-head strong {
+        font-size: 13px;
+      }
+
+      .launcher-stage-head span {
+        color: #7a8186;
+        font-size: 10px;
+      }
+
+      .launcher-guide {
+        position: absolute;
+        right: 27px;
+        bottom: 27px;
+        width: 88px;
+        height: 88px;
+        border-right: 1px dashed rgba(37, 45, 51, 0.18);
+        border-bottom: 1px dashed rgba(37, 45, 51, 0.18);
+      }
+
+      .launcher {
+        position: absolute;
+        right: 28px;
+        bottom: 28px;
+        display: grid;
+        width: 56px;
+        height: 56px;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 999px;
+        /* background: var(--widget-accent);
+        color: var(--widget-accent-fg); */
+        color: var(--widget-accent);
+        background: var(--widget-accent-fg);
+        box-shadow: 0 13px 34px rgba(14, 42, 42, 0.28);
+        cursor: pointer;
+        transition: transform 160ms ease, box-shadow 160ms ease;
+      }
+
+      .launcher:hover,
+      .launcher:focus-visible {
+        outline: none;
+        transform: translateY(-2px) scale(1.025);
+        box-shadow: 0 17px 40px rgba(14, 42, 42, 0.34), 0 0 0 4px rgba(36, 211, 196, 0.13);
+      }
+
+      .launcher svg {
+        width: 23px;
+        height: 23px;
+      }
+
+      .launcher-options {
+        position: absolute;
+        right: 108px;
+        bottom: 45px;
+        color: #737b80;
+        font-size: 10px;
+        text-align: right;
+      }
+
+      .dual-stage {
+        display: grid;
+        grid-template-columns: 430px minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .mobile-stage,
+      .theme-stage {
+        position: relative;
+        overflow: hidden;
+        height: 760px;
+        border: 1px solid var(--page-line);
+        border-radius: 22px;
+        box-shadow: 0 22px 70px rgba(0, 0, 0, 0.28);
+      }
+
+      .mobile-stage {
+        background:
+          radial-gradient(circle at 0 0, rgba(205, 147, 82, 0.2), transparent 15rem),
+          #ece8df;
+      }
+
+      .mobile-host {
+        display: flex;
+        height: 58px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 19px;
+        color: #31353a;
+        font-family: Georgia, serif;
+        font-size: 14px;
+      }
+
+      .mobile-host span:last-child {
+        color: #817b73;
+        font-family: var(--font-body);
+        font-size: 10px;
+      }
+
+      .mobile-widget {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: grid;
+        height: calc(100% - 58px);
+        grid-template-rows: 58px minmax(0, 1fr) 34px;
+        overflow: hidden;
+        border-top: 1px solid var(--widget-line);
+        border-radius: 18px 18px 0 0;
+        background: var(--widget-bg);
+        color: var(--widget-text);
+        box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.36);
+      }
+
+      .mobile-widget .widget-header {
+        padding-inline: 15px 12px;
+      }
+
+      .mobile-widget .widget-logo {
+        width: 28px;
+        height: 28px;
+      }
+
+      .mobile-widget .messages-scroll {
+        padding: 22px 0 142px;
+      }
+
+      .mobile-widget .messages {
+        width: calc(100% - 34px);
+        gap: 21px;
+      }
+
+      .mobile-widget .message.user {
+        max-width: 82%;
+      }
+
+      .mobile-widget .assistant-copy {
+        max-width: 100%;
+        font-size: 13px;
+        line-height: 1.75;
+      }
+
+      .mobile-widget .composer-dock {
+        padding: 48px 0 12px;
+      }
+
+      .mobile-widget .composer-dock .composer {
+        width: calc(100% - 24px);
+        min-height: 98px;
+      }
+
+      .mobile-widget .composer-hint {
+        display: none;
+      }
+
+      .theme-stage {
+        background: #d7dde1;
+      }
+
+      .theme-host {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: 170px minmax(0, 1fr);
+        background: linear-gradient(135deg, #dce3e7, #cdd5da);
+        color: #40505b;
+      }
+
+      .theme-host-side {
+        border-right: 1px solid rgba(42, 57, 67, 0.12);
+        padding: 30px 22px;
+        font-family: Georgia, serif;
+      }
+
+      .theme-host-side strong {
+        display: block;
+        margin-bottom: 30px;
+        font-size: 17px;
+      }
+
+      .theme-host-side span {
+        display: block;
+        margin: 16px 0;
+        color: #7c8a92;
+        font-family: var(--font-body);
+        font-size: 10px;
+      }
+
+      .theme-host-copy {
+        padding: 72px 50px;
+      }
+
+      .theme-host-copy h3 {
+        max-width: 420px;
+        margin: 0;
+        font-family: Georgia, serif;
+        font-size: 36px;
+        font-weight: 500;
+        line-height: 1.12;
+      }
+
+      .theme-widget {
+        --widget-bg: #f4f0e8;
+        --widget-surface: #f9f6f0;
+        --widget-surface-raised: #fffdf8;
+        --widget-user: #e8e1d6;
+        --widget-text: #272420;
+        --widget-body: #45413c;
+        --widget-muted: #716b63;
+        --widget-faint: #989087;
+        --widget-line: rgba(66, 55, 43, 0.16);
+        --widget-line-soft: rgba(66, 55, 43, 0.1);
+        --widget-accent: #b74d35;
+        --widget-accent-fg: #fffaf5;
+        --widget-accent-soft: rgba(183, 77, 53, 0.1);
+        --shadow-widget: 0 28px 80px rgba(41, 50, 55, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.5);
+        right: auto;
+        bottom: 18px;
+        left: 50%;
+        width: min(700px, calc(100% - 96px));
+        min-height: 580px;
+        max-height: 650px;
+        background: var(--widget-bg);
+        color-scheme: light;
+        transform: translateX(-50%);
+      }
+
+      .theme-widget .widget-logo {
+        border-color: rgba(183, 77, 53, 0.22);
+        background: var(--widget-accent-soft);
+        font-family: Georgia, serif;
+      }
+
+      .theme-widget .messages {
+        width: min(570px, calc(100% - 54px));
+      }
+
+      .theme-widget .composer-dock .composer {
+        width: min(570px, calc(100% - 54px));
+      }
+
+      .theme-widget .composer-dock {
+        background: linear-gradient(to top, var(--widget-bg) 38%, rgba(244, 240, 232, 0.9) 70%, transparent);
+      }
+
+      .theme-widget .citation-token {
+        border-color: rgba(183, 77, 53, 0.25);
+      }
+
+      .theme-widget .inline-code {
+        background: rgba(50, 42, 34, 0.055);
+      }
+
+      .variant-label {
+        position: absolute;
+        z-index: 4;
+        top: 12px;
+        left: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 999px;
+        background: rgba(8, 9, 10, 0.74);
+        color: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(12px);
+        padding: 5px 8px;
+        font-size: 9px;
+        font-weight: 720;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .mobile-stage .variant-label {
+        top: 67px;
+      }
+
+      @media (max-width: 1000px) {
+        .preview-shell {
+          width: min(100% - 20px, 760px);
+          padding-top: 30px;
+        }
+
+        .stage {
+          height: 720px;
+        }
+
+        .widget {
+          right: 12px;
+          bottom: 12px;
+          width: calc(100% - 64px);
+        }
+
+        .widget-empty {
+          height: 410px;
+        }
+
+        .widget-chat {
+          min-height: 540px;
+          max-height: calc(100% - 24px);
+        }
+
+        .host-sidebar {
+          display: none;
+        }
+
+        .host-body {
+          grid-template-columns: 1fr;
+        }
+
+        .dual-stage {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .mobile-stage {
+          width: min(430px, 100%);
+          margin: 0 auto;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .state-heading {
+          display: grid;
+          gap: 5px;
+        }
+
+        .stage {
+          height: 690px;
+        }
+
+        .host-site {
+          display: none;
+        }
+
+        .widget {
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          border: 0;
+          border-radius: 0;
+        }
+
+        .messages,
+        .composer-dock .composer {
+          width: calc(100% - 28px);
+        }
+
+        .empty-layout {
+          padding-inline: 18px;
+        }
+
+        .theme-widget {
+          width: calc(100% - 24px);
+          transform: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="preview-shell">
+      <header class="preview-intro">
+        <span class="preview-kicker">Visitor Widget / UI direction</span>
+        <h1>A quiet reading surface for answers that need context.</h1>
+        <p>默认深色主题。大型悬浮面板、简化对话控制，以及与回答正文紧密联动的引用来源。以下仅展示静态 HTML 阶段需要确认的五个核心状态。</p>
+      </header>
+
+      <!-- State A: Empty / Welcome -->
+      <section id="state-a" class="state">
+        <div class="state-heading">
+          <h2>State A — Empty / Welcome</h2>
+          <p>launcher closed state · 紧凑空状态 · 直接新建会话</p>
+        </div>
+        <div class="launcher-stage" aria-label="Widget launcher closed state">
+          <div class="launcher-stage-head"><strong>Launcher — closed state</strong><span>默认右下角；支持左右位置、尺寸与安全偏移配置</span></div>
+          <span class="launcher-options">bottom-right<br />28px offset</span>
+          <span class="launcher-guide" aria-hidden="true"></span>
+          <button class="launcher" type="button" aria-label="Open TadaAsk Assistant">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5.5 6.5A3.5 3.5 0 0 1 9 3h6a3.5 3.5 0 0 1 3.5 3.5v6A3.5 3.5 0 0 1 15 16H9l-4 4v-7.5A3.5 3.5 0 0 1 5.5 9z" stroke-linejoin="round"/><path d="M9 8h6M9 11h4" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="stage">
+          <div class="host-site" aria-hidden="true">
+            <div class="host-header">
+              <div class="host-brand"><span class="host-mark">A</span>Arcfield Docs</div>
+              <div class="host-nav"><span>Guides</span><span>API</span><span>Changelog</span></div>
+            </div>
+            <div class="host-body">
+              <aside class="host-sidebar"><strong>Documentation</strong><div class="host-link active">Getting started</div><div class="host-link">Platform concepts</div><div class="host-link">Deployments</div><div class="host-link">API reference</div></aside>
+              <article class="host-copy"><div class="host-overline">Introduction</div><h3>Build with context, not guesswork.</h3><p>Everything you need to connect your product, organize knowledge, and ship a focused assistant for your users.</p><div class="host-rule"></div><div class="host-lines"><span></span><span></span><span></span></div></article>
+            </div>
+          </div>
+          <section class="widget widget-empty" aria-label="TadaAsk widget empty state">
+            <header class="widget-header">
+              <div class="widget-brand"><span class="widget-logo">T</span><span class="widget-title">TadaAsk Assistant</span></div>
+              <div class="header-actions">
+                <button class="icon-button" aria-label="Start a new chat" title="New chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button>
+                <button class="icon-button" aria-label="Close widget" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18" stroke-linecap="round"/></svg></button>
+              </div>
+            </header>
+            <div class="widget-body empty-layout">
+              <div class="empty-center">
+                <div class="welcome">
+                  <span class="welcome-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5.5 6.5A3.5 3.5 0 0 1 9 3h6a3.5 3.5 0 0 1 3.5 3.5v6A3.5 3.5 0 0 1 15 16H9l-4 4v-7.5A3.5 3.5 0 0 1 5.5 9z" stroke-linejoin="round"/><path d="M9 8h6M9 11h4" stroke-linecap="round"/></svg></span>
+                  <h3>How can I help?</h3>
+                  <p>Ask a question about this site.</p>
+                </div>
+                <div class="composer">
+                  <textarea aria-label="Message" placeholder="Ask anything…"></textarea>
+                  <div class="composer-footer"><span class="composer-hint">Enter to send · Shift + Enter for a new line</span><button class="send-button" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+                </div>
+              </div>
+            </div>
+            <footer class="widget-footer"><a class="powered-link" href="#"><span>Powered by</span><span class="powered-mark">T</span><strong>TadaAsk</strong></a></footer>
+          </section>
+        </div>
+      </section>
+
+      <!-- State B: Completed Conversation -->
+      <section id="state-b" class="state">
+        <div class="state-heading">
+          <h2>State B — Completed Conversation</h2>
+          <p>宽正文列 · assistant 无气泡 · sources 默认折叠</p>
+        </div>
+        <div class="stage">
+          <div class="host-site" aria-hidden="true"><div class="host-header"><div class="host-brand"><span class="host-mark">A</span>Arcfield Docs</div><div class="host-nav"><span>Guides</span><span>API</span><span>Changelog</span></div></div><div class="host-body"><aside class="host-sidebar"><strong>Documentation</strong><div class="host-link">Getting started</div><div class="host-link active">Deployments</div><div class="host-link">Configuration</div></aside><article class="host-copy"><div class="host-overline">Deployment</div><h3>Embed the assistant in your documentation.</h3><p>Install one script and keep the experience consistent across every page.</p></article></div></div>
+          <section class="widget widget-chat" aria-label="TadaAsk widget completed conversation">
+            <header class="widget-header"><div class="widget-brand"><span class="widget-logo">T</span><span class="widget-title">TadaAsk Assistant</span></div><div class="header-actions"><button class="icon-button" aria-label="Start a new chat" title="New chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button><button class="icon-button" aria-label="Close widget" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div></header>
+            <div class="widget-body thread">
+              <div class="messages-scroll"><div class="messages">
+                <article class="message user"><div class="user-bubble">如何把 TadaAsk Widget 嵌入到静态文档站点？</div></article>
+                <article class="message assistant">
+                  <div class="assistant-copy"><p>把 Widget 脚本放到站点的公共布局中，并为组件传入项目与部署标识。这样每个生成页面都会加载同一个助手实例。<span class="citation-token">1</span></p><h3>推荐步骤</h3><ul><li>在全局 layout 的结束标签前加载 Widget 脚本。</li><li>添加 <span class="inline-code">&lt;tada-ask-widget&gt;</span> 标签并配置必要属性。<span class="citation-token">2</span></li><li>确认当前站点 Origin 已在对应 Widget 部署中启用。<span class="citation-token">3</span></li></ul><p>样式层面只覆盖公开的语义变量，消息、Markdown 与引用交互会继续由组件内部控制。<span class="citation-token">4</span></p></div>
+                  <button class="source-toggle" type="button"><span class="source-count">4</span><span>sources</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 10 4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </article>
+                <article class="message user"><div class="user-bubble">页面刷新后还会保留这次对话吗？</div></article>
+                <article class="message assistant"><div class="assistant-copy"><p>不会。Widget 只维护当前页面生命周期内的一轮可见会话；折叠再打开仍会保留，但刷新页面或点击新会话后，上一轮消息不会重新加载。</p></div></article>
+              </div></div>
+              <div class="composer-dock"><div class="composer"><textarea aria-label="Follow-up message" placeholder="Ask a follow-up…"></textarea><div class="composer-footer"><span class="composer-hint">Enter to send · Shift + Enter for a new line</span><button class="send-button" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div></div>
+            </div>
+            <footer class="widget-footer"><a class="powered-link" href="#"><span>Powered by</span><span class="powered-mark">T</span><strong>TadaAsk</strong></a></footer>
+          </section>
+        </div>
+      </section>
+
+      <!-- State C: Sources Expanded -->
+      <section id="state-c" class="state">
+        <div class="state-heading">
+          <h2>State C — Sources Expanded</h2>
+          <p>消息内联展开 · 最多 4 项 · 文件摘要与网页外链分流</p>
+        </div>
+        <div class="stage">
+          <div class="host-site" aria-hidden="true"><div class="host-header"><div class="host-brand"><span class="host-mark">A</span>Arcfield Docs</div><div class="host-nav"><span>Guides</span><span>API</span><span>Changelog</span></div></div><div class="host-body"><aside class="host-sidebar"><strong>Documentation</strong><div class="host-link">Getting started</div><div class="host-link active">Deployments</div><div class="host-link">Configuration</div></aside><article class="host-copy"><div class="host-overline">Deployment</div><h3>Embed the assistant in your documentation.</h3><p>Install one script and keep the experience consistent across every page.</p></article></div></div>
+          <section class="widget widget-chat" aria-label="TadaAsk widget expanded sources">
+            <header class="widget-header"><div class="widget-brand"><span class="widget-logo">T</span><span class="widget-title">TadaAsk Assistant</span></div><div class="header-actions"><button class="icon-button" aria-label="Start a new chat" title="New chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button><button class="icon-button" aria-label="Close widget" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div></header>
+            <div class="widget-body thread state-sources">
+              <div class="messages-scroll"><div class="messages">
+                <article class="message user"><div class="user-bubble">如何把 TadaAsk Widget 嵌入到静态文档站点？</div></article>
+                <article class="message assistant">
+                  <div class="assistant-copy"><p>将脚本放入公共 layout，并传入项目和 Widget 标识。所有页面会共享相同的部署配置。<span class="citation-token">1</span> 样式只通过公开变量覆盖，内部的 Markdown 和引用行为保持固定。<span class="citation-token">2</span></p></div>
+                  <button class="source-toggle" type="button"><span class="source-count">4</span><span>sources</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 14 4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                  <section class="sources-panel" aria-label="Sources">
+                    <header class="sources-head"><strong>Sources used in this answer</strong><span>4 references</span></header>
+                    <article class="source-row highlighted"><span class="source-index">1</span><div class="source-main"><div class="source-title-line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h7l4 4v14H7z" stroke-linejoin="round"/><path d="M14 3v5h5M10 13h5M10 16h5" stroke-linecap="round"/></svg><h4>widget-installation.md</h4></div><p class="source-meta">Product docs · Installation · Local file</p><p class="source-excerpt">Add the widget script to the shared layout so every generated page loads the same assistant deployment.</p></div><span></span></article>
+                    <article class="source-row"><span class="source-index">2</span><div class="source-main"><div class="source-title-line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h7l4 4v14H7z" stroke-linejoin="round"/><path d="M14 3v5h5M10 13h5M10 16h5" stroke-linecap="round"/></svg><h4>frontend-ui-scope-constraints.md</h4></div><p class="source-meta">Frontend notes · Widget CSS boundary · Page 6</p><p class="source-excerpt">Widget styling is exposed through controlled semantic tokens while message rendering and interaction remain internal.</p></div><span></span></article>
+                    <a class="source-row" href="#" style="color: inherit; text-decoration: none"><span class="source-index">3</span><div class="source-main"><div class="source-title-line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg><h4>Deploying on a static site</h4></div><p class="source-meta">docs.arcfield.dev · External page</p></div><span class="source-open"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 5h5v5M19 5l-8 8M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
+                    <a class="source-row" href="#" style="color: inherit; text-decoration: none"><span class="source-index">4</span><div class="source-main"><div class="source-title-line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg><h4>CSS custom properties</h4></div><p class="source-meta">developer.mozilla.org · External page</p></div><span class="source-open"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 5h5v5M19 5l-8 8M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" stroke-linecap="round" stroke-linejoin="round"/></svg></span></a>
+                  </section>
+                </article>
+              </div></div>
+              <div class="composer-dock"><div class="composer"><textarea aria-label="Follow-up message" placeholder="Ask a follow-up…"></textarea><div class="composer-footer"><span class="composer-hint">Enter to send · Shift + Enter for a new line</span><button class="send-button" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div></div>
+            </div>
+            <footer class="widget-footer"><a class="powered-link" href="#"><span>Powered by</span><span class="powered-mark">T</span><strong>TadaAsk</strong></a></footer>
+          </section>
+        </div>
+      </section>
+
+      <!-- State D: Streaming -->
+      <section id="state-d" class="state">
+        <div class="state-heading">
+          <h2>State D — Streaming</h2>
+          <p>部分 Markdown · citation 已可用 · send 替换为 stop</p>
+        </div>
+        <div class="stage">
+          <div class="host-site" aria-hidden="true"><div class="host-header"><div class="host-brand"><span class="host-mark">A</span>Arcfield Docs</div><div class="host-nav"><span>Guides</span><span>API</span><span>Changelog</span></div></div><div class="host-body"><aside class="host-sidebar"><strong>Documentation</strong><div class="host-link active">Getting started</div><div class="host-link">Platform concepts</div><div class="host-link">Deployments</div></aside><article class="host-copy"><div class="host-overline">Architecture</div><h3>Connect your knowledge to every answer.</h3><p>Sources are retrieved, ranked, and attached to the assistant response as a stable snapshot.</p></article></div></div>
+          <section class="widget widget-chat" aria-label="TadaAsk widget streaming state">
+            <header class="widget-header"><div class="widget-brand"><span class="widget-logo">T</span><span class="widget-title">TadaAsk Assistant</span></div><div class="header-actions"><button class="icon-button" aria-label="Start a new chat" title="New chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button><button class="icon-button" aria-label="Close widget" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div></header>
+            <div class="widget-body thread streaming">
+              <div class="messages-scroll"><div class="messages">
+                <article class="message user"><div class="user-bubble">RAG Snapshot 在流式回答中是怎样工作的？</div></article>
+                <article class="message assistant">
+                  <div class="stream-status"><span class="pulse-dot"></span><span>Writing answer</span></div>
+                  <div class="assistant-copy"><p><span class="inline-code">rag_ready</span> 会先于文本 delta 到达，因此前端能在回答生成期间提前获得有效 citation ID。<span class="citation-token">1</span></p><p>之后每个 delta 只追加正文内容；当完整的 <span class="inline-code">[[citation:N]]</span> marker 出现时，渲染器会把它转换为可点击的引用编号，同时隐藏尚未闭合的尾部片段。<span class="typing-caret"></span></p></div>
+                  <button class="source-toggle" type="button"><span class="source-count">3</span><span>sources ready</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 10 4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </article>
+              </div></div>
+              <div class="composer-dock"><div class="composer"><textarea aria-label="Message being generated" disabled>RAG Snapshot 在流式回答中是怎样工作的？</textarea><div class="composer-footer"><span class="composer-hint">Generating a response…</span><button class="send-button stop-button" aria-label="Stop generating"><span class="stop-square"></span></button></div></div></div>
+            </div>
+            <footer class="widget-footer"><a class="powered-link" href="#"><span>Powered by</span><span class="powered-mark">T</span><strong>TadaAsk</strong></a></footer>
+          </section>
+        </div>
+      </section>
+
+      <!-- State E: Mobile / Custom Theme -->
+      <section id="state-e" class="state">
+        <div class="state-heading">
+          <h2>State E — Mobile / Custom Theme</h2>
+          <p>移动端保留顶部退出区域 · 自定义浅色语义主题</p>
+        </div>
+        <div class="dual-stage">
+          <div class="mobile-stage">
+            <span class="variant-label">Mobile layout</span>
+            <div class="mobile-host"><strong>Arcfield</strong><span>Tap here to close</span></div>
+            <section class="mobile-widget" aria-label="Mobile widget">
+              <header class="widget-header"><div class="widget-brand"><span class="widget-logo">T</span><span class="widget-title">TadaAsk Assistant</span></div><div class="header-actions"><button class="icon-button" aria-label="Start a new chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button><button class="icon-button" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div></header>
+              <div class="widget-body thread"><div class="messages-scroll"><div class="messages"><article class="message user"><div class="user-bubble">移动端会覆盖整个宿主页面吗？</div></article><article class="message assistant"><div class="assistant-copy"><p>不会。Widget 宽度占满，但顶部保留一段宿主页面区域。点击未覆盖区域即可关闭面板，当前会话仍会保留。</p><p>Composer 固定在底部，并使用动态视口高度适配移动端键盘。</p></div><button class="source-toggle" type="button"><span class="source-count">2</span><span>sources</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 10 4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></article></div></div><div class="composer-dock"><div class="composer"><textarea aria-label="Mobile message" placeholder="Ask a follow-up…"></textarea><div class="composer-footer"><span class="composer-hint"></span><button class="send-button" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div></div></div>
+              <footer class="widget-footer"><a class="powered-link" href="#"><span>Powered by</span><span class="powered-mark">T</span><strong>TadaAsk</strong></a></footer>
+            </section>
+          </div>
+
+          <div class="theme-stage">
+            <span class="variant-label">Custom CSS · panel-align: center</span>
+            <div class="theme-host" aria-hidden="true"><aside class="theme-host-side"><strong>Atlas Journal</strong><span>Research</span><span>Field notes</span><span>Methods</span></aside><article class="theme-host-copy"><h3>Knowledge shaped for careful decisions.</h3></article></div>
+            <section class="widget widget-chat theme-widget" aria-label="Custom themed widget">
+              <header class="widget-header"><div class="widget-brand"><span class="widget-logo">A</span><span class="widget-title">Atlas Research Assistant</span></div><div class="header-actions"><button class="icon-button" aria-label="Start a new chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button><button class="icon-button" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 6 12 12M18 6 6 18" stroke-linecap="round"/></svg></button></div></header>
+              <div class="widget-body thread"><div class="messages-scroll"><div class="messages"><article class="message user"><div class="user-bubble">What can I customize without changing chat behavior?</div></article><article class="message assistant"><div class="assistant-copy"><p>You can provide a title, logo and semantic colors for the background, surfaces, text, borders and accent. This supports a complete light or dark presentation.<span class="citation-token">1</span></p><p>The conversation layout, streaming feedback, Markdown safety rules and citation behavior remain controlled by the widget.<span class="citation-token">2</span></p></div><button class="source-toggle" type="button"><span class="source-count">2</span><span>sources</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m8 10 4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></article></div></div><div class="composer-dock"><div class="composer"><textarea aria-label="Custom themed message" placeholder="Ask the Atlas team…"></textarea><div class="composer-footer"><span class="composer-hint">Enter to send</span><button class="send-button" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div></div></div>
+              <footer class="widget-footer"><a class="powered-link" href="#"><span>Powered by</span><span class="powered-mark">T</span><strong>TadaAsk</strong></a></footer>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
