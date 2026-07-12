@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:widget": "vite --open /widget/",
     "build": "vue-tsc -b && vite build",
     "format": "prettier . --write",
     "format:check": "prettier . --check",

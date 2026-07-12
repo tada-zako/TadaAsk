@@ -1,0 +1,137 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #e8e7e2;
+  color: #242a2f;
+  font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+}
+
+.site-header {
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(23, 29, 34, 0.12);
+  padding: 0 30px;
+}
+
+.site-brand {
+  color: #223743;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-header nav {
+  display: flex;
+  gap: 24px;
+}
+
+.site-header nav a,
+.site-sidebar a {
+  color: #70767c;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.site-layout {
+  display: grid;
+  min-height: calc(100dvh - 66px);
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.site-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 17px;
+  border-right: 1px solid rgba(23, 29, 34, 0.1);
+  padding: 38px 28px;
+}
+
+.site-sidebar strong {
+  margin-bottom: 5px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.site-sidebar .active {
+  color: #213f4b;
+  font-weight: 700;
+}
+
+.site-article {
+  width: min(720px, calc(100% - 80px));
+  padding: 90px 0 120px 70px;
+}
+
+.site-article > span {
+  color: #86785d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.site-article h1 {
+  margin: 14px 0 22px;
+  font-family: Georgia, serif;
+  font-size: clamp(42px, 6vw, 70px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
+}
+
+.site-article p {
+  max-width: 570px;
+  color: #72777c;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.placeholder-lines {
+  display: grid;
+  gap: 12px;
+  margin-top: 38px;
+}
+
+.placeholder-lines i {
+  display: block;
+  width: 76%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(37, 43, 48, 0.09);
+}
+
+.placeholder-lines i:nth-child(2) {
+  width: 64%;
+}
+
+.placeholder-lines i:nth-child(3) {
+  width: 70%;
+}
+
+@media (max-width: 720px) {
+  .site-header nav,
+  .site-sidebar {
+    display: none;
+  }
+
+  .site-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .site-article {
+    width: calc(100% - 36px);
+    padding: 54px 0 80px 18px;
+  }
+}

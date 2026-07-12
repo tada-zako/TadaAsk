@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TadaAsk Widget Preview</title>
+    <link rel="stylesheet" href="/widget/preview.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="site-brand" href="#">Arcfield Docs</a>
+      <nav aria-label="Documentation">
+        <a href="#">Guides</a><a href="#">API</a><a href="#">Changelog</a>
+      </nav>
+    </header>
+    <main class="site-layout">
+      <aside class="site-sidebar">
+        <strong>Documentation</strong
+        ><a class="active" href="#">Getting started</a
+        ><a href="#">Platform concepts</a><a href="#">Deployments</a
+        ><a href="#">API reference</a>
+      </aside>
+      <article class="site-article">
+        <span>Introduction</span>
+        <h1>Build with context,<br />not guesswork.</h1>
+        <p>
+          Everything you need to connect your product, organize knowledge, and
+          ship a focused assistant for your users.
+        </p>
+        <div class="placeholder-lines" aria-hidden="true">
+          <i></i><i></i><i></i>
+        </div>
+      </article>
+    </main>
+
+    <!-- 独立入口模拟真实宿主网站；静态阶段默认展示完成态 Panel。 -->
+    <tada-ask-widget data-preview-state="completed"></tada-ask-widget>
+    <script type="module" src="/src/widget/main.ts"></script>
+  </body>
+</html>
