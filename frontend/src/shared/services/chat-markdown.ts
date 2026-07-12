@@ -18,6 +18,8 @@ export interface RenderChatMarkdownOptions {
   citationAriaLabel?: (citationId: number) => string;
   /** 流式阶段隐藏尚未闭合的 citation 尾部片段 */
   streaming?: boolean;
+  /** 移除当前 snapshot 不存在的 citation marker，仅供公开 Widget 使用。 */
+  stripUnknownCitationMarkers?: boolean;
 }
 
 /** markdown-it 渲染时的环境变量 */
@@ -116,7 +118,11 @@ export function renderChatMarkdown(
     options.streaming && citationIds.size > 0
       ? hideTrailingCitationFragment(content)
       : content;
-  const html = renderer.render(renderContent, {
+  // widget 侧只展示最多 4 个 citations, 多余跳过展示
+  const normalizedContent = options.stripUnknownCitationMarkers
+    ? stripUnknownCitationMarkers(renderContent, citationIds)
+    : renderContent;
+  const html = renderer.render(normalizedContent, {
     citationAriaLabel: options.citationAriaLabel,
     citationIds,
     copyCodeLabel: options.copyCodeLabel,
@@ -150,6 +156,16 @@ export function renderChatMarkdown(
       "video",
     ],
   });
+}
+
+/** Widget 最多公开四条来源，因此隐藏未进入展示集合的 marker。 */
+function stripUnknownCitationMarkers(
+  content: string,
+  citationIds: ReadonlySet<number>,
+): string {
+  return content.replace(/\[\[citation:([1-9]\d*)\]\]/g, (marker, rawId) =>
+    citationIds.has(Number(rawId)) ? marker : "",
+  );
 }
 
 /** 获取缓存的 MarkdownIt 实例，首次调用时初始化并配置插件 */

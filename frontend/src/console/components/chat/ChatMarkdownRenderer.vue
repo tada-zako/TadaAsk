@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 
-import { renderChatMarkdown } from "@/console/services/chat-markdown";
+import { renderChatMarkdown } from "@/shared/services/chat-markdown";
 import type { RAGSnapshotItem } from "@/console/services/chat";
 
 import "katex/dist/katex.min.css";
