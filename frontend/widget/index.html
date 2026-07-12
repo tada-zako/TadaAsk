@@ -33,8 +33,23 @@
       </article>
     </main>
 
-    <!-- 独立入口模拟真实宿主网站；静态阶段默认展示完成态 Panel。 -->
-    <tada-ask-widget data-preview-state="completed"></tada-ask-widget>
+    <!-- 开发预览通过环境变量连接本地 visitor API；默认仅显示 launcher。 -->
+    <tada-ask-widget id="tada-widget"></tada-ask-widget>
+    <script type="module">
+      const widget = document.querySelector("#tada-widget");
+      widget.setAttribute(
+        "api-base-url",
+        import.meta.env.VITE_WIDGET_PREVIEW_API_BASE_URL ?? "",
+      );
+      widget.setAttribute(
+        "project-uid",
+        import.meta.env.VITE_WIDGET_PREVIEW_PROJECT_UID ?? "",
+      );
+      widget.setAttribute(
+        "widget-uid",
+        import.meta.env.VITE_WIDGET_PREVIEW_WIDGET_UID ?? "",
+      );
+    </script>
     <script type="module" src="/src/widget/main.ts"></script>
   </body>
 </html>

@@ -1,5 +1,7 @@
 /* ===== Tailwind 配置：仅扫描 Widget 目录内文件 ===== */
 @import "tailwindcss" source(none);
+@import "katex/dist/katex.min.css";
+@import "../../shared/styles/chat-markdown.css";
 
 @source "../TadaAskWidget.ce.vue";
 @source "../components/**/*.vue";
@@ -139,7 +141,7 @@ svg {
   height: 42%;
 }
 
-:host([data-launcher-position="bottom-left"]) .widget-launcher {
+.launcher-bottom-left .widget-launcher {
   right: auto;
   left: max(var(--tada-widget-offset-x), env(safe-area-inset-left));
 }
@@ -149,14 +151,14 @@ svg {
   position: absolute;
   right: max(var(--tada-widget-offset-x), env(safe-area-inset-right));
   bottom: max(var(--tada-widget-offset-y), env(safe-area-inset-bottom));
-  display: none;
+  display: grid;
   width: min(
     var(--tada-widget-panel-width),
     var(--tada-widget-panel-max-width),
     calc(100dvw - 48px)
   );
   min-width: min(560px, calc(100dvw - 48px));
-  min-height: 560px;
+  min-height: min(var(--tada-widget-empty-height), calc(100dvh - 48px));
   max-height: min(var(--tada-widget-panel-max-height), calc(100dvh - 48px));
   grid-template-rows: 62px minmax(0, 1fr) 36px;
   overflow: hidden;
@@ -182,38 +184,20 @@ svg {
   max-height: calc(100% - 44px);
 }
 
-:host([data-panel-align="left"]) .widget-panel {
+.panel-left .widget-panel {
   right: auto;
   left: max(var(--tada-widget-offset-x), env(safe-area-inset-left));
 }
 
-:host([data-panel-align="center"]) .widget-panel {
+.panel-center .widget-panel {
   right: auto;
   left: 50%;
   transform: translateX(-50%);
 }
 
-:host([data-preview-state="empty"]) .widget-panel,
-:host([data-preview-state="completed"]) .widget-panel,
-:host([data-preview-state="sources"]) .widget-panel,
-:host([data-preview-state="streaming"]) .widget-panel {
-  display: grid;
-}
-
-:host([data-preview-state]:not([data-preview-state="launcher"]))
-  .widget-launcher {
-  display: none;
-}
-
-:host([data-preview-state="empty"]) .widget-panel {
+.widget-panel:has(.state-empty) {
   height: min(var(--tada-widget-empty-height), calc(100dvh - 48px));
   min-height: 0;
-}
-
-:host([data-preview-state="completed"]) .widget-panel,
-:host([data-preview-state="sources"]) .widget-panel,
-:host([data-preview-state="streaming"]) .widget-panel {
-  height: auto;
 }
 
 /* ===== 面板 header ===== */
@@ -243,6 +227,15 @@ svg {
   color: var(--tada-widget-accent);
   font-size: 14px;
   font-weight: 780;
+}
+
+.panel-logo-image {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border: 1px solid var(--tada-widget-border);
+  border-radius: 9px;
+  object-fit: cover;
 }
 
 .brand-custom {
@@ -293,16 +286,9 @@ svg {
 }
 
 .panel-state {
-  display: none;
+  display: block;
   height: 100%;
   min-height: 0;
-}
-
-:host([data-preview-state="empty"]) .state-empty,
-:host([data-preview-state="completed"]) .state-completed,
-:host([data-preview-state="sources"]) .state-sources,
-:host([data-preview-state="streaming"]) .state-streaming {
-  display: block;
 }
 
 .state-empty {
@@ -353,7 +339,6 @@ svg {
 }
 
 /* ===== 消息输入框（empty 内联 & dock 浮动共用） ===== */
-.empty-composer,
 .widget-composer {
   display: grid;
   overflow: hidden;
@@ -363,11 +348,10 @@ svg {
   box-shadow: 0 18px 54px rgb(0 0 0 / 0.2);
 }
 
-.empty-composer {
+.composer-compact {
   min-height: 112px;
 }
 
-.empty-composer textarea,
 .widget-composer textarea {
   width: 100%;
   resize: none;
@@ -379,30 +363,26 @@ svg {
   line-height: 1.55;
 }
 
-.empty-composer textarea {
+.composer-compact textarea {
   min-height: 66px;
   padding: 17px 19px 6px;
 }
 
-.empty-composer textarea::placeholder,
 .widget-composer textarea::placeholder {
   color: var(--tada-widget-faint);
 }
 
-.empty-composer > div,
 .composer-footer {
   @apply flex items-center justify-between gap-4;
   min-height: 44px;
   padding: 4px 10px 9px 17px;
 }
 
-.empty-composer > div > span,
 .composer-footer > span {
   color: var(--tada-widget-faint);
   font-size: 10.5px;
 }
 
-.empty-composer button,
 .composer-footer button {
   @apply grid size-[35px] shrink-0 place-items-center rounded-full;
   border: 0;
@@ -411,7 +391,6 @@ svg {
   cursor: pointer;
 }
 
-.empty-composer button svg,
 .composer-footer button svg {
   width: 16px;
   height: 16px;
@@ -453,10 +432,24 @@ svg {
 }
 
 .assistant-copy {
+  --text-body: var(--tada-widget-body);
+  --text-strong: var(--tada-widget-foreground);
+  --text-muted: var(--tada-widget-muted);
+  --text-faint: var(--tada-widget-faint);
+  --primary: var(--tada-widget-accent);
+  --line-soft: var(--tada-widget-border-soft);
+  --console-radius-sm: 6px;
+  --console-radius-lg: 11px;
   max-width: 94%;
   color: var(--tada-widget-body);
   font-size: 13.5px;
   line-height: 1.82;
+}
+
+.message-note {
+  margin-top: 8px !important;
+  color: var(--tada-widget-faint);
+  font-size: 10.5px;
 }
 
 .assistant-copy p,
@@ -528,6 +521,7 @@ svg {
   color: var(--tada-widget-muted);
   padding: 0 6px 0 0;
   font-size: 11px;
+  cursor: pointer;
 }
 
 .sources-toggle > span {
@@ -720,20 +714,13 @@ svg {
   padding: 14px 18px 5px;
 }
 
-.composer-streaming {
-  display: none;
-}
-
-:host([data-preview-state="streaming"]) .composer-normal {
-  display: none;
-}
-
-:host([data-preview-state="streaming"]) .composer-streaming {
-  display: grid;
-}
-
-.composer-streaming textarea:disabled {
+.widget-composer textarea:disabled {
   opacity: 0.58;
+}
+
+.widget-composer button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
 }
 
 .composer-footer .stop-button {
@@ -756,16 +743,9 @@ svg {
   font-size: 10.5px;
 }
 
-.panel-footer a {
+.panel-footer > div {
   @apply inline-flex items-center gap-1.5;
   color: inherit;
-  text-decoration: none;
-}
-
-.panel-footer a:hover,
-.panel-footer a:focus-visible {
-  color: var(--tada-widget-muted);
-  outline: none;
 }
 
 .panel-footer i {
@@ -776,6 +756,38 @@ svg {
   font-size: 9px;
   font-style: normal;
   font-weight: 800;
+}
+
+.widget-error {
+  position: absolute;
+  right: 18px;
+  bottom: 136px;
+  left: 18px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid color-mix(in srgb, #e97171 32%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tada-widget-raised) 94%, #e97171 6%);
+  color: var(--tada-widget-body);
+  padding: 9px 11px;
+  font-size: 11px;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.2);
+}
+
+.widget-error button {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--tada-widget-muted);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.mobile-dismiss-area {
+  display: none;
 }
 
 /* ===== 动画关键帧 ===== */
@@ -843,6 +855,18 @@ svg {
 
 /* ===== 响应式：小屏自动切换为底部 sheet 布局 ===== */
 @media (max-width: 640px) {
+  .panel-open .mobile-dismiss-area {
+    position: absolute;
+    inset: 0 0 auto;
+    display: block;
+    width: 100%;
+    height: 58px;
+    border: 0;
+    background: rgb(0 0 0 / 0.18);
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
   .widget-panel {
     right: 0;
     bottom: 0;
