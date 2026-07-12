@@ -1,37 +1,78 @@
 <script setup lang="ts">
-// 消息输入框，包含普通模式和流式生成中的停止模式
 import { ArrowUp, Square } from "@lucide/vue";
+
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string;
+    busy?: boolean;
+    cancelling?: boolean;
+    canSend?: boolean;
+    compact?: boolean;
+    placeholder?: string;
+  }>(),
+  {
+    modelValue: "",
+    busy: false,
+    cancelling: false,
+    canSend: false,
+    compact: false,
+    placeholder: "Ask anything…",
+  },
+);
+
+const emit = defineEmits<{
+  "update:modelValue": [value: string];
+  send: [];
+  cancel: [];
+}>();
+
+function handleInput(event: Event) {
+  emit("update:modelValue", (event.target as HTMLTextAreaElement).value);
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  event.preventDefault();
+  if (props.canSend) emit("send");
+}
 </script>
 
 <template>
-  <div class="composer-dock">
-    <!-- 普通输入模式 -->
-    <section
-      class="widget-composer composer-normal"
-      aria-label="Message composer"
-    >
-      <textarea aria-label="Message" placeholder="Ask a follow-up…"></textarea>
-      <div class="composer-footer">
-        <span>Enter to send · Shift + Enter for a new line</span>
-        <button type="button" aria-label="Send message">
-          <ArrowUp aria-hidden="true" />
-        </button>
-      </div>
-    </section>
-
-    <!-- 流式生成中：输入框禁用，显示停止按钮 -->
-    <section
-      class="widget-composer composer-streaming"
-      aria-label="Message composer"
-    >
-      <textarea aria-label="Message" disabled>
-RAG Snapshot 在流式回答中是怎样工作的？</textarea>
-      <div class="composer-footer">
-        <span>Generating a response…</span>
-        <button class="stop-button" type="button" aria-label="Stop generating">
-          <Square aria-hidden="true" />
-        </button>
-      </div>
-    </section>
-  </div>
+  <section
+    class="widget-composer"
+    :class="{ 'composer-compact': compact }"
+    aria-label="Message composer"
+  >
+    <textarea
+      aria-label="Message"
+      :value="modelValue"
+      :placeholder="placeholder"
+      :disabled="busy"
+      @input="handleInput"
+      @keydown="handleKeydown"
+    ></textarea>
+    <div class="composer-footer">
+      <span v-if="busy">Generating a response…</span>
+      <span v-else>Enter to send · Shift + Enter for a new line</span>
+      <button
+        v-if="busy"
+        class="stop-button"
+        type="button"
+        :disabled="cancelling"
+        :aria-label="cancelling ? 'Stopping generation' : 'Stop generating'"
+        @click="$emit('cancel')"
+      >
+        <Square aria-hidden="true" />
+      </button>
+      <button
+        v-else
+        type="button"
+        aria-label="Send message"
+        :disabled="!canSend"
+        @click="$emit('send')"
+      >
+        <ArrowUp aria-hidden="true" />
+      </button>
+    </div>
+  </section>
 </template>

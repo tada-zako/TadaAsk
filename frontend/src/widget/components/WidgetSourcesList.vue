@@ -1,77 +1,98 @@
 <script setup lang="ts">
-// 引用来源列表，展示回答所引用的文档和外部链接
 import { ExternalLink, FileText, Globe2 } from "@lucide/vue";
+
+import type { RAGSnapshotItem } from "../services/chat";
+
+defineProps<{
+  items: RAGSnapshotItem[];
+  activeCitationId?: number | null;
+}>();
+
+function safeWebUrl(value?: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// 从 citation 中提取 title
+function sourceTitle(item: RAGSnapshotItem) {
+  return (
+    item.title ||
+    item.filename ||
+    item.sourceName ||
+    `Source ${item.citationId}`
+  );
+}
+
+// 从 citation 提取 meta 数据
+function sourceMeta(item: RAGSnapshotItem) {
+  const parts = [item.sourceName];
+  if (item.sectionHeader) parts.push(item.sectionHeader);
+  if (item.pageNumber != null) parts.push(`Page ${item.pageNumber}`);
+  if (safeWebUrl(item.originUrl)) {
+    try {
+      parts.push(new URL(item.originUrl!).hostname);
+    } catch {
+      // URL 已通过协议检查，兜底保持 meta 可用
+    }
+  }
+  return parts.filter(Boolean).join(" · ");
+}
 </script>
 
 <template>
   <section class="sources-panel" aria-label="Sources">
     <header>
       <strong>Sources used in this answer</strong>
-      <span>4 references</span>
+      <span>{{ items.length }} references</span>
     </header>
 
-    <article class="source-row source-highlighted">
-      <span class="source-index">1</span>
-      <div class="source-main">
-        <div class="source-title">
-          <FileText aria-hidden="true" /><strong>widget-installation.md</strong>
+    <!-- citation list -->
+    <template v-for="item in items" :key="item.citationId">
+      <!-- web crawl source 的网页 page 引用 -->
+      <a
+        v-if="safeWebUrl(item.originUrl)"
+        class="source-row"
+        :class="{ 'source-highlighted': activeCitationId === item.citationId }"
+        :href="safeWebUrl(item.originUrl) ?? undefined"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span class="source-index">{{ item.citationId }}</span>
+        <div class="source-main">
+          <div class="source-title">
+            <Globe2 aria-hidden="true" /><strong>{{
+              sourceTitle(item)
+            }}</strong>
+          </div>
+          <p class="source-meta">{{ sourceMeta(item) }}</p>
         </div>
-        <p class="source-meta">Product docs · Installation · Local file</p>
-        <p class="source-excerpt">
-          Add the widget script to the shared layout so every generated page
-          loads the same assistant deployment.
-        </p>
-      </div>
-    </article>
+        <ExternalLink class="source-open" aria-hidden="true" />
+      </a>
 
-    <article class="source-row">
-      <span class="source-index">2</span>
-      <div class="source-main">
-        <div class="source-title">
-          <FileText aria-hidden="true" /><strong
-            >frontend-ui-scope-constraints.md</strong
-          >
+      <!-- local file source 的文件 citation -->
+      <article
+        v-else
+        class="source-row"
+        :class="{ 'source-highlighted': activeCitationId === item.citationId }"
+      >
+        <span class="source-index">{{ item.citationId }}</span>
+        <div class="source-main">
+          <div class="source-title">
+            <FileText aria-hidden="true" /><strong>{{
+              sourceTitle(item)
+            }}</strong>
+          </div>
+          <p v-if="sourceMeta(item)" class="source-meta">
+            {{ sourceMeta(item) }}
+          </p>
+          <p v-if="item.excerpt" class="source-excerpt">{{ item.excerpt }}</p>
         </div>
-        <p class="source-meta">Frontend notes · Widget CSS boundary · Page 6</p>
-        <p class="source-excerpt">
-          Widget styling is exposed through controlled semantic tokens while
-          message rendering and interaction remain internal.
-        </p>
-      </div>
-    </article>
-
-    <a
-      class="source-row"
-      href="https://example.com/docs/deploy"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      <span class="source-index">3</span>
-      <div class="source-main">
-        <div class="source-title">
-          <Globe2 aria-hidden="true" /><strong
-            >Deploying on a static site</strong
-          >
-        </div>
-        <p class="source-meta">docs.arcfield.dev · External page</p>
-      </div>
-      <ExternalLink class="source-open" aria-hidden="true" />
-    </a>
-
-    <a
-      class="source-row"
-      href="https://developer.mozilla.org/"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      <span class="source-index">4</span>
-      <div class="source-main">
-        <div class="source-title">
-          <Globe2 aria-hidden="true" /><strong>CSS custom properties</strong>
-        </div>
-        <p class="source-meta">developer.mozilla.org · External page</p>
-      </div>
-      <ExternalLink class="source-open" aria-hidden="true" />
-    </a>
+      </article>
+    </template>
   </section>
 </template>

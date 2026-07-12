@@ -1,13 +1,22 @@
 <script setup lang="ts">
-// 浮动启动按钮，点击后展开 Widget 面板
 import { MessageSquareText } from "@lucide/vue";
+
+withDefaults(
+  defineProps<{
+    label?: string;
+  }>(),
+  { label: "Open TadaAsk Assistant" },
+);
+
+defineEmits<{ open: [] }>();
 </script>
 
 <template>
   <button
     class="widget-launcher"
     type="button"
-    aria-label="Open TadaAsk Assistant"
+    :aria-label="label"
+    @click="$emit('open')"
   >
     <MessageSquareText aria-hidden="true" />
   </button>
