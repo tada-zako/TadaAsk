@@ -1,0 +1,895 @@
+/* ===== Tailwind 配置：仅扫描 Widget 目录内文件 ===== */
+@import "tailwindcss" source(none);
+
+@source "../TadaAskWidget.ce.vue";
+@source "../components/**/*.vue";
+
+/* 将 CSS 变量映射为 Tailwind theme token，方便在 class 中通过 text-widget-xxx 等方式引用 */
+@theme inline {
+  --color-widget-background: var(--tada-widget-background);
+  --color-widget-surface: var(--tada-widget-surface);
+  --color-widget-raised: var(--tada-widget-raised);
+  --color-widget-foreground: var(--tada-widget-foreground);
+  --color-widget-body: var(--tada-widget-body);
+  --color-widget-muted: var(--tada-widget-muted);
+  --color-widget-faint: var(--tada-widget-faint);
+  --color-widget-border: var(--tada-widget-border);
+  --color-widget-accent: var(--tada-widget-accent);
+  --color-widget-accent-foreground: var(--tada-widget-accent-foreground);
+}
+
+/* ===== :host 默认主题（暗色） ===== */
+:host {
+  --tada-widget-background: #090a0b;
+  --tada-widget-surface: #111316;
+  --tada-widget-raised: #181b1f;
+  --tada-widget-user: #1c2024;
+  --tada-widget-foreground: #f4f5f3;
+  --tada-widget-body: #d2d4d5;
+  --tada-widget-muted: #92979e;
+  --tada-widget-faint: #626870;
+  --tada-widget-border: rgb(255 255 255 / 0.09);
+  --tada-widget-border-soft: rgb(255 255 255 / 0.06);
+  --tada-widget-accent: #24d3c4;
+  --tada-widget-accent-foreground: #031110;
+  --tada-widget-accent-soft: rgb(36 211 196 / 0.1);
+  --tada-widget-panel-width: 70vw;
+  --tada-widget-panel-max-width: 980px;
+  --tada-widget-panel-max-height: 700px;
+  --tada-widget-empty-height: 430px;
+  --tada-widget-launcher-size: 56px;
+  --tada-widget-offset-x: 24px;
+  --tada-widget-offset-y: 24px;
+  --tada-widget-z-index: 2147483000;
+  --tada-widget-font:
+    "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+
+  color-scheme: dark;
+  font-family: var(--tada-widget-font);
+}
+
+/* ===== 自定义主题变体（浅色） ===== */
+:host([data-preview-theme="custom"]) {
+  --tada-widget-background: #f4f0e8;
+  --tada-widget-surface: #f9f6f0;
+  --tada-widget-raised: #fffdf8;
+  --tada-widget-user: #e8e1d6;
+  --tada-widget-foreground: #272420;
+  --tada-widget-body: #45413c;
+  --tada-widget-muted: #716b63;
+  --tada-widget-faint: #989087;
+  --tada-widget-border: rgb(66 55 43 / 0.16);
+  --tada-widget-border-soft: rgb(66 55 43 / 0.1);
+  --tada-widget-accent: #b74d35;
+  --tada-widget-accent-foreground: #fffaf5;
+  --tada-widget-accent-soft: rgb(183 77 53 / 0.1);
+  color-scheme: light;
+}
+
+/* ===== 全局 reset ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+svg {
+  display: block;
+}
+
+/* ===== 根容器：固定定位覆盖视口，pointer-events: none 透传非 Widget 区域点击 ===== */
+.widget-root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--tada-widget-z-index);
+  pointer-events: none;
+}
+
+:host([data-preview]) {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+:host([data-preview]) .widget-root {
+  position: absolute;
+}
+
+/* ===== 浮动启动按钮 ===== */
+.widget-launcher {
+  position: absolute;
+  right: max(var(--tada-widget-offset-x), env(safe-area-inset-right));
+  bottom: max(var(--tada-widget-offset-y), env(safe-area-inset-bottom));
+  display: grid;
+  width: clamp(48px, var(--tada-widget-launcher-size), 64px);
+  height: clamp(48px, var(--tada-widget-launcher-size), 64px);
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 999px;
+  background: var(--tada-widget-accent);
+  color: var(--tada-widget-accent-foreground);
+  box-shadow: 0 13px 34px rgb(14 42 42 / 0.28);
+  pointer-events: auto;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.widget-launcher:hover,
+.widget-launcher:focus-visible {
+  outline: none;
+  transform: translateY(-2px) scale(1.025);
+  box-shadow:
+    0 17px 40px rgb(14 42 42 / 0.34),
+    0 0 0 4px var(--tada-widget-accent-soft);
+}
+
+.widget-launcher svg {
+  width: 42%;
+  height: 42%;
+}
+
+:host([data-launcher-position="bottom-left"]) .widget-launcher {
+  right: auto;
+  left: max(var(--tada-widget-offset-x), env(safe-area-inset-left));
+}
+
+/* ===== 主面板：grid 布局，header / content / footer 三段 ===== */
+.widget-panel {
+  position: absolute;
+  right: max(var(--tada-widget-offset-x), env(safe-area-inset-right));
+  bottom: max(var(--tada-widget-offset-y), env(safe-area-inset-bottom));
+  display: none;
+  width: min(
+    var(--tada-widget-panel-width),
+    var(--tada-widget-panel-max-width),
+    calc(100dvw - 48px)
+  );
+  min-width: min(560px, calc(100dvw - 48px));
+  min-height: 560px;
+  max-height: min(var(--tada-widget-panel-max-height), calc(100dvh - 48px));
+  grid-template-rows: 62px minmax(0, 1fr) 36px;
+  overflow: hidden;
+  border: 1px solid var(--tada-widget-border);
+  border-radius: 18px;
+  background:
+    radial-gradient(
+      circle at 82% -15%,
+      color-mix(in srgb, var(--tada-widget-accent) 6%, transparent),
+      transparent 26rem
+    ),
+    var(--tada-widget-background);
+  color: var(--tada-widget-foreground);
+  box-shadow:
+    0 34px 100px rgb(0 0 0 / 0.56),
+    0 0 0 1px rgb(255 255 255 / 0.025);
+  pointer-events: auto;
+}
+
+:host([data-preview]) .widget-panel {
+  width: min(var(--tada-widget-panel-max-width), calc(100% - 170px));
+  min-width: 0;
+  max-height: calc(100% - 44px);
+}
+
+:host([data-panel-align="left"]) .widget-panel {
+  right: auto;
+  left: max(var(--tada-widget-offset-x), env(safe-area-inset-left));
+}
+
+:host([data-panel-align="center"]) .widget-panel {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+:host([data-preview-state="empty"]) .widget-panel,
+:host([data-preview-state="completed"]) .widget-panel,
+:host([data-preview-state="sources"]) .widget-panel,
+:host([data-preview-state="streaming"]) .widget-panel {
+  display: grid;
+}
+
+:host([data-preview-state]:not([data-preview-state="launcher"]))
+  .widget-launcher {
+  display: none;
+}
+
+:host([data-preview-state="empty"]) .widget-panel {
+  height: min(var(--tada-widget-empty-height), calc(100dvh - 48px));
+  min-height: 0;
+}
+
+:host([data-preview-state="completed"]) .widget-panel,
+:host([data-preview-state="sources"]) .widget-panel,
+:host([data-preview-state="streaming"]) .widget-panel {
+  height: auto;
+}
+
+/* ===== 面板 header ===== */
+.panel-header {
+  @apply flex items-center justify-between gap-4;
+  border-bottom: 1px solid var(--tada-widget-border-soft);
+  padding: 0 17px 0 19px;
+}
+
+.panel-brand {
+  @apply flex min-w-0 items-center gap-2.5;
+}
+
+.panel-brand strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-logo {
+  @apply grid size-[30px] shrink-0 place-items-center;
+  border: 1px solid var(--tada-widget-border);
+  border-radius: 9px;
+  background: var(--tada-widget-surface);
+  color: var(--tada-widget-accent);
+  font-size: 14px;
+  font-weight: 780;
+}
+
+.brand-custom {
+  display: none;
+}
+
+:host([data-preview-theme="custom"]) .brand-default {
+  display: none;
+}
+
+:host([data-preview-theme="custom"]) .brand-custom {
+  display: grid;
+}
+
+:host([data-preview-theme="custom"]) strong.brand-custom {
+  display: block;
+}
+
+.panel-actions {
+  @apply flex items-center gap-1;
+}
+
+.panel-actions button {
+  @apply grid size-[34px] place-items-center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--tada-widget-muted);
+  cursor: pointer;
+}
+
+.panel-actions button:hover,
+.panel-actions button:focus-visible {
+  background: var(--tada-widget-raised);
+  color: var(--tada-widget-foreground);
+  outline: none;
+}
+
+.panel-actions svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ===== 面板内容区 ===== */
+.panel-content {
+  position: relative;
+  min-height: 0;
+}
+
+.panel-state {
+  display: none;
+  height: 100%;
+  min-height: 0;
+}
+
+:host([data-preview-state="empty"]) .state-empty,
+:host([data-preview-state="completed"]) .state-completed,
+:host([data-preview-state="sources"]) .state-sources,
+:host([data-preview-state="streaming"]) .state-streaming {
+  display: block;
+}
+
+.state-empty {
+  padding: 26px 48px 36px;
+}
+
+.empty-center {
+  display: grid;
+  width: min(690px, 100%);
+  height: 100%;
+  align-content: center;
+  gap: 25px;
+  margin: 0 auto;
+}
+
+.empty-welcome {
+  @apply grid justify-items-center gap-2 text-center;
+}
+
+.empty-welcome > span {
+  @apply mb-1 grid size-11 place-items-center;
+  border: 1px solid
+    color-mix(in srgb, var(--tada-widget-accent) 20%, transparent);
+  border-radius: 14px;
+  background: var(--tada-widget-accent-soft);
+  color: var(--tada-widget-accent);
+}
+
+.empty-welcome svg {
+  width: 21px;
+  height: 21px;
+}
+
+.empty-welcome h2,
+.empty-welcome p {
+  margin: 0;
+}
+
+.empty-welcome h2 {
+  font-size: 24px;
+  font-weight: 690;
+  letter-spacing: -0.035em;
+}
+
+.empty-welcome p {
+  color: var(--tada-widget-muted);
+  font-size: 13px;
+}
+
+/* ===== 消息输入框（empty 内联 & dock 浮动共用） ===== */
+.empty-composer,
+.widget-composer {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--tada-widget-border);
+  border-radius: 18px;
+  background: var(--tada-widget-raised);
+  box-shadow: 0 18px 54px rgb(0 0 0 / 0.2);
+}
+
+.empty-composer {
+  min-height: 112px;
+}
+
+.empty-composer textarea,
+.widget-composer textarea {
+  width: 100%;
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--tada-widget-foreground);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.empty-composer textarea {
+  min-height: 66px;
+  padding: 17px 19px 6px;
+}
+
+.empty-composer textarea::placeholder,
+.widget-composer textarea::placeholder {
+  color: var(--tada-widget-faint);
+}
+
+.empty-composer > div,
+.composer-footer {
+  @apply flex items-center justify-between gap-4;
+  min-height: 44px;
+  padding: 4px 10px 9px 17px;
+}
+
+.empty-composer > div > span,
+.composer-footer > span {
+  color: var(--tada-widget-faint);
+  font-size: 10.5px;
+}
+
+.empty-composer button,
+.composer-footer button {
+  @apply grid size-[35px] shrink-0 place-items-center rounded-full;
+  border: 0;
+  background: var(--tada-widget-accent);
+  color: var(--tada-widget-accent-foreground);
+  cursor: pointer;
+}
+
+.empty-composer button svg,
+.composer-footer button svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ===== 消息列表 ===== */
+.messages-scroll {
+  overflow: auto;
+  scrollbar-color: var(--tada-widget-border) transparent;
+  scrollbar-width: thin;
+  padding: 31px 0 150px;
+}
+
+.messages-list {
+  display: grid;
+  width: min(760px, calc(100% - 64px));
+  gap: 25px;
+  margin: 0 auto;
+}
+
+.message {
+  display: grid;
+  gap: 8px;
+}
+
+.message-user {
+  max-width: 72%;
+  justify-self: end;
+}
+
+.message-user > div {
+  border: 1px solid var(--tada-widget-border-soft);
+  border-radius: 18px 18px 5px 18px;
+  background: var(--tada-widget-user);
+  color: var(--tada-widget-foreground);
+  padding: 9px 13px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.assistant-copy {
+  max-width: 94%;
+  color: var(--tada-widget-body);
+  font-size: 13.5px;
+  line-height: 1.82;
+}
+
+.assistant-copy p,
+.assistant-copy h3 {
+  margin: 0;
+}
+
+.assistant-copy p + p {
+  margin-top: 12px;
+}
+
+.assistant-copy h3 {
+  margin-top: 17px;
+  margin-bottom: 7px;
+  color: var(--tada-widget-foreground);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.assistant-copy ul {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 12px;
+  padding-left: 20px;
+}
+
+.assistant-copy li::marker {
+  color: var(--tada-widget-faint);
+}
+
+.assistant-copy code {
+  border: 1px solid var(--tada-widget-border-soft);
+  border-radius: 5px;
+  background: color-mix(
+    in srgb,
+    var(--tada-widget-foreground) 4.5%,
+    transparent
+  );
+  color: var(--tada-widget-foreground);
+  font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  font-size: 0.88em;
+  padding: 1px 5px;
+}
+
+/* ===== 引用标记（inline citation badge） ===== */
+.citation-token {
+  display: inline-grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  margin: 0 2px;
+  border: 1px solid
+    color-mix(in srgb, var(--tada-widget-accent) 25%, transparent);
+  border-radius: 999px;
+  background: var(--tada-widget-accent-soft);
+  color: var(--tada-widget-accent);
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1;
+  vertical-align: 0.12em;
+  cursor: pointer;
+}
+
+.sources-toggle {
+  @apply inline-flex w-fit items-center gap-2;
+  min-height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--tada-widget-muted);
+  padding: 0 6px 0 0;
+  font-size: 11px;
+}
+
+.sources-toggle > span {
+  @apply grid size-5 place-items-center rounded-full;
+  background: var(--tada-widget-accent-soft);
+  color: var(--tada-widget-accent);
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.sources-toggle svg {
+  width: 13px;
+  height: 13px;
+  color: var(--tada-widget-faint);
+}
+
+.sources-messages {
+  gap: 17px;
+}
+
+/* ===== 来源引用面板 ===== */
+.sources-panel {
+  overflow: hidden;
+  width: min(700px, 100%);
+  border: 1px solid var(--tada-widget-border-soft);
+  border-radius: 11px;
+  background: color-mix(
+    in srgb,
+    var(--tada-widget-foreground) 1.8%,
+    transparent
+  );
+}
+
+.sources-panel > header {
+  @apply flex items-center justify-between;
+  min-height: 40px;
+  border-bottom: 1px solid var(--tada-widget-border-soft);
+  padding: 0 13px;
+}
+
+.sources-panel > header strong {
+  color: var(--tada-widget-body);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.sources-panel > header span {
+  color: var(--tada-widget-faint);
+  font-size: 10px;
+}
+
+.source-row {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  color: inherit;
+  padding: 11px 13px;
+  text-decoration: none;
+}
+
+.source-row + .source-row {
+  border-top: 1px solid var(--tada-widget-border-soft);
+}
+
+.source-highlighted {
+  background: color-mix(in srgb, var(--tada-widget-accent) 6.5%, transparent);
+  box-shadow: inset 2px 0 var(--tada-widget-accent);
+}
+
+.source-index {
+  @apply grid size-[23px] place-items-center rounded-full;
+  border: 1px solid var(--tada-widget-border);
+  color: var(--tada-widget-muted);
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.source-highlighted .source-index {
+  border-color: color-mix(in srgb, var(--tada-widget-accent) 28%, transparent);
+  background: var(--tada-widget-accent-soft);
+  color: var(--tada-widget-accent);
+}
+
+.source-main {
+  min-width: 0;
+}
+
+.source-title {
+  @apply flex min-w-0 items-center gap-2;
+}
+
+.source-title svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--tada-widget-faint);
+}
+
+.source-title strong {
+  overflow: hidden;
+  color: var(--tada-widget-foreground);
+  font-size: 11.5px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-meta,
+.source-excerpt {
+  margin: 0;
+}
+
+.source-meta {
+  margin-top: 4px;
+  color: var(--tada-widget-faint);
+  font-size: 9.5px;
+}
+
+.source-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 6px;
+  color: var(--tada-widget-muted);
+  font-size: 10.5px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.source-open {
+  width: 13px;
+  height: 13px;
+  margin: 5px;
+  color: var(--tada-widget-faint);
+}
+
+/* ===== 流式状态指示器 ===== */
+.stream-status {
+  @apply inline-flex items-center gap-2;
+  color: var(--tada-widget-faint);
+  font-size: 11px;
+}
+
+.stream-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--tada-widget-accent);
+  box-shadow: 0 0 0 4px var(--tada-widget-accent-soft);
+  animation: widget-breathe 1.45s ease-in-out infinite;
+}
+
+.typing-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 3px;
+  background: var(--tada-widget-accent);
+  vertical-align: -0.15em;
+  animation: widget-blink 900ms steps(1) infinite;
+}
+
+/* ===== 输入框浮动停靠区：渐变遮罩 + pointer-events 隔离 ===== */
+.composer-dock {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  background: linear-gradient(
+    to top,
+    var(--tada-widget-background) 38%,
+    color-mix(in srgb, var(--tada-widget-background) 90%, transparent) 70%,
+    transparent
+  );
+  pointer-events: none;
+  padding: 52px 0 17px;
+}
+
+.widget-composer {
+  width: min(760px, calc(100% - 64px));
+  min-height: 102px;
+  margin: 0 auto;
+  pointer-events: auto;
+}
+
+.widget-composer textarea {
+  min-height: 57px;
+  padding: 14px 18px 5px;
+}
+
+.composer-streaming {
+  display: none;
+}
+
+:host([data-preview-state="streaming"]) .composer-normal {
+  display: none;
+}
+
+:host([data-preview-state="streaming"]) .composer-streaming {
+  display: grid;
+}
+
+.composer-streaming textarea:disabled {
+  opacity: 0.58;
+}
+
+.composer-footer .stop-button {
+  background: color-mix(in srgb, var(--tada-widget-foreground) 8%, transparent);
+  color: var(--tada-widget-foreground);
+}
+
+.composer-footer .stop-button svg {
+  width: 10px;
+  height: 10px;
+  fill: currentcolor;
+}
+
+/* ===== 面板 footer ===== */
+.panel-footer {
+  @apply flex min-w-0 items-center;
+  border-top: 1px solid var(--tada-widget-border-soft);
+  padding: 0 17px;
+  color: var(--tada-widget-faint);
+  font-size: 10.5px;
+}
+
+.panel-footer a {
+  @apply inline-flex items-center gap-1.5;
+  color: inherit;
+  text-decoration: none;
+}
+
+.panel-footer a:hover,
+.panel-footer a:focus-visible {
+  color: var(--tada-widget-muted);
+  outline: none;
+}
+
+.panel-footer i {
+  @apply grid size-4 place-items-center;
+  border-radius: 5px;
+  background: var(--tada-widget-faint);
+  color: var(--tada-widget-background);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+/* ===== 动画关键帧 ===== */
+@keyframes widget-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes widget-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ===== 移动端布局 ===== */
+:host([data-preview-layout="mobile"]) .widget-panel {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  height: calc(100% - 58px);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 18px 18px 0 0;
+  grid-template-rows: 58px minmax(0, 1fr) 34px;
+  transform: none;
+}
+
+:host([data-preview-layout="mobile"]) .messages-list,
+:host([data-preview-layout="mobile"]) .widget-composer {
+  width: calc(100% - 28px);
+}
+
+:host([data-preview-layout="mobile"]) .messages-scroll {
+  padding-top: 22px;
+  padding-bottom: 138px;
+}
+
+:host([data-preview-layout="mobile"]) .message-user {
+  max-width: 82%;
+}
+
+:host([data-preview-layout="mobile"]) .assistant-copy {
+  max-width: 100%;
+  font-size: 13px;
+}
+
+:host([data-preview-layout="mobile"]) .composer-footer > span {
+  display: none;
+}
+
+/* ===== 响应式：小屏自动切换为底部 sheet 布局 ===== */
+@media (max-width: 640px) {
+  .widget-panel {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    height: calc(100dvh - 58px) !important;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 18px 18px 0 0;
+    grid-template-rows: 58px minmax(0, 1fr) 34px;
+    transform: none;
+  }
+
+  .messages-list,
+  .widget-composer {
+    width: calc(100% - 28px);
+  }
+
+  .messages-scroll {
+    padding-top: 22px;
+    padding-bottom: 138px;
+  }
+
+  .message-user {
+    max-width: 82%;
+  }
+
+  .state-empty {
+    padding-inline: 18px;
+  }
+
+  .composer-footer > span {
+    display: none;
+  }
+}
+
+/* ===== 无障碍：尊重用户 reduced-motion 偏好 ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
