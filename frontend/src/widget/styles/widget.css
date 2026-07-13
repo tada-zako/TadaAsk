@@ -313,7 +313,6 @@ svg {
   border: 1px solid
     color-mix(in srgb, var(--tada-widget-accent) 20%, transparent);
   border-radius: 14px;
-  background: var(--tada-widget-accent-soft);
   color: var(--tada-widget-accent);
 }
 
@@ -353,7 +352,8 @@ svg {
 }
 
 .widget-composer textarea {
-  width: 100%;
+  width: calc(100% - 8px);
+  margin-right: 8px;
   resize: none;
   border: 0;
   outline: 0;
@@ -364,6 +364,7 @@ svg {
   scrollbar-color: color-mix(in srgb, var(--tada-widget-muted) 36%, transparent)
     transparent;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
 }
 
 .widget-composer textarea::-webkit-scrollbar {
@@ -372,6 +373,7 @@ svg {
 
 .widget-composer textarea::-webkit-scrollbar-track {
   background: transparent;
+  margin-block: 9px 3px;
 }
 
 .widget-composer textarea::-webkit-scrollbar-thumb {
@@ -404,6 +406,7 @@ svg {
 .composer-footer > span {
   color: var(--tada-widget-faint);
   font-size: 10.5px;
+  transform: translateY(2px);
 }
 
 .composer-footer button {
@@ -539,12 +542,29 @@ svg {
 .sources-toggle {
   @apply inline-flex w-fit items-center gap-2;
   min-height: 30px;
-  border: 0;
-  background: transparent;
+  border: 1px solid var(--tada-widget-border-soft);
+  border-radius: 999px;
+  background: color-mix(
+    in srgb,
+    var(--tada-widget-foreground) 4.5%,
+    transparent
+  );
   color: var(--tada-widget-muted);
-  padding: 0 6px 0 0;
+  padding: 0 9px 0 6px;
   font-size: 11px;
   cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.sources-toggle:hover,
+.sources-toggle:focus-visible {
+  border-color: var(--tada-widget-border);
+  background: color-mix(in srgb, var(--tada-widget-foreground) 7%, transparent);
+  color: var(--tada-widget-foreground);
+  outline: none;
 }
 
 .sources-toggle > span {
@@ -604,6 +624,9 @@ svg {
   color: inherit;
   padding: 11px 13px;
   text-decoration: none;
+  transition:
+    background-color 220ms ease,
+    box-shadow 220ms ease;
 }
 
 .source-row + .source-row {
@@ -735,10 +758,6 @@ svg {
 .widget-composer textarea {
   min-height: 57px;
   padding: 14px 18px 5px;
-}
-
-.widget-composer textarea:disabled {
-  opacity: 0.58;
 }
 
 .widget-composer button:disabled {
