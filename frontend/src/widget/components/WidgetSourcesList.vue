@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ExternalLink, FileText, Globe2 } from "@lucide/vue";
 
-import type { RAGSnapshotItem } from "../services/chat";
+import type { WidgetCitationItem } from "../services/chat";
 
 defineProps<{
-  items: RAGSnapshotItem[];
+  items: WidgetCitationItem[];
   activeCitationId?: number | null;
 }>();
 
@@ -19,17 +19,14 @@ function safeWebUrl(value?: string | null): string | null {
 }
 
 // 从 citation 中提取 title
-function sourceTitle(item: RAGSnapshotItem) {
+function sourceTitle(item: WidgetCitationItem) {
   return (
-    item.title ||
-    item.filename ||
-    item.sourceName ||
-    `Source ${item.citationId}`
+    item.title || item.filename || item.sourceName || `Source ${item.displayId}`
   );
 }
 
 // 从 citation 提取 meta 数据
-function sourceMeta(item: RAGSnapshotItem) {
+function sourceMeta(item: WidgetCitationItem) {
   const parts = [item.sourceName];
   if (item.sectionHeader) parts.push(item.sectionHeader);
   if (item.pageNumber != null) parts.push(`Page ${item.pageNumber}`);
@@ -57,12 +54,13 @@ function sourceMeta(item: RAGSnapshotItem) {
       <a
         v-if="safeWebUrl(item.originUrl)"
         class="source-row"
+        :data-source-citation-id="item.citationId"
         :class="{ 'source-highlighted': activeCitationId === item.citationId }"
         :href="safeWebUrl(item.originUrl) ?? undefined"
         target="_blank"
         rel="noopener noreferrer"
       >
-        <span class="source-index">{{ item.citationId }}</span>
+        <span class="source-index">{{ item.displayId }}</span>
         <div class="source-main">
           <div class="source-title">
             <Globe2 aria-hidden="true" /><strong>{{
@@ -78,9 +76,10 @@ function sourceMeta(item: RAGSnapshotItem) {
       <article
         v-else
         class="source-row"
+        :data-source-citation-id="item.citationId"
         :class="{ 'source-highlighted': activeCitationId === item.citationId }"
       >
-        <span class="source-index">{{ item.citationId }}</span>
+        <span class="source-index">{{ item.displayId }}</span>
         <div class="source-main">
           <div class="source-title">
             <FileText aria-hidden="true" /><strong>{{

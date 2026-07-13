@@ -194,6 +194,9 @@ function isMessageCancelled(messageUid: string) {
 
 /** citation bottom 点击事件 */
 function openCitation(messageUid: string, citationId: number) {
+  const message = messages.value.find((item) => item.uid === messageUid);
+  if (!message?.sourcesReady) return;
+
   activeCitationId.value = citationId;
   citationSheetMessageUid.value = messageUid;
 }
@@ -564,7 +567,10 @@ onBeforeUnmount(() => {
                   @open-citation="openCitation(message.uid, $event)"
                 />
               </div>
-              <div v-if="message.citationCount > 0" class="flex">
+              <div
+                v-if="message.sourcesReady && message.citationCount > 0"
+                class="flex"
+              >
                 <ChatCitationsSheet
                   :active-citation-id="
                     citationSheetMessageUid === message.uid

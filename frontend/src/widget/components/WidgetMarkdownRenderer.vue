@@ -2,13 +2,13 @@
 import { computed, onBeforeUnmount } from "vue";
 
 import { renderChatMarkdown } from "@/shared/services/chat-markdown";
-import type { RAGSnapshotItem } from "../services/chat";
+import type { WidgetCitationItem } from "../services/chat";
 
 const props = withDefaults(
   defineProps<{
     content?: string;
     streaming?: boolean;
-    citationItems?: RAGSnapshotItem[];
+    citationItems?: WidgetCitationItem[];
   }>(),
   { content: "", streaming: false, citationItems: () => [] },
 );
@@ -19,11 +19,20 @@ const emit = defineEmits<{ openCitation: [citationId: number] }>();
 let resetTimer: ReturnType<typeof setTimeout> | null = null;
 let copiedButton: HTMLButtonElement | null = null;
 
+const displayIdByCitationId = computed(
+  () =>
+    new Map(
+      props.citationItems.map((item) => [item.citationId, item.displayId]),
+    ),
+);
+
 // 将 content 通过共享渲染管道转为安全 HTML，同步传入当前可用的 citation id 集合
 const renderedHtml = computed(() =>
   renderChatMarkdown(props.content, {
     citationIds: props.citationItems.map((item) => item.citationId),
-    citationAriaLabel: (id) => `Open citation ${id}`,
+    citationAriaLabel: (id) =>
+      `Open citation ${displayIdByCitationId.value.get(id) ?? id}`,
+    citationLabel: (id) => displayIdByCitationId.value.get(id) ?? id,
     copyCodeLabel: "Copy",
     streaming: props.streaming,
     stripUnknownCitationMarkers: true,
