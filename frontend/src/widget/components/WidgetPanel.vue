@@ -38,6 +38,8 @@ const emit = defineEmits<{
 }>();
 
 const scrollContainer = ref<HTMLElement | null>(null);
+const emptyComposerRef = ref<InstanceType<typeof WidgetComposer> | null>(null);
+const dockComposerRef = ref<InstanceType<typeof WidgetComposer> | null>(null);
 const followsOutput = ref(true);
 const BOTTOM_THRESHOLD = 72;
 
@@ -82,6 +84,18 @@ const busyPhases: WidgetChatPhase[] = [
   "streaming",
   "cancelling",
 ];
+
+/** 聚焦当前实际渲染的 composer，避免 v-if 切换后焦点落到宿主页面。 */
+async function focusComposer() {
+  await nextTick();
+  const composer = props.messages.length
+    ? dockComposerRef.value
+    : emptyComposerRef.value;
+  composer?.focus({ preventScroll: true });
+}
+
+// 继续向上传递 composer.textarea 的聚焦操作
+defineExpose({ focusComposer });
 </script>
 
 <template>
@@ -131,6 +145,7 @@ const busyPhases: WidgetChatPhase[] = [
               <p>Ask a question about this site.</p>
             </div>
             <WidgetComposer
+              ref="emptyComposerRef"
               compact
               :model-value="draft"
               :placeholder="placeholder"
@@ -165,6 +180,7 @@ const busyPhases: WidgetChatPhase[] = [
 
         <div v-if="messages.length" class="composer-dock">
           <WidgetComposer
+            ref="dockComposerRef"
             :model-value="draft"
             :placeholder="placeholder"
             :busy="busyPhases.includes(phase)"

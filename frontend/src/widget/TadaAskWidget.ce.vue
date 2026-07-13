@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, toRef } from "vue";
+import { nextTick, ref, toRef } from "vue";
 
 import { useWidgetChat } from "./composables/use-widget-chat";
 import WidgetLauncher from "./components/WidgetLauncher.vue";
@@ -31,11 +31,35 @@ const props = withDefaults(
 
 // Panel 显隐不影响 chat composable，关闭时 SSE 仍会继续消费。
 const isOpen = ref(false);
+const panelRef = ref<InstanceType<typeof WidgetPanel> | null>(null);
 const chat = useWidgetChat({
   apiBaseUrl: toRef(props, "apiBaseUrl"),
   projectUid: toRef(props, "projectUid"),
   widgetUid: toRef(props, "widgetUid"),
 });
+
+async function focusComposer() {
+  await nextTick();
+  await panelRef.value?.focusComposer();
+}
+
+/** 打开 chat panel 后立即将用户光标聚焦于 composer */
+function openPanel() {
+  isOpen.value = true;
+  void focusComposer();
+}
+
+function startNewChat() {
+  chat.startNewChat();
+  // 获取光标焦点
+  void focusComposer();
+}
+
+function sendMessage() {
+  // 乐观消息会在首次 await 前同步插入，下一帧即可聚焦 dock composer。
+  void chat.sendMessage();
+  void focusComposer();
+}
 </script>
 
 <template>
@@ -50,9 +74,10 @@ const chat = useWidgetChat({
     <WidgetLauncher
       v-show="!isOpen"
       :label="`Open ${title}`"
-      @open="isOpen = true"
+      @open="openPanel"
     />
     <WidgetPanel
+      ref="panelRef"
       v-show="isOpen"
       :title="title"
       :logo-url="logoUrl"
@@ -64,8 +89,8 @@ const chat = useWidgetChat({
       :error-message="chat.errorMessage.value"
       @update:draft="chat.draft.value = $event"
       @close="isOpen = false"
-      @new-chat="chat.startNewChat"
-      @send="chat.sendMessage"
+      @new-chat="startNewChat"
+      @send="sendMessage"
       @cancel="chat.cancelGeneration"
       @dismiss-error="chat.dismissError"
     />

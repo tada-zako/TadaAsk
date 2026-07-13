@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ArrowUp, Square } from "@lucide/vue";
+import { ref } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -26,15 +27,27 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 
+const textareaRef = ref<HTMLTextAreaElement | null>(null);
+
 function handleInput(event: Event) {
   emit("update:modelValue", (event.target as HTMLTextAreaElement).value);
 }
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  // 生成中不可发送，但 Enter 仍应保留为普通换行输入。
+  if (!props.canSend) return;
   event.preventDefault();
-  if (props.canSend) emit("send");
+  emit("send");
 }
+
+function focus(options: FocusOptions = { preventScroll: true }) {
+  textareaRef.value?.focus(options);
+}
+
+// 将子组件中的 focus 方法暴露给父组件，
+// 允许父组件调用 composer 内部的 textarea 的 focus 方法
+defineExpose({ focus });
 </script>
 
 <template>
@@ -44,10 +57,11 @@ function handleKeydown(event: KeyboardEvent) {
     aria-label="Message composer"
   >
     <textarea
+      ref="textareaRef"
       aria-label="Message"
+      :aria-busy="busy || undefined"
       :value="modelValue"
       :placeholder="placeholder"
-      :disabled="busy"
       @input="handleInput"
       @keydown="handleKeydown"
     ></textarea>
