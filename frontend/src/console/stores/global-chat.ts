@@ -726,6 +726,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
         return sessionKey;
       case "cancelled":
         appendMessageDelta(sessionKey, event.messageUid, event.delta);
+        setMessageSourcesReady(sessionKey, event.messageUid);
         markMessageCancelled(event.messageUid);
         clearStreamState(sessionKey);
         return sessionKey;
@@ -735,6 +736,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
         clearStreamState(sessionKey);
         return sessionKey;
       case "error":
+        setActiveMessageSourcesReady(sessionKey);
         throw new Error(event.message);
     }
   }
@@ -797,7 +799,7 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     });
   }
 
-  /** 在首个 delta 前将 RAG snapshot 写入 optimistic assistant message。 */
+  /** 在首个 delta 前缓存 RAG snapshot，但不提前发布 citation UI。 */
   function applyRagReady(
     sessionKey: ChatSessionKey,
     event: Extract<ChatStreamEvent, { event: "rag_ready" }>,
@@ -818,12 +820,12 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
       const nextMessages = current.messages.slice();
       nextMessages[targetIndex] = {
         ...targetMessage,
-        // 提前挂载 citation 数据;
-        // 允许在 message 传输完成之前查看流式引用 citation
+        // inline citation 立即可用；sourcesReady 负责控制终态来源入口。
         citationItems,
         citationCount: citationItems.length,
         usedCitationCount: citationItems.filter((item) => item.usedInContext)
           .length,
+        sourcesReady: false,
         rawMessage: {
           ...targetMessage.rawMessage,
           ragSnapshot: event.ragSnapshot,
@@ -835,6 +837,27 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
         messages: nextMessages,
       };
     });
+  }
+
+  /** assistant 进入终态后开放来源入口；inline citation 已在流式阶段显示。 */
+  function setMessageSourcesReady(
+    sessionKey: ChatSessionKey,
+    messageUid: string,
+  ) {
+    updateTimeline(sessionKey, (current) => ({
+      ...current,
+      messages: current.messages.map((message) =>
+        message.uid === messageUid
+          ? { ...message, sourcesReady: true }
+          : message,
+      ),
+    }));
+  }
+
+  function setActiveMessageSourcesReady(sessionKey: ChatSessionKey) {
+    const messageUid =
+      streamStatesBySessionKey.value[sessionKey]?.assistantMessageUid;
+    if (messageUid) setMessageSourcesReady(sessionKey, messageUid);
   }
 
   function appendMessageDelta(
@@ -917,6 +940,10 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     const streamState = streamStatesBySessionKey.value[sessionKey];
     const errorText = getErrorMessage(error, chatStoreError("streamGlobal"));
     setTimelineError(sessionKey, errorText);
+
+    if (generationStarted) {
+      setActiveMessageSourcesReady(sessionKey);
+    }
 
     if (!generationStarted && streamState?.controller === controller) {
       rollbackOptimisticStream(sessionKey, streamState);
@@ -1176,7 +1203,10 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     streamState: ChatStreamState | undefined,
   ) {
     const userMessage = toMessageViewModel(event.userMessage);
-    const assistantMessage = toMessageViewModel(event.assistantMessage);
+    const assistantMessage = {
+      ...toMessageViewModel(event.assistantMessage),
+      sourcesReady: false,
+    };
 
     updateTimeline(sessionKey, (current) => {
       let nextMessages = current.messages.map((message) => {
@@ -1471,7 +1501,7 @@ function createOptimisticMessage(input: {
   model: string;
 }): ChatMessageViewModel {
   const now = new Date().toISOString();
-  return toMessageViewModel({
+  const message = toMessageViewModel({
     uid: input.uid,
     role: input.role,
     message: input.message,
@@ -1483,6 +1513,10 @@ function createOptimisticMessage(input: {
     createdAt: now,
     updatedAt: now,
   });
+  return {
+    ...message,
+    sourcesReady: input.role !== "assistant",
+  };
 }
 
 function appendDeltaToMessage(

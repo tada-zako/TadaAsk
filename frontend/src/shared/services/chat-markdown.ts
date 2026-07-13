@@ -16,9 +16,11 @@ export interface RenderChatMarkdownOptions {
   citationIds?: readonly number[];
   /** citation 按钮的无障碍文案 */
   citationAriaLabel?: (citationId: number) => string;
+  /** citation 的可见编号；省略时继续显示后端原始 ID。 */
+  citationLabel?: (citationId: number) => string | number;
   /** 流式阶段隐藏尚未闭合的 citation 尾部片段 */
   streaming?: boolean;
-  /** 移除当前 snapshot 不存在的 citation marker，仅供公开 Widget 使用。 */
+  /** 移除当前允许集合之外的 citation marker，用于终态发布与 Widget 数量限制。 */
   stripUnknownCitationMarkers?: boolean;
 }
 
@@ -27,6 +29,7 @@ interface ChatMarkdownEnv {
   copyCodeLabel?: string;
   citationIds?: ReadonlySet<number>;
   citationAriaLabel?: (citationId: number) => string;
+  citationLabel?: (citationId: number) => string | number;
 }
 
 interface CitationTokenMeta {
@@ -114,17 +117,17 @@ export function renderChatMarkdown(
 ): string {
   const renderer = getMarkdownRenderer();
   const citationIds = new Set(options.citationIds ?? []);
-  const renderContent =
-    options.streaming && citationIds.size > 0
-      ? hideTrailingCitationFragment(content)
-      : content;
-  // widget 侧只展示最多 4 个 citations, 多余跳过展示
+  const renderContent = options.streaming
+    ? hideTrailingCitationFragment(content)
+    : content;
+  // 仅保留当前 UI 已允许发布的 citation marker。
   const normalizedContent = options.stripUnknownCitationMarkers
     ? stripUnknownCitationMarkers(renderContent, citationIds)
     : renderContent;
   const html = renderer.render(normalizedContent, {
     citationAriaLabel: options.citationAriaLabel,
     citationIds,
+    citationLabel: options.citationLabel,
     copyCodeLabel: options.copyCodeLabel,
   } satisfies ChatMarkdownEnv);
 
@@ -158,7 +161,7 @@ export function renderChatMarkdown(
   });
 }
 
-/** Widget 最多公开四条来源，因此隐藏未进入展示集合的 marker。 */
+/** 隐藏未进入当前展示集合的 marker，不修改原始 message content。 */
 function stripUnknownCitationMarkers(
   content: string,
   citationIds: ReadonlySet<number>,
@@ -257,8 +260,9 @@ function configureCitations(renderer: MarkdownIt) {
     const chatEnv = env as ChatMarkdownEnv;
     const ariaLabel =
       chatEnv.citationAriaLabel?.(citationId) ?? `Open citation ${citationId}`;
+    const visibleLabel = chatEnv.citationLabel?.(citationId) ?? citationId;
 
-    return `<button type="button" class="chat-md-citation" data-chat-citation-id="${citationId}" aria-label="${escapeAttribute(ariaLabel)}"><span aria-hidden="true">${citationId}</span></button>`;
+    return `<button type="button" class="chat-md-citation" data-chat-citation-id="${citationId}" aria-label="${escapeAttribute(ariaLabel)}"><span aria-hidden="true">${escapeHtml(String(visibleLabel))}</span></button>`;
   };
 }
 

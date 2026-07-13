@@ -8,6 +8,7 @@ import type {
 } from "@/shared/types/chat-stream";
 
 export type RAGSnapshotItem = components["schemas"]["RAGSnapshotItem"];
+export type WidgetCitationItem = RAGSnapshotItem & { displayId: number };
 export type WidgetMessageStatus =
   "pending" | "streaming" | "completed" | "cancelled" | "error";
 
@@ -18,7 +19,7 @@ export interface WidgetMessageViewModel {
   sequence: number;
   status: WidgetMessageStatus;
   ragSnapshot: RAGSnapshot | null;
-  citationItems: RAGSnapshotItem[];
+  citationItems: WidgetCitationItem[];
 }
 
 export interface WidgetChatService {
@@ -117,19 +118,14 @@ export function toWidgetMessage(
 export function selectCitationItems(
   content: string,
   items: readonly RAGSnapshotItem[],
-): RAGSnapshotItem[] {
+): WidgetCitationItem[] {
   const byId = new Map(items.map((item) => [item.citationId, item]));
-  const selected: RAGSnapshotItem[] = [];
+  const selected: WidgetCitationItem[] = [];
   const selectedIds = new Set<number>();
 
+  // 只展示正文实际引用的来源，并按首次出现顺序建立稳定的 1–4 显示编号。
   for (const match of content.matchAll(/\[\[citation:([1-9]\d*)\]\]/g)) {
     append(Number(match[1]));
-  }
-  for (const item of items.filter((candidate) => candidate.usedInContext)) {
-    append(item.citationId);
-  }
-  for (const item of items) {
-    append(item.citationId);
   }
 
   return selected;
@@ -140,7 +136,7 @@ export function selectCitationItems(
       return;
     }
     selectedIds.add(citationId);
-    selected.push(item);
+    selected.push({ ...item, displayId: selected.length + 1 });
   }
 }
 

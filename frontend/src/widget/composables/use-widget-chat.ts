@@ -10,7 +10,6 @@ import type { ChatStreamEvent } from "@/shared/types/chat-stream";
 import {
   createWidgetChatService,
   refreshMessageCitations,
-  selectCitationItems,
   toWidgetMessage,
   WidgetChatError,
   type WidgetMessageViewModel,
@@ -117,10 +116,9 @@ export function useWidgetChat(options: UseWidgetChatOptions) {
       if (epoch !== requestEpoch || isAbortError(error)) return;
       errorMessage.value = visitorErrorMessage(error);
       phase.value = "error";
-      patchActiveAssistant((message) => ({
-        ...message,
-        status: "error",
-      }));
+      patchActiveAssistant((message) =>
+        refreshMessageCitations({ ...message, status: "error" }),
+      );
     } finally {
       if (epoch === requestEpoch) {
         controller = null;
@@ -202,10 +200,8 @@ export function useWidgetChat(options: UseWidgetChatOptions) {
         patchMessage(event.messageUid, (message) => ({
           ...message,
           ragSnapshot: event.ragSnapshot,
-          citationItems: selectCitationItems(
-            message.content,
-            event.ragSnapshot.items ?? [],
-          ),
+          // rag_ready 只缓存原始 snapshot；引用 UI 在终态统一发布。
+          citationItems: [],
         }));
         break;
       case "delta":
@@ -237,7 +233,9 @@ export function useWidgetChat(options: UseWidgetChatOptions) {
       case "error":
         errorMessage.value = "The assistant could not finish this response.";
         phase.value = "error";
-        patchActiveAssistant((message) => ({ ...message, status: "error" }));
+        patchActiveAssistant((message) =>
+          refreshMessageCitations({ ...message, status: "error" }),
+        );
         break;
     }
   }

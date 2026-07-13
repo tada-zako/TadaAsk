@@ -97,6 +97,13 @@
   transform: translateY(-1px);
 }
 
+/* 流式阶段先展示引用编号，来源终态发布后再开放交互。 */
+.chat-md[data-streaming] .chat-md-citation {
+  pointer-events: none;
+  cursor: default;
+  opacity: 0.78;
+}
+
 .chat-md ul,
 .chat-md ol {
   display: grid;

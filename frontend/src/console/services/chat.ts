@@ -55,6 +55,8 @@ export interface ChatMessageViewModel {
   citationItems: RAGSnapshotItem[];
   citationCount: number;
   usedCitationCount: number;
+  /** rag_ready 后 inline citation 可用；终态后才开放 sources UI。 */
+  sourcesReady: boolean;
   rawMessage: ChatMessageRead;
 }
 
@@ -226,6 +228,7 @@ export function toMessageViewModel(
     citationCount: citationItems.length,
     usedCitationCount: citationItems.filter((item) => item.usedInContext)
       .length,
+    sourcesReady: true,
     rawMessage: message,
   };
 }
