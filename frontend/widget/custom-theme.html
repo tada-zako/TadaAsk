@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TadaAsk Custom Theme Host</title>
+    <link rel="stylesheet" href="/widget/custom-theme.css" />
+  </head>
+  <body>
+    <header class="journal-head">
+      <a class="wordmark" href="/widget/">Northwind Notes</a>
+      <nav aria-label="Journal sections">
+        <a href="#fieldwork">Fieldwork</a>
+        <a href="#archive">Archive</a>
+        <button type="button">Subscribe</button>
+      </nav>
+    </header>
+
+    <main>
+      <aside aria-label="Issue metadata">
+        <span>Issue 04</span>
+        <strong>Systems<br />in practice</strong>
+        <small>July 2026 · Hangzhou</small>
+      </aside>
+
+      <article>
+        <p class="eyebrow">Field notes / knowledge systems</p>
+        <h1>Documentation should feel like a conversation.</h1>
+        <p class="lede">
+          A deliberately light, editorial host page used to verify that a
+          deployed TadaAsk widget keeps its own layout while inheriting only the
+          public theme tokens set by the site owner.
+        </p>
+
+        <section class="story-grid">
+          <div class="story-card rust">
+            <span>01</span>
+            <h2>Make context visible</h2>
+            <p>
+              Answers remain useful when their source trail is close at hand.
+            </p>
+          </div>
+          <div class="story-card moss">
+            <span>02</span>
+            <h2>Keep the host intact</h2>
+            <p>
+              Buttons, inputs, and typography outside the shadow root stay
+              local.
+            </p>
+          </div>
+        </section>
+      </article>
+    </main>
+
+    <!-- 主题来自宿主样式表；不依赖 Widget 内部 preview selector。 -->
+    <tada-ask-widget
+      id="tada-widget"
+      title="Northwind Research Assistant"
+      placeholder="Ask about the field notes…"
+      launcher-position="bottom-left"
+      panel-align="left"
+    ></tada-ask-widget>
+
+    <script type="module">
+      const widget = document.querySelector("#tada-widget");
+      widget.setAttribute(
+        "api-base-url",
+        import.meta.env.VITE_WIDGET_PREVIEW_API_BASE_URL ?? "",
+      );
+      widget.setAttribute(
+        "project-uid",
+        import.meta.env.VITE_WIDGET_PREVIEW_PROJECT_UID ?? "",
+      );
+      widget.setAttribute(
+        "widget-uid",
+        import.meta.env.VITE_WIDGET_PREVIEW_WIDGET_UID ?? "",
+      );
+    </script>
+    <script type="module" src="/src/widget/main.ts"></script>
+  </body>
+</html>

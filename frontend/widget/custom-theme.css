@@ -1,0 +1,221 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600&display=swap");
+
+:root {
+  color: #272821;
+  background: #eae7dc;
+  font-family: "Manrope", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(90deg, transparent 49.9%, rgb(38 41 32 / 0.08) 50%), #eae7dc;
+  background-size: 36px 36px;
+}
+
+/* 故意定义宿主控件样式，用来确认 Shadow DOM 内部控件不被污染。 */
+button,
+textarea {
+  border: 2px solid #272821;
+  border-radius: 0;
+  background: #ff5c38;
+  color: #181912;
+  font:
+    600 12px/1 "DM Mono",
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+svg {
+  fill: #ff5c38;
+  stroke-width: 4;
+}
+
+.journal-head {
+  display: flex;
+  min-height: 78px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgb(38 41 32 / 0.3);
+  padding: 0 5vw;
+  background: rgb(234 231 220 / 0.9);
+  backdrop-filter: blur(12px);
+}
+
+.wordmark {
+  color: inherit;
+  font-family: "Instrument Serif", serif;
+  font-size: 29px;
+  text-decoration: none;
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+nav a {
+  color: inherit;
+  font:
+    500 11px/1 "DM Mono",
+    monospace;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+nav button {
+  min-height: 36px;
+  padding: 0 16px;
+}
+
+main {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.34fr) minmax(0, 1fr);
+  gap: clamp(40px, 8vw, 130px);
+  width: min(1180px, 90vw);
+  margin: 0 auto;
+  padding: clamp(68px, 10vw, 140px) 0 160px;
+}
+
+aside {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-top: 4px solid #ff5c38;
+  padding-top: 18px;
+}
+
+aside span,
+aside small,
+.eyebrow,
+.story-card > span {
+  font:
+    500 11px/1.4 "DM Mono",
+    monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+aside strong {
+  font-family: "Instrument Serif", serif;
+  font-size: clamp(30px, 3vw, 46px);
+  font-weight: 400;
+  line-height: 0.94;
+}
+
+article {
+  max-width: 760px;
+}
+
+.eyebrow {
+  margin: 0 0 24px;
+  color: #b33c24;
+}
+
+h1 {
+  max-width: 820px;
+  margin: 0;
+  font-family: "Instrument Serif", serif;
+  font-size: clamp(56px, 8vw, 112px);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.86;
+}
+
+.lede {
+  max-width: 640px;
+  margin: 42px 0 0;
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.story-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 68px;
+}
+
+.story-card {
+  min-height: 210px;
+  border: 1px solid rgb(38 41 32 / 0.3);
+  padding: 24px;
+}
+
+.story-card.rust {
+  background: #d7694d;
+}
+
+.story-card.moss {
+  background: #9daa82;
+}
+
+.story-card h2 {
+  margin: 48px 0 12px;
+  font-family: "Instrument Serif", serif;
+  font-size: 31px;
+  font-weight: 400;
+}
+
+.story-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 公开定制入口：变量从宿主元素传入 Shadow DOM。 */
+tada-ask-widget {
+  --tada-widget-background: #f5f0e5;
+  --tada-widget-surface: #ebe3d4;
+  --tada-widget-raised: #fffaf0;
+  --tada-widget-user: #ded5c5;
+  --tada-widget-foreground: #25251f;
+  --tada-widget-body: #44453b;
+  --tada-widget-muted: #686b5d;
+  --tada-widget-faint: #898b7e;
+  --tada-widget-border: rgb(43 45 37 / 0.22);
+  --tada-widget-border-soft: rgb(43 45 37 / 0.12);
+  --tada-widget-accent: #d64f32;
+  --tada-widget-accent-foreground: #fff9ed;
+  --tada-widget-accent-soft: rgb(214 79 50 / 0.12);
+  --tada-widget-color-scheme: light;
+  --tada-widget-font: "Manrope", sans-serif;
+  --tada-widget-panel-width: 72vw;
+  --tada-widget-panel-max-width: 920px;
+  --tada-widget-panel-max-height: 680px;
+  --tada-widget-launcher-size: 60px;
+  --tada-widget-offset-x: 30px;
+  --tada-widget-offset-y: 30px;
+}
+
+@media (max-width: 720px) {
+  .journal-head {
+    padding: 0 20px;
+  }
+
+  nav a {
+    display: none;
+  }
+
+  main {
+    grid-template-columns: 1fr;
+    width: min(100% - 40px, 620px);
+    padding-top: 52px;
+  }
+
+  aside {
+    display: none;
+  }
+
+  .story-grid {
+    grid-template-columns: 1fr;
+  }
+}
