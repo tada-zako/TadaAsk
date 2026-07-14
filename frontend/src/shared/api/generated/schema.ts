@@ -24,6 +24,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current Admin
+         * @description 返回当前有效 access token 对应的管理员信息。
+         */
+        get: operations["get_current_admin_profile_admin_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/project/new": {
         parameters: {
             query?: never;
@@ -1034,6 +1054,25 @@ export interface components {
             sourceUids?: string[];
             ragOptions?: components["schemas"]["HybridSearchRequest"];
         };
+        /** AdminRead */
+        AdminRead: {
+            /** Username */
+            username: string;
+            /** Uid */
+            uid: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Lastloginat */
+            lastLoginAt?: string | null;
+            /**
+             * Tokenversion
+             * @description Token version number; defaults to 0, increments with each password change
+             */
+            tokenVersion: number;
+        };
         /** Body_bind_project_sources_admin_project__project_uid__sources_post */
         Body_bind_project_sources_admin_project__project_uid__sources_post: {
             /**
@@ -1797,20 +1836,6 @@ export interface components {
             fileDeleted: boolean;
         };
         /**
-         * SourceItemDownloadResponse
-         * @description Source item 下载响应结构体
-         */
-        SourceItemDownloadResponse: {
-            /** Sourceuid */
-            sourceUid: string;
-            /** Sourceitemuid */
-            sourceItemUid: string;
-            /** Downloadurl */
-            downloadUrl: string;
-            /** Filename */
-            filename: string;
-        };
-        /**
          * SourceItemProcessStatus
          * @description source_item 文档处理状态
          * @enum {string}
@@ -2244,6 +2269,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_current_admin_profile_admin_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRead"];
                 };
             };
         };
@@ -3081,13 +3126,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description Authenticated local source item download */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceItemDownloadResponse"];
+                    "application/octet-stream": unknown;
                 };
             };
             /** @description Validation Error */

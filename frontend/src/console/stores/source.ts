@@ -29,7 +29,6 @@ import type {
   IngestPausedResponse,
   SourceDeleteResponse,
   SourceItemDeleteResponse,
-  SourceItemDownloadResponse,
   SourceItemProcessStatus,
   SourceItemRead,
   SourceRead,
@@ -282,7 +281,7 @@ export const useSourceStore = defineStore("console-source", () => {
   async function downloadItem(
     sourceUid: string,
     sourceItemUid: string,
-  ): Promise<SourceItemDownloadResponse> {
+  ): Promise<void> {
     return await withMutation(
       t("sources.service.errors.downloadItem"),
       async () => await downloadSourceItemRequest(sourceUid, sourceItemUid),

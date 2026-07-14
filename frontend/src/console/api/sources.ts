@@ -13,8 +13,6 @@ export type SourceItemDeleteResponse =
   components["schemas"]["SourceItemDeleteResponse"];
 export type SourceItemRenamePayload =
   components["schemas"]["SourceItemRenameRequest"];
-export type SourceItemDownloadResponse =
-  components["schemas"]["SourceItemDownloadResponse"];
 export type SourceItemProcessStatus =
   components["schemas"]["SourceItemProcessStatus"];
 export type SourceProcessStatus = components["schemas"]["SourceProcessStatus"];
@@ -202,7 +200,7 @@ export const sourceApi = {
       body,
     }),
 
-  /** 获取 local_file source item 的静态下载地址 */
+  /** 通过 Admin Bearer token 获取 local_file source item 文件内容。 */
   getItemDownload: (sourceUid: string, sourceItemUid: string) =>
     client.GET("/admin/source/{source_uid}/items/{source_item_uid}/download", {
       params: {
@@ -211,6 +209,7 @@ export const sourceApi = {
           source_item_uid: sourceItemUid,
         },
       },
+      parseAs: "blob",
     }),
 
   /** 启动 web_crawl 同步后台任务 */

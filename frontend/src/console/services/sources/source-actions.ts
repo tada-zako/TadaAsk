@@ -3,7 +3,6 @@ import {
   type SourceCreatePayload,
   type SourceDeleteResponse,
   type SourceItemDeleteResponse,
-  type SourceItemDownloadResponse,
   type SourceItemRead,
   type SourceItemRenamePayload,
   type SourceRead,
@@ -144,31 +143,45 @@ export async function deleteSourceItem(
   return unwrapApiData(data, error, t("sources.service.errors.deleteItem"));
 }
 
-// 获取 local_file 子项下载地址并通过动态 <a> 元素触发浏览器下载。
+// 通过鉴权 API 获取文件 Blob，并使用一次性 Object URL 触发下载。
 export async function downloadSourceItem(
   sourceUid: string,
   sourceItemUid: string,
-): Promise<SourceItemDownloadResponse> {
-  const { data, error } = await sourceApi.getItemDownload(
+): Promise<void> {
+  const { data, error, response } = await sourceApi.getItemDownload(
     sourceUid,
     sourceItemUid,
   );
-  const download = unwrapApiData(
+  const blob = unwrapApiData(
     data,
     error,
     t("sources.service.errors.downloadItem"),
   );
 
   if (typeof document !== "undefined") {
+    const objectUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = download.downloadUrl;
-    link.download = download.filename;
+    link.href = objectUrl;
+    link.download = getDownloadFilename(response.headers, "download");
     document.body.append(link);
     link.click();
     link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  }
+}
+
+function getDownloadFilename(headers: Headers, fallback: string): string {
+  const disposition = headers.get("Content-Disposition") ?? "";
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return fallback;
+    }
   }
 
-  return download;
+  return disposition.match(/filename="([^"]+)"/i)?.[1] ?? fallback;
 }
 
 // 补齐创建载荷缺省字段并 trim 文本值。
