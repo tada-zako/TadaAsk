@@ -253,9 +253,6 @@ function getProjectUidFromRoute(): string | null {
           <Plus class="text-primary size-4" />
           <span class="grid gap-0.5">
             <span>{{ t("shell.sidebar.newProject") }}</span>
-            <span class="text-[11px] font-normal text-(--text-faint)">
-              {{ t("shell.sidebar.returnProjectLanding") }}
-            </span>
           </span>
         </DropdownMenuItem>
       </DropdownMenuContent>

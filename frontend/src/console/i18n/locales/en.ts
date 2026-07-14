@@ -58,7 +58,6 @@ export const en = {
       projects: "Projects",
       noProject: "No project yet",
       newProject: "New project",
-      returnProjectLanding: "Return to project landing",
       project: "Project",
       overview: "Overview",
       ask: "Ask",

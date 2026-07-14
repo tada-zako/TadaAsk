@@ -60,7 +60,6 @@ export const zhCN: typeof en = {
       projects: "项目",
       noProject: "暂无项目",
       newProject: "新建项目",
-      returnProjectLanding: "返回项目首页",
       project: "项目",
       overview: "概览",
       ask: "问答",

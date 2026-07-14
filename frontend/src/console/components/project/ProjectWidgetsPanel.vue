@@ -463,6 +463,7 @@ async function copyText(value: string): Promise<void> {
             </span>
           </div>
 
+          <!-- 配置缺失提示 -->
           <div
             v-if="deploymentCode.missingConfig.length > 0"
             class="rounded-(--console-radius-md) border border-yellow-300/25 bg-yellow-300/10 px-4 py-3 text-sm leading-6 text-yellow-100"
