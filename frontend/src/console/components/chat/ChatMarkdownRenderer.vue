@@ -6,7 +6,7 @@ import { renderChatMarkdown } from "@/shared/services/chat-markdown";
 import type { RAGSnapshotItem } from "@/console/services/chat";
 
 import "katex/dist/katex.min.css";
-import "./chat-markdown.css";
+import "@/shared/styles/chat-markdown.css";
 
 const props = withDefaults(
   defineProps<{
