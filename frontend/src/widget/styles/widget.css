@@ -43,10 +43,11 @@
   --tada-widget-offset-x: 24px;
   --tada-widget-offset-y: 24px;
   --tada-widget-z-index: 2147483000;
+  --tada-widget-color-scheme: dark;
   --tada-widget-font:
     "Noto Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
 
-  color-scheme: dark;
+  color-scheme: var(--tada-widget-color-scheme);
   font-family: var(--tada-widget-font);
 }
 
@@ -65,7 +66,7 @@
   --tada-widget-accent: #b74d35;
   --tada-widget-accent-foreground: #fffaf5;
   --tada-widget-accent-soft: rgb(183 77 53 / 0.1);
-  color-scheme: light;
+  --tada-widget-color-scheme: light;
 }
 
 /* ===== 全局 reset ===== */
