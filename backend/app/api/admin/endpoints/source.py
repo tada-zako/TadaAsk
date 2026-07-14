@@ -1,5 +1,7 @@
 from typing import Annotated
 from pathlib import Path
+import mimetypes
+from urllib.parse import quote
 
 from fastapi import (
     APIRouter,
@@ -9,6 +11,7 @@ from fastapi import (
     Path as FastAPIPath,
     Body,
     HTTPException,
+    Response,
     status,
 )
 from loguru import logger
@@ -27,7 +30,6 @@ from ...schemas import (
     IngestPausedResponse,
     SourceDeleteResponse,
     SourceItemDeleteResponse,
-    SourceItemDownloadResponse,
     RAGJobStartResponse,
     RAGJobRead,
     ActiveRAGJobsResponse,
@@ -505,14 +507,20 @@ async def rename_source_item(
 
 @router.get(
     "/{source_uid}/items/{source_item_uid}/download",
-    response_model=SourceItemDownloadResponse,
+    response_class=Response,
+    responses={
+        200: {
+            "content": {"application/octet-stream": {}},
+            "description": "Authenticated local source item download",
+        }
+    },
 )
 async def get_source_item_download(
     source: ValidSourceDeps,
     source_item: Annotated[SourceItem, Depends(valid_source_item_from_path)],
     source_item_service: SourceItemServiceDeps,
 ):
-    """获取 local file source item 的下载地址；web crawl 暂不支持下载。"""
+    """通过 Admin 鉴权直接下载 local file；web crawl 暂不支持下载。"""
     try:
         download_info = await source_item_service.get_download_info(
             source=source,
@@ -523,11 +531,18 @@ async def get_source_item_download(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    return SourceItemDownloadResponse(
-        source_uid=source.uid,
-        source_item_uid=source_item.uid,
-        download_url=download_info.download_url,
-        filename=download_info.filename,
+    filename = download_info.filename
+    ascii_filename = filename.encode("ascii", "ignore").decode().replace('"', "")
+    fallback_filename = ascii_filename or "download"
+    content_disposition = (
+        f'attachment; filename="{fallback_filename}"; '
+        f"filename*=UTF-8''{quote(filename, safe='')}"
+    )
+    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return Response(
+        content=download_info.content,
+        media_type=media_type,
+        headers={"Content-Disposition": content_disposition},
     )
 
 

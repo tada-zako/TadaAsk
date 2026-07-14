@@ -16,7 +16,7 @@ class FileStorage(Protocol):
             content: 文件内容的字节数据
 
         Returns:
-            存储后的文件访问路径或 URL
+            存储后的文件 key
         """
         ...
 
@@ -32,20 +32,12 @@ class FileStorage(Protocol):
         """检查文件是否存在"""
         ...
 
-    async def get_access_url(self, key: str, expires_in: int = 3600) -> str:
-        """
-        获取文件访问 URL
-        - 未来如果扩展 S3 或其他云存储；expires_in 用于确定 URL 的有效期
-        """
-        ...
-
 
 class LocalFileStorage:
     """本地文件存储实现"""
 
-    def __init__(self, base_path: str, base_url: str = "/static"):
+    def __init__(self, base_path: str):
         self.base_path = Path(base_path)
-        self.base_url = base_url
 
         # 确保 base_path 存在
         self.base_path.mkdir(parents=True, exist_ok=True)
@@ -60,7 +52,7 @@ class LocalFileStorage:
                 f.write(content)
 
         await asyncio.to_thread(_write)
-        return f"{self.base_url}/{key}"
+        return key
 
     async def load_file(self, key: str) -> bytes:
         """加载文件内容"""
@@ -86,7 +78,3 @@ class LocalFileStorage:
         """检查文件是否存在"""
         file_path = self.base_path / key
         return await asyncio.to_thread(file_path.exists)
-
-    async def get_access_url(self, key: str, expires_in: int = 3600) -> str:
-        """获取文件访问 URL"""
-        return f"{self.base_url}/{key}"

@@ -80,8 +80,6 @@ class Settings(BaseSettings):
     upload_folder_path: str = str(
         PROJECT_ROOT / "storages" / "uploads"
     )  # 文件上传存储路径
-    upload_static_base_url: str = "/static/uploads"  # 本地上传文件静态访问前缀
-
     vector_store_perf: str = "chromadb"  # 向量库配置
 
     # 模型缓存路径

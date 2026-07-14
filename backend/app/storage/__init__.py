@@ -12,8 +12,5 @@ def file_storage_factory(storage_backend: str) -> FileStorage:
     if storage_backend == "local":
         from .base import LocalFileStorage
 
-        return LocalFileStorage(
-            base_path=settings.upload_folder_path,
-            base_url=settings.upload_static_base_url,
-        )
+        return LocalFileStorage(base_path=settings.upload_folder_path)
     raise ValueError(f"Unsupported file storage provider: {storage_backend}")

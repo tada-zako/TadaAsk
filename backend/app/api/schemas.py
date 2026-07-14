@@ -149,21 +149,6 @@ class SourceDeleteResponse(BaseModel):
     )
 
 
-class SourceItemDownloadResponse(BaseModel):
-    """Source item 下载响应结构体"""
-
-    source_uid: str
-    source_item_uid: str
-    download_url: str
-    filename: str
-
-    model_config = ConfigDict(
-        alias_generator=to_camel,
-        validate_by_alias=True,
-        validate_by_name=True,
-    )
-
-
 class ModelSelection(BaseModel):
     """模型选择请求结构体"""
 

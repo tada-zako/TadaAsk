@@ -33,7 +33,7 @@ class SourceItemDeleteResult:
 class SourceItemDownloadInfo:
     """Source item 下载信息"""
 
-    download_url: str
+    content: bytes
     filename: str
 
 
@@ -133,15 +133,8 @@ class SourceItemService:
         if not source_item.storage_key:
             raise FileNotFoundError("Source item file not found")
 
-        exists = await self.file_storage.exists(key=source_item.storage_key)
-        if not exists:
-            raise FileNotFoundError("Source item file not found")
-
-        # 获取下载 url
-        download_url = await self.file_storage.get_access_url(
-            key=source_item.storage_key
-        )
+        content = await self.file_storage.load_file(key=source_item.storage_key)
         return SourceItemDownloadInfo(
-            download_url=download_url,
+            content=content,
             filename=source_item.filename or source_item.title,
         )
