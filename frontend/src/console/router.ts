@@ -78,7 +78,11 @@ const router = createRouter({
  */
 router.beforeEach(async (to) => {
   const authStore = useAuthStore();
-  await authStore.initializeAuth();
+
+  // 本地 token 只有经过后端确认后，才视为有效登录态。
+  if (authStore.token && !authStore.isAuthenticated) {
+    await authStore.verifyToken();
+  }
 
   if (to.meta.public && authStore.isAuthenticated) {
     return resolveSafeAuthRedirect(router, to.query.redirect);

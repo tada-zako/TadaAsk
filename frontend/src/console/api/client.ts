@@ -22,8 +22,8 @@ const authMiddleware: Middleware = {
     if (schemaPath.startsWith("/admin/") && schemaPath !== ADMIN_LOGIN_PATH) {
       const authStore = useAuthStore();
 
-      const token = authStore.getToken();
-      // 初始化 /me 时 status 仍为 unknown，但本地 token 也必须被带上。
+      const token = authStore.token;
+      // 初始化 /me 时尚未认证，但本地 token 仍必须被带上。
       if (token) {
         const headers = new Headers(request.headers);
         headers.set("Authorization", `Bearer ${token}`);
@@ -47,7 +47,7 @@ const authMiddleware: Middleware = {
       const authStore = useAuthStore();
 
       // 设置登出状态
-      authStore.invalidateSession();
+      authStore.clearAuth();
 
       if (
         schemaPath !== ADMIN_ME_PATH &&
