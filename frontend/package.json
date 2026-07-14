@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dev:widget": "vite --open /widget/",
-    "build": "vue-tsc -b && vite build",
+    "typecheck": "vue-tsc -b",
+    "build:console": "vite build",
+    "build:widget": "vite build --config vite.widget.config.ts",
+    "build": "npm run typecheck && npm run build:console && npm run build:widget",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "preview": "vite preview",
