@@ -1,7 +1,8 @@
-from .base import FileStorage
+from .base import FileDownloadTarget, FileStorage
 from app.core.config import settings
 
 __all__ = [
+    "FileDownloadTarget",
     "FileStorage",
 ]
 

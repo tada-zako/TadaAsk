@@ -1,7 +1,5 @@
-from typing import Annotated
 from pathlib import Path
-import mimetypes
-from urllib.parse import quote
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -11,9 +9,9 @@ from fastapi import (
     Path as FastAPIPath,
     Body,
     HTTPException,
-    Response,
     status,
 )
+from fastapi.responses import FileResponse, RedirectResponse
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
@@ -507,7 +505,7 @@ async def rename_source_item(
 
 @router.get(
     "/{source_uid}/items/{source_item_uid}/download",
-    response_class=Response,
+    response_class=FileResponse,
     responses={
         200: {
             "content": {"application/octet-stream": {}},
@@ -531,19 +529,14 @@ async def get_source_item_download(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    filename = download_info.filename
-    ascii_filename = filename.encode("ascii", "ignore").decode().replace('"', "")
-    fallback_filename = ascii_filename or "download"
-    content_disposition = (
-        f'attachment; filename="{fallback_filename}"; '
-        f"filename*=UTF-8''{quote(filename, safe='')}"
-    )
-    media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    return Response(
-        content=download_info.content,
-        media_type=media_type,
-        headers={"Content-Disposition": content_disposition},
-    )
+    if isinstance(download_info.target, Path):
+        return FileResponse(
+            path=download_info.target,
+            filename=download_info.filename,
+        )
+
+    # NOTE: 保留逻辑，暂未实现；对象存储可在完成 Admin 鉴权后跳转到短时效预签名 URL
+    return RedirectResponse(url=download_info.target, status_code=307)
 
 
 @router.delete(

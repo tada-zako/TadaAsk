@@ -6,7 +6,7 @@ from loguru import logger
 from app.crud import SourceCRUD
 from app.db.models import Source, SourceItem
 from app.rag import VectorDatabase
-from app.storage import FileStorage
+from app.storage import FileDownloadTarget, FileStorage
 from app.core.constants import SourceItemProcessStatus, SourceType
 from app.core.exceptions import (
     SourceItemDeleteConflictError,
@@ -33,7 +33,7 @@ class SourceItemDeleteResult:
 class SourceItemDownloadInfo:
     """Source item 下载信息"""
 
-    content: bytes
+    target: FileDownloadTarget
     filename: str
 
 
@@ -133,8 +133,14 @@ class SourceItemService:
         if not source_item.storage_key:
             raise FileNotFoundError("Source item file not found")
 
-        content = await self.file_storage.load_file(key=source_item.storage_key)
+        try:
+            target = await self.file_storage.get_download_target(
+                key=source_item.storage_key
+            )
+        except ValueError as exc:
+            raise FileNotFoundError("Source item file not found") from exc
+
         return SourceItemDownloadInfo(
-            content=content,
+            target=target,
             filename=source_item.filename or source_item.title,
         )
