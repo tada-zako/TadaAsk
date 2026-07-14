@@ -1,7 +1,16 @@
 <script setup lang="ts">
-import { reactive, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { Ellipsis, Pencil, Plus, Trash2, Power } from "@lucide/vue";
+import {
+  Check,
+  Code2,
+  Copy,
+  Ellipsis,
+  Pencil,
+  Plus,
+  Trash2,
+  Power,
+} from "@lucide/vue";
 
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -36,9 +45,14 @@ import type {
   ProjectWidgetRow,
   ProjectWidgetUpdate,
 } from "@/console/services/project-workspace";
+import {
+  createWidgetDeploymentCode,
+  WIDGET_CUSTOMIZATION_EXAMPLE,
+} from "@/console/services/widget-deployment";
 
-defineProps<{
+const props = defineProps<{
   isMutating?: boolean;
+  projectUid: string;
   widgets: ProjectWidgetRow[];
 }>();
 
@@ -51,7 +65,27 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const createDialogOpen = ref(false);
 const editDialogOpen = ref(false);
+const deploymentDialogOpen = ref(false);
 const editingWidgetUid = ref<string | null>(null);
+const deployingWidget = ref<ProjectWidgetRow | null>(null);
+const copyState = ref<"idle" | "copied" | "failed">("idle");
+
+const deploymentCode = computed(() =>
+  deployingWidget.value
+    ? createWidgetDeploymentCode({
+        projectUid: props.projectUid,
+        widgetUid: deployingWidget.value.uid,
+      })
+    : null,
+);
+
+const missingDeploymentConfig = computed(() =>
+  deploymentCode.value?.missingConfig
+    .map((key) =>
+      key === "apiBaseUrl" ? "VITE_API_BASE_URL" : "VITE_WIDGET_SCRIPT_URL",
+    )
+    .join(", "),
+);
 
 // Dialog 表单只维护本地输入，提交时交给页面容器执行 API。
 const createForm = reactive<ProjectWidgetCreate>({
@@ -104,6 +138,43 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
     payload: { isEnabled },
     widgetUid: widget.uid,
   });
+}
+
+function openDeployment(widget: ProjectWidgetRow) {
+  deployingWidget.value = widget;
+  copyState.value = "idle";
+  deploymentDialogOpen.value = true;
+}
+
+async function copyDeploymentCode() {
+  const code = deploymentCode.value;
+  if (!code || code.missingConfig.length > 0) {
+    return;
+  }
+
+  try {
+    await copyText(code.html);
+    copyState.value = "copied";
+  } catch {
+    copyState.value = "failed";
+  }
+}
+
+async function copyText(value: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Clipboard copy failed");
 }
 </script>
 
@@ -252,6 +323,10 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem @select="openDeployment(widget)">
+                  <Code2 class="size-4" />
+                  {{ t("project.widgets.install") }}
+                </DropdownMenuItem>
                 <DropdownMenuItem @select="openEdit(widget)">
                   <Pencil class="size-4" />
                   {{ t("common.actions.edit") }}
@@ -338,6 +413,116 @@ function toggleWidget(widget: ProjectWidgetRow, isEnabled: boolean) {
             {{ t("common.actions.save") }}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- 部署代码只依赖当前 project/widget 标识与构建环境地址。 -->
+    <Dialog v-model:open="deploymentDialogOpen">
+      <DialogContent class="max-w-2xl gap-0 overflow-hidden p-0">
+        <DialogHeader class="border-b border-(--line-soft) px-6 py-5">
+          <div class="flex items-start gap-3 pr-8">
+            <span
+              class="border-primary/25 bg-primary/10 text-primary grid size-9 shrink-0 place-items-center rounded-(--console-radius-md) border"
+            >
+              <Code2 class="size-4" />
+            </span>
+            <div class="grid gap-1">
+              <DialogTitle>{{ t("project.widgets.deployTitle") }}</DialogTitle>
+              <DialogDescription>
+                {{ t("project.widgets.deployDescription") }}
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div v-if="deployingWidget && deploymentCode" class="grid gap-5 p-6">
+          <div
+            class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-panel-soft) px-4 py-3 max-[620px]:grid-cols-1"
+          >
+            <div class="min-w-0">
+              <strong class="block truncate text-sm text-(--text-strong)">
+                {{ deployingWidget.name }}
+              </strong>
+              <span class="mt-1 block truncate text-xs text-(--text-faint)">
+                {{ deployingWidget.siteOrigin }}
+              </span>
+            </div>
+            <span
+              class="w-fit rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+              :class="
+                deployingWidget.isEnabled
+                  ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-200'
+                  : 'border-yellow-300/25 bg-yellow-300/10 text-yellow-100'
+              "
+            >
+              {{
+                deployingWidget.isEnabled
+                  ? t("project.widgets.deployEnabled")
+                  : t("project.widgets.deployDisabled")
+              }}
+            </span>
+          </div>
+
+          <div
+            v-if="deploymentCode.missingConfig.length > 0"
+            class="rounded-(--console-radius-md) border border-yellow-300/25 bg-yellow-300/10 px-4 py-3 text-sm leading-6 text-yellow-100"
+          >
+            {{
+              t("project.widgets.deployMissingConfig", {
+                config: missingDeploymentConfig,
+              })
+            }}
+          </div>
+
+          <section class="grid gap-2">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-semibold text-(--text-strong)">
+                  {{ t("project.widgets.embedCode") }}
+                </h3>
+                <p class="mt-1 text-xs text-(--text-faint)">
+                  {{ t("project.widgets.embedCodeHelp") }}
+                </p>
+              </div>
+              <Button
+                type="button"
+                :aria-label="t('project.widgets.copyCode')"
+                variant="outline"
+                size="sm"
+                :disabled="deploymentCode.missingConfig.length > 0"
+                @click="copyDeploymentCode"
+              >
+                <Check v-if="copyState === 'copied'" class="size-3.5" />
+                <Copy v-else class="size-3.5" />
+                {{
+                  copyState === "copied"
+                    ? t("project.widgets.copied")
+                    : t("project.widgets.copy")
+                }}
+              </Button>
+            </div>
+            <pre
+              class="console-scrollbar max-h-64 overflow-auto rounded-(--console-radius-md) border border-(--line-soft) bg-[#070809] p-4 text-[12px] leading-6 text-cyan-50 shadow-inner"
+            ><code>{{ deploymentCode.html }}</code></pre>
+            <p v-if="copyState === 'failed'" class="text-xs text-red-300">
+              {{ t("project.widgets.copyFailed") }}
+            </p>
+          </section>
+
+          <section class="grid gap-2 border-t border-(--line-soft) pt-5">
+            <div>
+              <h3 class="text-sm font-semibold text-(--text-strong)">
+                {{ t("project.widgets.customizeTitle") }}
+              </h3>
+              <p class="mt-1 text-xs leading-5 text-(--text-faint)">
+                {{ t("project.widgets.customizeHelp") }}
+              </p>
+            </div>
+            <pre
+              class="console-scrollbar max-h-44 overflow-auto rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-base) p-4 text-[12px] leading-6 text-(--text-body)"
+            ><code>{{ WIDGET_CUSTOMIZATION_EXAMPLE }}</code></pre>
+          </section>
+        </div>
       </DialogContent>
     </Dialog>
   </section>

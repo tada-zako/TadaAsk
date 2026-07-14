@@ -205,6 +205,7 @@ function badgeToneClass(tone: ProjectHealthItem["tone"]): string {
       </div>
       <ProjectWidgetsPanel
         :is-mutating="isMutating"
+        :project-uid="workspace.project.uid"
         :widgets="workspace.widgetRows"
         @create-widget="$emit('createWidget', $event)"
         @delete-widget="$emit('deleteWidget', $event)"

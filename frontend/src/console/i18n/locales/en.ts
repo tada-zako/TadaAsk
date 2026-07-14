@@ -180,6 +180,23 @@ export const en = {
       },
       widgetEnabled: "{name} widget enabled",
       widgetActions: "{name} widget actions",
+      install: "Install",
+      deployTitle: "Install widget",
+      deployDescription:
+        "Copy the generated Web Component markup into the allowed host site.",
+      deployEnabled: "Ready",
+      deployDisabled: "Disabled",
+      deployMissingConfig:
+        "Deployment code is incomplete. Configure {config} when building the Console.",
+      embedCode: "Embed code",
+      embedCodeHelp: "Add this markup before the closing body tag.",
+      copyCode: "Copy widget embed code",
+      copy: "Copy",
+      copied: "Copied",
+      copyFailed: "Clipboard access failed. Copy the code manually.",
+      customizeTitle: "Optional theme tokens",
+      customizeHelp:
+        "Set CSS custom properties on the element; internal chat behavior remains isolated.",
       editWidget: "Edit widget",
       dialogEditTitle: "Edit widget",
       dialogEditDescription:
