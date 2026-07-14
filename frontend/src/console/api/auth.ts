@@ -35,4 +35,6 @@ export const authApi = {
         "Content-Type": "application/x-www-form-urlencoded",
       },
     }),
+  /** 校验本地 access token，并获取当前管理员。 */
+  me: () => client.GET("/admin/auth/me"),
 };

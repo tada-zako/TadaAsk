@@ -2,8 +2,11 @@ import type { Middleware } from "openapi-fetch";
 import { createApiClient } from "@/shared/api/create-client";
 import router from "@/console/router";
 import { useAuthStore } from "@/console/stores/auth";
+import { resolveSafeAuthRedirect } from "@/console/lib/auth-redirect";
 
 const ADMIN_LOGIN_PATH = "/admin/auth/login";
+const ADMIN_ME_PATH = "/admin/auth/me";
+let unauthorizedRedirectPending = false; // 多并发 401 路由跳转限制；避免并发跳转多次重写 redirect
 
 /**
  * Console Admin 鉴权中间件：
@@ -19,9 +22,9 @@ const authMiddleware: Middleware = {
     if (schemaPath.startsWith("/admin/") && schemaPath !== ADMIN_LOGIN_PATH) {
       const authStore = useAuthStore();
 
-      if (authStore.isAuthenticated) {
-        const token = authStore.getToken(); // 取当前 token
-
+      const token = authStore.getToken();
+      // 初始化 /me 时 status 仍为 unknown，但本地 token 也必须被带上。
+      if (token) {
         const headers = new Headers(request.headers);
         headers.set("Authorization", `Bearer ${token}`);
         return new Request(request, { headers });
@@ -44,14 +47,28 @@ const authMiddleware: Middleware = {
       const authStore = useAuthStore();
 
       // 设置登出状态
-      authStore.logout();
+      authStore.invalidateSession();
 
-      if (router.currentRoute.value.path !== "/login") {
+      if (
+        schemaPath !== ADMIN_ME_PATH &&
+        router.currentRoute.value.path !== "/login" &&
+        !unauthorizedRedirectPending
+      ) {
+        // 设置跳转进行时标记
+        unauthorizedRedirectPending = true;
+        const redirect = resolveSafeAuthRedirect(
+          router,
+          router.currentRoute.value.fullPath,
+        );
         // 跳转登录页面，并保留当前路由地址
-        void router.replace({
-          path: "/login",
-          query: { redirect: router.currentRoute.value.fullPath },
-        });
+        void router
+          .replace({
+            path: "/login",
+            query: { redirect },
+          })
+          .finally(() => {
+            unauthorizedRedirectPending = false;
+          });
       }
     }
 

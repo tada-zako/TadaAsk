@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "./stores/auth";
+import { resolveSafeAuthRedirect } from "./lib/auth-redirect";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -75,13 +76,12 @@ const router = createRouter({
 /**
  * console 侧全局路由守卫
  */
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore();
+  await authStore.initializeAuth();
 
-  // 路由层只判断是否存在本地 token；token 过期由 client 401 处理。
   if (to.meta.public && authStore.isAuthenticated) {
-    // 已登录用户默认跳转到项目页
-    return "/project";
+    return resolveSafeAuthRedirect(router, to.query.redirect);
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {

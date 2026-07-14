@@ -6,6 +6,7 @@ import { useRoute, useRouter } from "vue-router";
 import { ArrowRight, LockKeyhole, ShieldCheck } from "@lucide/vue";
 
 import { useAuthStore } from "@/console/stores/auth";
+import { resolveSafeAuthRedirect } from "@/console/lib/auth-redirect";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
@@ -40,10 +41,7 @@ async function handleLogin(): Promise<void> {
 
   // 支持从受保护页面跳转到 login 后，
   // 登录成功再回到原目标路径
-  const redirectTo =
-    typeof route.query.redirect === "string"
-      ? route.query.redirect
-      : "/project";
+  const redirectTo = resolveSafeAuthRedirect(router, route.query.redirect);
 
   await router.replace(redirectTo);
 }
@@ -119,11 +117,10 @@ async function handleLogin(): Promise<void> {
         </p>
 
         <Button
-          type="button"
+          type="submit"
           aria-label="Sign in to admin console"
           class="h-11 justify-between"
           :disabled="!canSubmit"
-          @click="handleLogin"
         >
           <span class="inline-flex items-center gap-2">
             <LockKeyhole class="size-4" />
