@@ -3,13 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@11.13.0",
+  "engines": {
+    "node": ">=24.11.0 <25",
+    "pnpm": ">=11.13.0 <12"
+  },
   "scripts": {
     "dev": "vite",
     "dev:widget": "vite --open /widget/",
     "typecheck": "vue-tsc -b",
     "build:console": "vite build",
     "build:widget": "vite build --config vite.widget.config.ts",
-    "build": "npm run typecheck && npm run build:console && npm run build:widget",
+    "build": "pnpm run typecheck && pnpm run build:console && pnpm run build:widget",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "preview": "vite preview",
@@ -38,7 +43,7 @@
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",
-    "@types/node": "^25.9.4",
+    "@types/node": "^24.0.0",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/tsconfig": "^0.9.1",
     "openapi-typescript": "^7.13.0",
