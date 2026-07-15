@@ -9,7 +9,11 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.exceptions import RateLimitExceededError
-from app.core.security import get_password_hash, ProviderAPIKeyCipher
+from app.core.security import (
+    get_password_hash,
+    verify_password,
+    ProviderAPIKeyCipher,
+)
 from app.core.rate_limit import VisitorRateLimiter
 from app.crud import AdminCRUD, ModelProfileCRUD
 from app.db import init_db, run_migrations, async_session
@@ -50,28 +54,56 @@ from app.api import admin, visitor
 from app.api.visitor.widget_cors import WidgetScopedCORSMiddleware
 
 
-async def valid_or_create_admin():
-    """在应用启动时验证是否存在管理员账号，如果不存在则创建一个默认管理员"""
+async def sync_admin_credentials():
+    """启动时创建或同步由 Settings 管理的单一管理员凭据。"""
     async with async_session() as session:
-        async with session.begin():  # 开启事务
+        async with session.begin():
             admin_crud = AdminCRUD(session)
-
             existing_admin = await admin_crud.get_admin_by_username(
                 username=settings.admin_username
             )
-            if existing_admin:
-                logger.info(f"管理员账号已存在，用户名：{settings.admin_username}")
-                # TODO: 检查 ADMIN_PASSWORD 是否与现有管理员密码一致，
-                # 如果不一致则更新密码（不一定要实现）
+
+            # 修改 ADMIN_USERNAME 后无法按新名称命中，此时复用最早创建的账号，
+            # 避免每次改名都创建新的管理员记录。
+            if existing_admin is None:
+                existing_admin = await admin_crud.get_primary_admin()
+
+            if existing_admin is None:
+                # 不存在历史 admin 账号，创建新账号
+                password_hash = get_password_hash(settings.admin_password)
+                default_admin_data = AdminCreate(
+                    username=settings.admin_username,
+                    password_hash=password_hash,
+                )
+                new_admin = await admin_crud.create_admin(default_admin_data)
+                logger.info(f"默认管理员账号已创建，用户名：{new_admin.username}")
                 return
 
-            password_hash = get_password_hash(settings.admin_password)
-            default_admin_data = AdminCreate(
-                username=settings.admin_username,
-                password_hash=password_hash,
+            username_changed = existing_admin.username != settings.admin_username
+            password_changed = not verify_password(
+                settings.admin_password,
+                existing_admin.password_hash,
             )
-            new_admin = await admin_crud.create_admin(default_admin_data)
-            logger.info(f"默认管理员账号已创建，用户名：{new_admin.username}")
+
+            if not username_changed and not password_changed:
+                # 用户名以及密码未更新
+                logger.info(f"管理员账号配置已同步，用户名：{settings.admin_username}")
+                return
+
+            # 更新 username 或 password
+            await admin_crud.update_credentials(
+                existing_admin,
+                username=settings.admin_username if username_changed else None,
+                password_hash=(
+                    get_password_hash(settings.admin_password)
+                    if password_changed
+                    else None
+                ),
+            )
+            logger.info(
+                "管理员账号已按启动配置更新，"
+                f"用户名变更：{username_changed}，密码变更：{password_changed}"
+            )
 
 
 async def sync_model_catalog():
@@ -100,6 +132,8 @@ async def lifespan(app: FastAPI):
         await run_migrations()
 
     await init_db()
+    # MVP：管理员凭据以启动配置为准，暂不提供运行时修改 API。
+    await sync_admin_credentials()
     await sync_model_catalog()
 
     # 挂载 visitor 限流器实例
@@ -252,9 +286,6 @@ async def lifespan(app: FastAPI):
         vector_db=vector_db,
     )
     app.state.rag_job_manager = RAGJobManager()
-
-    # TODO: MVP 实现：在应用启动时验证管理员账号，如果不存在则创建一个默认管理员
-    await valid_or_create_admin()
 
     yield  # 运行应用
 

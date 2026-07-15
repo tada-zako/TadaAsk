@@ -140,6 +140,24 @@ class Settings(BaseSettings):
             self.rerank_model_name = DEFAULT_RERANK_MODEL_NAME
         return self
 
+    @field_validator("admin_username", mode="before")
+    @classmethod
+    def validate_admin_username(cls, value: str) -> str:
+        """管理员用户名用于启动同步，禁止空值并移除意外的首尾空格。"""
+        username = str(value).strip()
+        if not username:
+            raise ValueError("ADMIN_USERNAME must not be empty")
+        return username
+
+    @field_validator("admin_password", mode="before")
+    @classmethod
+    def validate_admin_password(cls, value: str) -> str:
+        """密码保留原始字符，仅拒绝空值或纯空白配置。"""
+        password = str(value)
+        if not password.strip():
+            raise ValueError("ADMIN_PASSWORD must not be empty")
+        return password
+
     @model_validator(mode="after")
     def compute_chunk_defaults(self) -> "Settings":
         """计算文本切割相关的默认值，并进行合法性检查"""
