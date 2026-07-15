@@ -26,6 +26,7 @@ import {
 import type { ModelProfileRead } from "@/console/api/provider-model";
 import { translate as t } from "@/console/i18n";
 import { getErrorMessage } from "@/console/lib/api-result";
+import { parseApiDate } from "@/console/lib/date-format";
 import { useProviderModelStore } from "@/console/stores/provider-model";
 import { useSourceStore } from "@/console/stores/source";
 
@@ -1661,7 +1662,7 @@ function maxMessageSequence(messages: ChatMessageViewModel[]): number | null {
 }
 
 function dateValue(value: string): number {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 

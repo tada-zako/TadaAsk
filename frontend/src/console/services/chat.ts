@@ -14,6 +14,7 @@ import type {
 } from "@/console/api/chat";
 import { translate as t } from "@/console/i18n";
 import { unwrapApiData } from "@/console/lib/api-result";
+import { parseApiDate } from "@/console/lib/date-format";
 
 export type {
   AdminRagChatRequest,
@@ -264,7 +265,7 @@ function normalizeOptionalText(value: string): string | null {
 }
 
 function formatMessageTime(value: string): string {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) {
     return "";
   }
@@ -276,7 +277,7 @@ function formatMessageTime(value: string): string {
 }
 
 function formatRelativeTime(value: string): string {
-  const date = new Date(value);
+  const date = parseApiDate(value);
   if (Number.isNaN(date.getTime())) {
     return "";
   }

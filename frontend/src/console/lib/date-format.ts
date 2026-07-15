@@ -6,9 +6,20 @@ export interface RelativeDateMessages {
   daysAgo: (count: number) => string;
 }
 
+// 后端时间统一按 UTC 存储；SQLite 返回的 ISO 字符串可能不带时区后缀。
+export function parseApiDate(value: string): Date {
+  const normalized =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) &&
+    !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+      ? `${value}Z`
+      : value;
+
+  return new Date(normalized);
+}
+
 // 格式化绝对日期（如 "15 Jan 2026"）。
 export function formatDate(value: string, unknownLabel: string): string {
-  const date = new Date(value);
+  const date = parseApiDate(value);
 
   if (Number.isNaN(date.getTime())) {
     return unknownLabel;
@@ -26,7 +37,7 @@ export function formatRelativeDate(
   value: string,
   messages: RelativeDateMessages,
 ): string {
-  const date = new Date(value);
+  const date = parseApiDate(value);
 
   if (Number.isNaN(date.getTime())) {
     return messages.unknown;
