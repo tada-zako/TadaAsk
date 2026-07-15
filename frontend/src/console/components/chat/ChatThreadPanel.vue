@@ -130,7 +130,9 @@ const emptyTitle = computed(() =>
 );
 
 const selectedSourcesLabel = computed(() =>
-  t("chat.composer.selectedSources", { count: selectedSourceCount.value }),
+  selectedSourceCount.value > 0
+    ? t("chat.composer.selectedSources", { count: selectedSourceCount.value })
+    : t("chat.composer.selectSources"),
 );
 
 const showCenteredError = computed(
@@ -803,6 +805,7 @@ onBeforeUnmount(() => {
           <!-- composer 中 sources 选中状态显示 -->
           <span
             class="ml-1 hidden text-[12px] text-(--text-faint) sm:inline-flex"
+            :class="selectedSourceCount > 0 ? 'text-primary/70' : ''"
           >
             {{ selectedSourcesLabel }}
           </span>

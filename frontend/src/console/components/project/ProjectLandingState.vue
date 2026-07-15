@@ -103,7 +103,9 @@ function submitCreate() {
         </div>
 
         <!-- 项目列表滚动区域 -->
-        <div class="console-scrollbar grid max-h-112 gap-2 overflow-y-auto">
+        <div
+          class="console-scrollbar grid max-h-[min(28rem,48dvh)] gap-2 overflow-y-auto pr-1"
+        >
           <button
             v-for="project in projects"
             :key="project.uid"

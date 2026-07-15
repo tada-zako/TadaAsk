@@ -26,6 +26,7 @@ import { Button } from "@/shared/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -221,23 +222,30 @@ function getProjectUidFromRoute(): string | null {
           class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
           >{{ t("shell.sidebar.projects") }}</DropdownMenuLabel
         >
-        <DropdownMenuItem
-          v-for="project in projects"
-          :key="project.uid"
-          class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
-          :class="
-            isProjectActive(project.uid)
-              ? 'bg-primary/10 text-primary focus:bg-primary/15 focus:text-primary'
-              : ''
-          "
-          @select="selectProject(project.uid)"
+        <DropdownMenuGroup
+          v-if="projects.length > 0"
+          class="console-scrollbar max-h-[min(14rem,32dvh)] overflow-y-auto pr-0.5"
         >
-          <span class="min-w-0 flex-1 truncate">{{ project.name }}</span>
-          <Check
-            v-if="isProjectActive(project.uid)"
-            class="text-primary size-3.5"
-          />
-        </DropdownMenuItem>
+          <DropdownMenuItem
+            v-for="(project, projectIndex) in projects"
+            :key="project.uid"
+            class="min-h-9 rounded-(--console-radius-md) px-2.5 py-2 text-[13px] font-medium text-(--text-muted) focus:bg-(--surface-hover) focus:text-(--text-strong)"
+            :class="
+              isProjectActive(project.uid)
+                ? 'bg-primary/10 text-primary focus:bg-primary/15 focus:text-primary'
+                : projectIndex === 0 && !selectedProject
+                  ? 'bg-white/[0.045] text-(--text-body)'
+                  : ''
+            "
+            @select="selectProject(project.uid)"
+          >
+            <span class="min-w-0 flex-1 truncate">{{ project.name }}</span>
+            <Check
+              v-if="isProjectActive(project.uid)"
+              class="text-primary size-3.5"
+            />
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
         <DropdownMenuItem
           v-if="projects.length === 0"
           disabled

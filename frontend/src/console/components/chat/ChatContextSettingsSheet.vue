@@ -72,15 +72,22 @@ function sourceStatusLabel(status: string): string {
         :aria-label="t('chat.context.openAria')"
         :title="compact ? t('chat.context.title') : undefined"
         :variant="compact ? 'ghost' : 'outline'"
-        class="gap-2 text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)"
-        :class="
+        class="gap-2 hover:bg-(--surface-hover) hover:text-(--text-strong)"
+        :class="[
           compact
             ? 'size-8 rounded-(--console-radius-md) px-0'
-            : 'h-9 justify-start rounded-(--console-radius-lg) border-(--line-soft) bg-transparent text-[13px] font-medium'
-        "
+            : 'h-9 justify-start rounded-(--console-radius-lg) border-(--line-soft) bg-transparent text-[13px] font-medium',
+          !compact && selectedSourceCount > 0 ? 'text-primary/80' : '',
+        ]"
       >
         <Settings2 class="size-4" />
-        <span v-if="!compact">{{ t("chat.context.title") }}</span>
+        <span v-if="!compact">
+          {{
+            selectedSourceCount > 0
+              ? t("chat.context.configured", { count: selectedSourceCount })
+              : t("chat.context.configure")
+          }}
+        </span>
       </Button>
     </SheetTrigger>
 
@@ -121,7 +128,7 @@ function sourceStatusLabel(status: string): string {
 
           <!-- selector -->
           <div
-            class="console-scrollbar max-h-43 overflow-y-auto rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft)"
+            class="console-scrollbar max-h-48 overflow-y-auto rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft)"
           >
             <p
               v-if="isLoading"
@@ -140,7 +147,7 @@ function sourceStatusLabel(status: string): string {
                 <div
                   v-for="source in sources"
                   :key="source.uid"
-                  class="grid min-h-11 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px] last:border-b-0 hover:bg-white/[0.025]"
+                  class="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-(--line-soft) px-3 text-[13px] last:border-b-0 hover:bg-white/[0.025]"
                 >
                   <Checkbox
                     :id="`chat-source-${source.uid}`"
@@ -154,15 +161,15 @@ function sourceStatusLabel(status: string): string {
                   />
                   <Label
                     :for="`chat-source-${source.uid}`"
-                    class="min-w-0 cursor-pointer"
+                    class="min-w-0 cursor-pointer flex-col items-start gap-0.5"
                   >
                     <span
-                      class="block truncate font-medium text-(--text-strong)"
+                      class="block w-80 truncate text-[13px] leading-4 font-medium text-(--text-strong)"
                     >
                       {{ source.sourceName }}
                     </span>
                     <span
-                      class="block truncate text-[11px] font-normal text-(--text-faint)"
+                      class="block w-full truncate text-[10px] leading-4 font-normal text-(--text-faint)"
                     >
                       {{ sourceTypeLabel(source.sourceType) }} ·
                       {{ sourceStatusLabel(source.status) }}
