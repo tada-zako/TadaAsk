@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   CirclePlay,
   Download,
@@ -73,6 +74,8 @@ const emit = defineEmits<{
   (event: "deleteItems", itemUids: string[]): void;
 }>();
 
+const { t } = useI18n();
+
 // 弹窗状态
 const renameOpen = ref(false);
 const renameTarget = ref<SourceItemRow | null>(null);
@@ -81,14 +84,21 @@ const deleteOpen = ref(false);
 const deleteTargetUids = ref<string[]>([]);
 
 const isWebCrawl = computed(() => props.sourceType === "web-crawl");
-const entityLabel = computed(() => (isWebCrawl.value ? "pages" : "files"));
+const entityLabel = computed(() =>
+  isWebCrawl.value
+    ? t("sources.itemsTable.pages")
+    : t("sources.itemsTable.files"),
+);
 const selectedUidSet = computed(() => new Set(props.selectedItemUids));
 const rowUidSet = computed(() => new Set(props.rows.map((row) => row.uid)));
 const selectedRows = computed(() =>
   props.rows.filter((row) => selectedUidSet.value.has(row.uid)),
 );
-const selectedLabel = computed(
-  () => `Selected: ${selectedRows.value.length} ${entityLabel.value}`,
+const selectedLabel = computed(() =>
+  t("sources.itemsTable.selected", {
+    count: selectedRows.value.length,
+    entity: entityLabel.value,
+  }),
 );
 // 表头复选框三态：全选 true / 部分 indeterminate / 全不选 false
 const headerChecked = computed<CheckboxValue>(() => {
@@ -217,6 +227,18 @@ function badgeClass(tone: SourceTone): string {
 
   return "border-(--line-soft) bg-(--surface-panel-soft) text-(--text-muted)";
 }
+
+function rowProcessAction(row: SourceItemRow): string {
+  if (row.canPause) {
+    return t("sources.common.actions.pause");
+  }
+
+  if (row.canResume) {
+    return t("sources.common.actions.resume");
+  }
+
+  return t("sources.common.actions.index");
+}
 </script>
 
 <template>
@@ -233,24 +255,32 @@ function badgeClass(tone: SourceTone): string {
           </strong>
           <span class="h-5 w-px bg-(--line)"></span>
           <span class="text-xs text-(--text-faint)">
-            Batch operations apply to checked rows.
+            {{ t("sources.itemsTable.batchHelp") }}
           </span>
         </div>
         <div class="flex flex-wrap justify-end gap-2 max-[760px]:justify-start">
           <Button
             type="button"
-            :aria-label="`Index selected ${entityLabel}`"
+            :aria-label="
+              t('sources.itemsTable.indexSelectedAria', {
+                entity: entityLabel,
+              })
+            "
             variant="outline"
             size="sm"
             :disabled="isMutating || !canBulkIndex"
             @click="emitForSelected('indexItems', (row) => row.canIndex)"
           >
             <CirclePlay class="size-4" />
-            Index
+            {{ t("sources.common.actions.index") }}
           </Button>
           <Button
             type="button"
-            :aria-label="`Delete selected ${entityLabel}`"
+            :aria-label="
+              t('sources.itemsTable.deleteSelectedAria', {
+                entity: entityLabel,
+              })
+            "
             variant="outline"
             size="sm"
             class="border-red-400/35 text-red-100 hover:bg-red-400/10"
@@ -264,7 +294,7 @@ function badgeClass(tone: SourceTone): string {
             "
           >
             <Trash2 class="size-4" />
-            Delete
+            {{ t("sources.common.actions.delete") }}
           </Button>
         </div>
       </div>
@@ -285,17 +315,31 @@ function badgeClass(tone: SourceTone): string {
             <TableHead class="text-center">
               <Checkbox
                 :model-value="headerChecked"
-                :aria-label="`Select all ${entityLabel}`"
+                :aria-label="
+                  t('sources.itemsTable.selectAllAria', {
+                    entity: entityLabel,
+                  })
+                "
                 class="mx-auto"
                 :disabled="isLoading || rows.length === 0"
                 @update:model-value="handleToggleAll"
               />
             </TableHead>
-            <TableHead>{{ isWebCrawl ? "Page" : "File" }}</TableHead>
-            <TableHead>Updated</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Indexing</TableHead>
-            <TableHead class="text-center">Actions</TableHead>
+            <TableHead>
+              {{
+                isWebCrawl
+                  ? t("sources.itemsTable.columns.page")
+                  : t("sources.itemsTable.columns.file")
+              }}
+            </TableHead>
+            <TableHead>{{ t("sources.itemsTable.columns.updated") }}</TableHead>
+            <TableHead>{{ t("sources.itemsTable.columns.status") }}</TableHead>
+            <TableHead>{{
+              t("sources.itemsTable.columns.indexing")
+            }}</TableHead>
+            <TableHead class="text-center">
+              {{ t("sources.itemsTable.columns.actions") }}
+            </TableHead>
           </TableRow>
         </TableHeader>
 
@@ -303,13 +347,13 @@ function badgeClass(tone: SourceTone): string {
           <!-- 加载进度条 -->
           <TableRow v-if="isLoading">
             <TableCell colspan="6" class="h-24 text-center text-(--text-muted)">
-              Loading source items...
+              {{ t("sources.itemsTable.loading") }}
             </TableCell>
           </TableRow>
 
           <TableRow v-else-if="rows.length === 0">
             <TableCell colspan="6" class="h-24 text-center text-(--text-muted)">
-              No source items found.
+              {{ t("sources.itemsTable.empty") }}
             </TableCell>
           </TableRow>
 
@@ -317,7 +361,9 @@ function badgeClass(tone: SourceTone): string {
             <TableCell class="text-center">
               <Checkbox
                 :model-value="selectedUidSet.has(row.uid)"
-                :aria-label="`Select ${row.title}`"
+                :aria-label="
+                  t('sources.itemsTable.selectRowAria', { title: row.title })
+                "
                 class="mx-auto"
                 @update:model-value="handleToggleRow(row, $event)"
               />
@@ -363,10 +409,10 @@ function badgeClass(tone: SourceTone): string {
                 v-else-if="row.status === 'completed'"
                 class="text-xs text-emerald-200"
               >
-                Ready
+                {{ t("sources.itemsTable.ready") }}
               </span>
               <span v-else class="text-xs text-(--text-faint)">
-                Not indexed
+                {{ t("sources.itemsTable.notIndexed") }}
               </span>
             </TableCell>
             <TableCell>
@@ -376,7 +422,12 @@ function badgeClass(tone: SourceTone): string {
                   <TooltipTrigger as-child>
                     <Button
                       type="button"
-                      :aria-label="`${row.canPause ? 'Pause' : row.canResume ? 'Resume' : 'Index'} ${row.title}`"
+                      :aria-label="
+                        t('sources.itemsTable.actionAria', {
+                          action: rowProcessAction(row),
+                          title: row.title,
+                        })
+                      "
                       variant="ghost"
                       size="icon-sm"
                       :disabled="
@@ -396,13 +447,7 @@ function badgeClass(tone: SourceTone): string {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {{
-                      row.canPause
-                        ? "Pause"
-                        : row.canResume
-                          ? "Resume"
-                          : "Index"
-                    }}
+                    {{ rowProcessAction(row) }}
                   </TooltipContent>
                 </Tooltip>
 
@@ -410,7 +455,12 @@ function badgeClass(tone: SourceTone): string {
                   <TooltipTrigger as-child>
                     <Button
                       type="button"
-                      :aria-label="`Download ${row.title}`"
+                      :aria-label="
+                        t('sources.itemsTable.actionAria', {
+                          action: t('sources.common.actions.download'),
+                          title: row.title,
+                        })
+                      "
                       variant="ghost"
                       size="icon-sm"
                       :disabled="isMutating"
@@ -419,14 +469,21 @@ function badgeClass(tone: SourceTone): string {
                       <Download class="size-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Download</TooltipContent>
+                  <TooltipContent>
+                    {{ t("sources.common.actions.download") }}
+                  </TooltipContent>
                 </Tooltip>
 
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button
                       type="button"
-                      :aria-label="`Rename ${row.title}`"
+                      :aria-label="
+                        t('sources.itemsTable.actionAria', {
+                          action: t('sources.common.actions.rename'),
+                          title: row.title,
+                        })
+                      "
                       variant="ghost"
                       size="icon-sm"
                       :disabled="isMutating || !row.canRename"
@@ -435,14 +492,21 @@ function badgeClass(tone: SourceTone): string {
                       <Pencil class="size-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Rename</TooltipContent>
+                  <TooltipContent>
+                    {{ t("sources.common.actions.rename") }}
+                  </TooltipContent>
                 </Tooltip>
 
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button
                       type="button"
-                      :aria-label="`Delete ${row.title}`"
+                      :aria-label="
+                        t('sources.itemsTable.actionAria', {
+                          action: t('sources.common.actions.delete'),
+                          title: row.title,
+                        })
+                      "
                       variant="ghost"
                       size="icon-sm"
                       class="text-red-100 hover:bg-red-400/10 hover:text-red-100"
@@ -452,7 +516,9 @@ function badgeClass(tone: SourceTone): string {
                       <Trash2 class="size-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Delete</TooltipContent>
+                  <TooltipContent>
+                    {{ t("sources.common.actions.delete") }}
+                  </TooltipContent>
                 </Tooltip>
               </div>
             </TableCell>
@@ -466,10 +532,12 @@ function badgeClass(tone: SourceTone): string {
   <Dialog v-model:open="renameOpen">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Rename source item</DialogTitle>
+        <DialogTitle>{{ t("sources.itemsTable.renameTitle") }}</DialogTitle>
       </DialogHeader>
       <div class="grid gap-2 py-2">
-        <Label for="source-item-title">Title</Label>
+        <Label for="source-item-title">
+          {{ t("sources.itemsTable.titleField") }}
+        </Label>
         <Input
           id="source-item-title"
           v-model="renameTitle"
@@ -479,19 +547,19 @@ function badgeClass(tone: SourceTone): string {
       <DialogFooter>
         <Button
           type="button"
-          aria-label="Cancel rename source item"
+          :aria-label="t('sources.itemsTable.cancelRenameAria')"
           variant="outline"
           @click="renameOpen = false"
         >
-          Cancel
+          {{ t("sources.common.actions.cancel") }}
         </Button>
         <Button
           type="button"
-          aria-label="Confirm rename source item"
+          :aria-label="t('sources.itemsTable.confirmRenameAria')"
           :disabled="isMutating || !renameTitle.trim()"
           @click="submitRename"
         >
-          Rename
+          {{ t("sources.common.actions.rename") }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -501,19 +569,22 @@ function badgeClass(tone: SourceTone): string {
   <AlertDialog v-model:open="deleteOpen">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>Delete selected item?</AlertDialogTitle>
+        <AlertDialogTitle>
+          {{ t("sources.itemsTable.deleteTitle") }}
+        </AlertDialogTitle>
         <AlertDialogDescription>
-          This removes the source item and cleans up related file/vector data
-          when supported by the backend.
+          {{ t("sources.itemsTable.deleteDescription") }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogCancel>
+          {{ t("sources.common.actions.cancel") }}
+        </AlertDialogCancel>
         <AlertDialogAction
           class="bg-red-500 text-white hover:bg-red-500/90"
           @click="submitDelete"
         >
-          Delete
+          {{ t("sources.common.actions.delete") }}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

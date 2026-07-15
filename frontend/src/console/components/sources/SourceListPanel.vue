@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { FileText, Funnel, Globe2, Search } from "@lucide/vue";
+import { useI18n } from "vue-i18n";
 
 import SourceSettingsSheet from "./SourceSettingsSheet.vue";
 import type { SourceRow } from "@/console/services/source-workspace";
@@ -41,6 +42,7 @@ const emit = defineEmits<{
 
 const query = ref("");
 const typeFilter = ref<SourceTypeFilter>("all");
+const { t } = useI18n();
 
 const filteredSources = computed(() => {
   // source type 过滤后的 sources
@@ -88,7 +90,7 @@ function badgeClass(
         <Input
           v-model="query"
           class="pl-9"
-          placeholder="Search sources"
+          :placeholder="t('sources.list.searchPlaceholder')"
           :disabled="isLoading"
         />
       </div>
@@ -96,15 +98,19 @@ function badgeClass(
       <Select v-model="typeFilter">
         <SelectTrigger
           class="w-[11.25rem] border-(--line) bg-(--surface-panel-soft) text-(--text-body)"
-          aria-label="Filter sources by type"
+          :aria-label="t('sources.list.filterAria')"
         >
           <Funnel class="size-4 text-(--text-faint)" />
-          <SelectValue placeholder="Filter by type" />
+          <SelectValue :placeholder="t('sources.list.filterPlaceholder')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All types</SelectItem>
-          <SelectItem value="local_file">Local file</SelectItem>
-          <SelectItem value="web_crawl">Web crawl</SelectItem>
+          <SelectItem value="all">{{ t("sources.list.allTypes") }}</SelectItem>
+          <SelectItem value="local_file">
+            {{ t("sources.common.localFile") }}
+          </SelectItem>
+          <SelectItem value="web_crawl">
+            {{ t("sources.common.webCrawl") }}
+          </SelectItem>
         </SelectContent>
       </Select>
     </div>
@@ -112,24 +118,26 @@ function badgeClass(
     <Table class="console-scrollbar">
       <TableHeader>
         <TableRow>
-          <TableHead>Source</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Visibility</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Last updated</TableHead>
-          <TableHead class="text-center">Workspace</TableHead>
+          <TableHead>{{ t("sources.list.columns.source") }}</TableHead>
+          <TableHead>{{ t("sources.list.columns.type") }}</TableHead>
+          <TableHead>{{ t("sources.list.columns.visibility") }}</TableHead>
+          <TableHead>{{ t("sources.list.columns.status") }}</TableHead>
+          <TableHead>{{ t("sources.list.columns.updated") }}</TableHead>
+          <TableHead class="text-center">
+            {{ t("sources.list.columns.workspace") }}
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         <TableRow v-if="isLoading">
           <TableCell colspan="6" class="h-24 text-center text-(--text-muted)">
-            Loading sources...
+            {{ t("sources.list.loading") }}
           </TableCell>
         </TableRow>
 
         <TableRow v-else-if="filteredSources.length === 0">
           <TableCell colspan="6" class="h-24 text-center text-(--text-muted)">
-            No sources found.
+            {{ t("sources.list.empty") }}
           </TableCell>
         </TableRow>
 
@@ -168,14 +176,16 @@ function badgeClass(
             <div class="flex items-center justify-center gap-2">
               <Button
                 type="button"
-                :aria-label="`Open ${source.name} source items`"
+                :aria-label="
+                  t('sources.list.openItemsAria', { name: source.name })
+                "
                 variant="outline"
                 size="sm"
                 class="w-24 overflow-hidden"
                 :disabled="!source.itemsRouteName || isMutating"
                 @click="emit('openItems', source)"
               >
-                Items
+                {{ t("sources.list.items") }}
               </Button>
               <SourceSettingsSheet
                 :is-mutating="isMutating"

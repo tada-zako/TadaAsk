@@ -3,6 +3,7 @@
 import { computed, ref } from "vue";
 // 导入 Lucide 图标
 import { RefreshCw, Settings, Upload } from "@lucide/vue";
+import { useI18n } from "vue-i18n";
 
 import type { SourceRead, SourceUpdatePayload } from "@/console/api/sources";
 // 导入 UI 组件
@@ -28,6 +29,8 @@ const emit = defineEmits<{
   (event: "deleteSource"): void;
 }>();
 
+const { t } = useI18n();
+
 // 本地文件上传隐藏 input 引用，通过代码触发原生文件选择
 const fileInput = ref<HTMLInputElement | null>(null);
 
@@ -35,16 +38,18 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const isWebCrawl = computed(() => props.sourceType === "web-crawl");
 // 搜索框占位符文本
 const searchValue = computed(() =>
-  isWebCrawl.value ? "Search crawled pages" : "Search source items",
+  isWebCrawl.value
+    ? t("sources.toolbar.searchPages")
+    : t("sources.toolbar.searchItems"),
 );
 // 主操作按钮文本
 const primaryActionLabel = computed(() =>
-  isWebCrawl.value ? "Sync crawl" : "Upload files",
+  isWebCrawl.value
+    ? t("sources.toolbar.syncCrawl")
+    : t("sources.toolbar.uploadFiles"),
 );
 // 主操作按钮无障碍标签
-const primaryActionAriaLabel = computed(() =>
-  isWebCrawl.value ? "Sync crawl" : "Upload files",
-);
+const primaryActionAriaLabel = primaryActionLabel;
 
 // 主操作按钮：web_crawl 触发同步，local_file 弹出文件选择
 function handlePrimaryAction(): void {
@@ -107,14 +112,14 @@ function handleFileChange(event: Event): void {
     <Button
       v-else
       type="button"
-      aria-label="Open source settings"
+      :aria-label="t('sources.toolbar.openSettingsAria')"
       variant="outline"
       size="sm"
       class="w-24 overflow-hidden"
       disabled
     >
       <Settings class="size-3.5" />
-      Settings
+      {{ t("sources.common.actions.settings") }}
     </Button>
   </div>
 </template>

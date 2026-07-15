@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from "vue";
 import { storeToRefs } from "pinia";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 
 import { Badge } from "@/shared/components/ui/badge";
@@ -19,6 +20,7 @@ type SourceItemsToolbarType = "local-file" | "web-crawl";
 // 统一 source item 工作区：页面差异由后端 sourceType 决定，而不是由路由拆分决定。
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const sourceStore = useSourceStore();
 const { errorMessage, isLoading, isMutating } = storeToRefs(sourceStore);
 const sourceUid = computed(() => String(route.params.sourceUid ?? ""));
@@ -58,19 +60,19 @@ const toolbarSourceType = computed<SourceItemsToolbarType>(() =>
 );
 const sourceKicker = computed(() => {
   if (isWebCrawl.value) {
-    return "Web crawl source";
+    return t("sources.workspace.webKicker");
   }
 
   if (source.value?.sourceType === "local_file") {
-    return "Local file source";
+    return t("sources.workspace.localKicker");
   }
 
-  return "Source items";
+  return t("sources.workspace.fallbackKicker");
 });
 const sourceSubtitle = computed(() =>
   isWebCrawl.value
-    ? "Sync configured crawl targets to create source items, then index selected pages."
-    : "Upload files, review generated source items, and index items when ready.",
+    ? t("sources.workspace.webDescription")
+    : t("sources.workspace.localDescription"),
 );
 
 watch(
@@ -197,12 +199,16 @@ function badgeClass(tone: SourceTone): string {
       <div class="console-page-head">
         <p class="console-kicker">{{ sourceKicker }}</p>
         <h1 class="console-page-title">
-          {{ source?.sourceName ?? "Loading source" }}
+          {{ source?.sourceName ?? t("sources.workspace.loadingSource") }}
         </h1>
         <p class="console-page-subtitle">
           {{ sourceSubtitle }}
           <span v-if="sourceRow">
-            Updated {{ sourceRow.lastUpdatedLabel }}.
+            {{
+              t("sources.workspace.updated", {
+                date: sourceRow.lastUpdatedLabel,
+              })
+            }}
           </span>
         </p>
       </div>
@@ -236,7 +242,9 @@ function badgeClass(tone: SourceTone): string {
       <div class="flex items-center justify-between gap-4 max-[760px]:grid">
         <div>
           <div class="flex flex-wrap items-center gap-2">
-            <strong class="text-sm text-(--text-strong)">Sync stream</strong>
+            <strong class="text-sm text-(--text-strong)">
+              {{ t("sources.workspace.syncStream") }}
+            </strong>
             <span
               v-if="syncStage"
               class="rounded-(--console-radius-xs) border border-(--line-soft) px-1.5 py-0.5 text-[11px] text-(--text-faint)"
@@ -267,10 +275,26 @@ function badgeClass(tone: SourceTone): string {
         v-if="syncCounters"
         class="grid grid-cols-4 gap-2 text-xs text-(--text-faint) max-[760px]:grid-cols-2"
       >
-        <span>Discovered {{ syncCounters.discovered }}</span>
-        <span>Fetched {{ syncCounters.fetched }}</span>
-        <span>Completed {{ syncCounters.completed }}</span>
-        <span>Failed {{ syncCounters.failed }}</span>
+        <span>
+          {{
+            t("sources.workspace.discovered", {
+              count: syncCounters.discovered,
+            })
+          }}
+        </span>
+        <span>
+          {{ t("sources.workspace.fetched", { count: syncCounters.fetched }) }}
+        </span>
+        <span>
+          {{
+            t("sources.workspace.completed", {
+              count: syncCounters.completed,
+            })
+          }}
+        </span>
+        <span>
+          {{ t("sources.workspace.failed", { count: syncCounters.failed }) }}
+        </span>
       </div>
     </section>
 

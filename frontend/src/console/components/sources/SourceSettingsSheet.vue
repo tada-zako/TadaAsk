@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { FileText, Globe2, Settings, Trash2 } from "@lucide/vue";
+import { useI18n } from "vue-i18n";
 
 import { useWebCrawlConfigForm } from "./useWebCrawlConfigForm";
 import { toSourceRow } from "@/console/services/source-workspace";
@@ -48,6 +49,8 @@ const emit = defineEmits<{
   (event: "deleteSource"): void;
 }>();
 
+const { t } = useI18n();
+
 // 响应式变量
 const open = ref(false);
 const sourceName = ref("");
@@ -76,13 +79,15 @@ const localError = ref<string | null>(null);
 const sourceRow = computed(() => toSourceRow(props.source));
 const isWebCrawl = computed(() => props.source.sourceType === "web_crawl");
 const sheetTitle = computed(() =>
-  isWebCrawl.value ? "Web crawl settings" : "Local file settings",
+  isWebCrawl.value
+    ? t("sources.settings.webTitle")
+    : t("sources.settings.localTitle"),
 );
 
 const visibilityHelp = computed(() =>
   isWebCrawl.value
-    ? "Keep enabled only after crawl results are reviewed."
-    : "Disable while uploading or reviewing imported files.",
+    ? t("sources.settings.webVisibilityHelp")
+    : t("sources.settings.localVisibilityHelp"),
 );
 
 watch(
@@ -102,7 +107,7 @@ function handleSave(): void {
   const name = sourceName.value.trim();
 
   if (!name) {
-    localError.value = "Source name is required.";
+    localError.value = t("sources.common.nameRequired");
     return;
   }
 
@@ -160,13 +165,13 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
     <SheetTrigger as-child>
       <Button
         type="button"
-        :aria-label="`Open ${sourceRow.name} source settings`"
+        :aria-label="t('sources.settings.openAria', { name: sourceRow.name })"
         variant="outline"
         size="sm"
         class="w-24 overflow-hidden"
       >
         <Settings class="size-3.5" />
-        Settings
+        {{ t("sources.common.actions.settings") }}
       </Button>
     </SheetTrigger>
     <SheetContent
@@ -181,19 +186,23 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
       >
         <section class="grid gap-4">
           <div>
-            <h2 class="console-panel-title">Source profile</h2>
+            <h2 class="console-panel-title">
+              {{ t("sources.settings.profileTitle") }}
+            </h2>
             <p class="console-panel-note">
-              Edit the container name and visitor visibility for this source.
+              {{ t("sources.settings.profileHelp") }}
             </p>
           </div>
 
           <div class="grid gap-2">
-            <Label for="source-settings-name">Name</Label>
+            <Label for="source-settings-name">
+              {{ t("sources.common.fields.name") }}
+            </Label>
             <Input id="source-settings-name" v-model="sourceName" />
           </div>
 
           <div class="grid gap-2">
-            <Label>Type</Label>
+            <Label>{{ t("sources.common.fields.type") }}</Label>
             <div
               class="flex min-h-10 items-center justify-between rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-panel-soft) px-3"
             >
@@ -214,14 +223,16 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
             class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-(--console-radius-lg) border border-(--line) bg-(--surface-panel-soft) p-3"
           >
             <div>
-              <Label>Public for visitor RAG</Label>
+              <Label>
+                {{ t("sources.common.fields.publicForVisitorRag") }}
+              </Label>
               <p class="mt-1 text-xs leading-5 text-(--text-faint)">
                 {{ visibilityHelp }}
               </p>
             </div>
             <Switch
               :model-value="isPublic"
-              aria-label="Source visibility"
+              :aria-label="t('sources.settings.visibilityAria')"
               @update:model-value="isPublic = Boolean($event)"
             />
           </div>
@@ -232,17 +243,21 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           class="grid gap-4 border-t border-(--line-soft) pt-4.5"
         >
           <div>
-            <h2 class="console-panel-title">Web crawl config</h2>
+            <h2 class="console-panel-title">
+              {{ t("sources.common.fields.webCrawlConfig") }}
+            </h2>
             <p class="console-panel-note">
-              Updating crawl rules resets the source to pending when accepted.
+              {{ t("sources.settings.crawlHelp") }}
             </p>
           </div>
 
           <div class="grid gap-2">
-            <Label>Entry type</Label>
+            <Label>{{ t("sources.common.fields.entryType") }}</Label>
             <Select v-model="entryType">
               <SelectTrigger class="w-full bg-(--surface-base)">
-                <SelectValue placeholder="Entry type" />
+                <SelectValue
+                  :placeholder="t('sources.common.fields.entryType')"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="site_root">site_root</SelectItem>
@@ -253,7 +268,9 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           </div>
 
           <div v-if="entryType === 'site_root'" class="grid gap-2">
-            <Label for="web-root-url">Root URL</Label>
+            <Label for="web-root-url">
+              {{ t("sources.common.fields.rootUrl") }}
+            </Label>
             <Input
               id="web-root-url"
               v-model="siteRootUrl"
@@ -262,7 +279,9 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           </div>
 
           <div v-else-if="entryType === 'sitemap_url'" class="grid gap-2">
-            <Label for="web-sitemap-url">Sitemap URL</Label>
+            <Label for="web-sitemap-url">
+              {{ t("sources.common.fields.sitemapUrl") }}
+            </Label>
             <Input
               id="web-sitemap-url"
               v-model="sitemapUrl"
@@ -271,7 +290,9 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           </div>
 
           <div v-else class="grid gap-2">
-            <Label for="web-url-list">URLs</Label>
+            <Label for="web-url-list">
+              {{ t("sources.common.fields.urls") }}
+            </Label>
             <Textarea
               id="web-url-list"
               v-model="urlsText"
@@ -282,17 +303,23 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
 
           <div class="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
             <div class="grid gap-2">
-              <Label for="web-max-pages">Max pages</Label>
+              <Label for="web-max-pages">
+                {{ t("sources.common.fields.maxPages") }}
+              </Label>
               <Input id="web-max-pages" v-model="maxPages" type="number" />
             </div>
             <div class="grid gap-2">
-              <Label for="web-max-depth">Max depth</Label>
+              <Label for="web-max-depth">
+                {{ t("sources.common.fields.maxDepth") }}
+              </Label>
               <Input id="web-max-depth" v-model="maxDepth" type="number" />
             </div>
           </div>
 
           <div class="grid gap-2">
-            <Label for="web-allowed-domains">Allowed domains</Label>
+            <Label for="web-allowed-domains">
+              {{ t("sources.common.fields.allowedDomains") }}
+            </Label>
             <Input
               id="web-allowed-domains"
               v-model="allowedDomainsText"
@@ -301,7 +328,9 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           </div>
 
           <div class="grid gap-2">
-            <Label for="web-include-paths">Include paths</Label>
+            <Label for="web-include-paths">
+              {{ t("sources.common.fields.includePaths") }}
+            </Label>
             <Input
               id="web-include-paths"
               v-model="includePathsText"
@@ -310,7 +339,9 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           </div>
 
           <div class="grid gap-2">
-            <Label for="web-exclude-paths">Exclude paths</Label>
+            <Label for="web-exclude-paths">
+              {{ t("sources.common.fields.excludePaths") }}
+            </Label>
             <Input
               id="web-exclude-paths"
               v-model="excludePathsText"
@@ -319,7 +350,9 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           </div>
 
           <div class="grid gap-2">
-            <Label for="web-content-selectors">Content selectors</Label>
+            <Label for="web-content-selectors">
+              {{ t("sources.common.fields.contentSelectors") }}
+            </Label>
             <Input
               id="web-content-selectors"
               v-model="contentSelectorsText"
@@ -328,7 +361,9 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           </div>
 
           <div class="grid gap-2">
-            <Label for="web-exclude-selectors">Exclude selectors</Label>
+            <Label for="web-exclude-selectors">
+              {{ t("sources.common.fields.excludeSelectors") }}
+            </Label>
             <Input
               id="web-exclude-selectors"
               v-model="excludeSelectorsText"
@@ -338,7 +373,9 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
 
           <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
             <div class="grid gap-2">
-              <Label for="web-request-delay">Request delay ms</Label>
+              <Label for="web-request-delay">
+                {{ t("sources.common.fields.requestDelayMs") }}
+              </Label>
               <Input
                 id="web-request-delay"
                 v-model="requestDelayMs"
@@ -348,7 +385,7 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
             <div class="pt-6">
               <Switch
                 :model-value="respectRobotsTxt"
-                aria-label="Respect robots txt"
+                :aria-label="t('sources.common.respectRobotsAria')"
                 @update:model-value="respectRobotsTxt = Boolean($event)"
               />
             </div>
@@ -367,30 +404,33 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           <AlertDialogTrigger as-child>
             <Button
               type="button"
-              aria-label="Delete source"
+              :aria-label="t('sources.settings.deleteAria')"
               variant="outline"
               class="border-red-400/35 text-red-100 hover:bg-red-400/10 hover:text-red-100"
               :disabled="isMutating"
             >
               <Trash2 class="size-4" />
-              Delete
+              {{ t("sources.common.actions.delete") }}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete this source?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {{ t("sources.settings.deleteTitle") }}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                This removes the source container and its related source items.
-                Processing sources may be rejected by the backend.
+                {{ t("sources.settings.deleteDescription") }}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>
+                {{ t("sources.common.actions.cancel") }}
+              </AlertDialogCancel>
               <AlertDialogAction
                 class="bg-red-500 text-white hover:bg-red-500/90"
                 @click="handleDelete"
               >
-                Delete
+                {{ t("sources.common.actions.delete") }}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -398,11 +438,11 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
         <div class="flex justify-end">
           <Button
             type="button"
-            aria-label="Save source settings"
+            :aria-label="t('sources.settings.saveAria')"
             :disabled="isMutating"
             @click="handleSave"
           >
-            Save changes
+            {{ t("sources.common.actions.saveChanges") }}
           </Button>
         </div>
       </SheetFooter>

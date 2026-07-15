@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { FileText, Globe2, Plus } from "@lucide/vue";
+import { useI18n } from "vue-i18n";
 
 import { useWebCrawlConfigForm } from "./useWebCrawlConfigForm";
 import type { CreateSourceInput } from "@/console/services/source-workspace";
@@ -34,6 +35,8 @@ defineProps<{
 const emit = defineEmits<{
   (event: "createSource", input: CreateSourceInput): void;
 }>();
+
+const { t } = useI18n();
 
 // 响应式变量
 const open = ref(false);
@@ -72,7 +75,7 @@ function handleCreate(): void {
   const name = sourceName.value.trim();
 
   if (!name) {
-    localError.value = "Source name is required.";
+    localError.value = t("sources.common.nameRequired");
     return;
   }
 
@@ -105,9 +108,9 @@ function resetForm(): void {
   <!-- 创建知识库数据源的侧边栏抽屉 -->
   <Sheet v-model:open="open">
     <SheetTrigger as-child>
-      <Button type="button" aria-label="Create source">
+      <Button type="button" :aria-label="t('sources.create.openAria')">
         <Plus class="size-4" />
-        Create source
+        {{ t("sources.create.title") }}
       </Button>
     </SheetTrigger>
     <SheetContent
@@ -115,7 +118,9 @@ function resetForm(): void {
     >
       <!-- 抽屉头部 -->
       <SheetHeader class="border-b border-(--line-soft) px-4.5 py-4">
-        <SheetTitle class="text-[15px]">Create source</SheetTitle>
+        <SheetTitle class="text-[15px]">
+          {{ t("sources.create.title") }}
+        </SheetTitle>
       </SheetHeader>
 
       <!-- 表单内容滚动区域 -->
@@ -124,7 +129,7 @@ function resetForm(): void {
       >
         <!-- 数据源类型选择 -->
         <section class="grid gap-2">
-          <Label>Source type</Label>
+          <Label>{{ t("sources.common.fields.sourceType") }}</Label>
           <div class="grid grid-cols-2 gap-2 max-[560px]:grid-cols-1">
             <!-- 本地文件类型 -->
             <button
@@ -135,7 +140,7 @@ function resetForm(): void {
                   : 'border-(--line) bg-(--surface-panel-soft)',
               ]"
               type="button"
-              aria-label="Local file source type"
+              :aria-label="t('sources.create.localFileAria')"
               @click="sourceType = 'local_file'"
             >
               <span
@@ -144,10 +149,10 @@ function resetForm(): void {
                 <FileText class="size-4" />
               </span>
               <strong class="text-[13px] font-semibold text-(--text-strong)">
-                Local file
+                {{ t("sources.common.localFile") }}
               </strong>
               <span class="text-xs leading-5 text-(--text-faint)">
-                Upload files from the items page.
+                {{ t("sources.create.localFileHelp") }}
               </span>
             </button>
 
@@ -160,7 +165,7 @@ function resetForm(): void {
                   : 'border-(--line) bg-(--surface-panel-soft)',
               ]"
               type="button"
-              aria-label="Web crawl source type"
+              :aria-label="t('sources.create.webCrawlAria')"
               @click="sourceType = 'web_crawl'"
             >
               <span
@@ -169,10 +174,10 @@ function resetForm(): void {
                 <Globe2 class="size-4" />
               </span>
               <strong class="text-[13px] font-semibold text-(--text-strong)">
-                Web crawl
+                {{ t("sources.common.webCrawl") }}
               </strong>
               <span class="text-xs leading-5 text-(--text-faint)">
-                Configure crawl rules before sync.
+                {{ t("sources.create.webCrawlHelp") }}
               </span>
             </button>
           </div>
@@ -180,54 +185,60 @@ function resetForm(): void {
 
         <!-- 数据源名称 -->
         <section class="grid gap-2">
-          <Label for="source-name">Name</Label>
+          <Label for="source-name">
+            {{ t("sources.common.fields.name") }}
+          </Label>
           <Input
             id="source-name"
             v-model="sourceName"
-            placeholder="Product docs PDF"
+            :placeholder="t('sources.create.namePlaceholder')"
           />
         </section>
 
         <!-- 可见性/启用状态 -->
         <section class="grid gap-2">
-          <Label>Visibility</Label>
+          <Label>{{ t("sources.common.fields.visibility") }}</Label>
           <div
             class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-(--console-radius-lg) border border-(--line) bg-(--surface-panel-soft) p-3"
           >
             <div>
               <strong class="block text-[13px] text-(--text-strong)">
-                Public for visitor RAG
+                {{ t("sources.common.fields.publicForVisitorRag") }}
               </strong>
               <span class="mt-1 block text-xs leading-5 text-(--text-faint)">
-                Keep off while importing or reviewing source items.
+                {{ t("sources.create.publicHelp") }}
               </span>
             </div>
             <Switch
               :model-value="isPublic"
-              aria-label="Public for visitor RAG"
+              :aria-label="t('sources.common.fields.publicForVisitorRag')"
               @update:model-value="isPublic = Boolean($event)"
             />
           </div>
           <p class="text-xs leading-5 text-(--text-faint)">
-            Visitor RAG still requires at least one completed source item.
+            {{ t("sources.create.visitorReadyHelp") }}
           </p>
         </section>
 
         <!-- 网页爬取配置面板（仅在选择 Web crawl 时展示） -->
         <section v-if="isWebCrawl" class="console-panel grid gap-4 p-4">
           <div>
-            <h2 class="console-panel-title">Web crawl config</h2>
+            <h2 class="console-panel-title">
+              {{ t("sources.common.fields.webCrawlConfig") }}
+            </h2>
             <p class="console-panel-note">
-              Crawled pages are materialized from the items workspace.
+              {{ t("sources.create.crawlHelp") }}
             </p>
           </div>
 
           <!-- 入口类型 -->
           <div class="grid gap-2">
-            <Label>Entry type</Label>
+            <Label>{{ t("sources.common.fields.entryType") }}</Label>
             <Select v-model="entryType">
               <SelectTrigger class="w-full bg-(--surface-base)">
-                <SelectValue placeholder="Entry type" />
+                <SelectValue
+                  :placeholder="t('sources.common.fields.entryType')"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="site_root">site_root</SelectItem>
@@ -239,7 +250,9 @@ function resetForm(): void {
 
           <!-- 起始 URL -->
           <div v-if="entryType === 'site_root'" class="grid gap-2">
-            <Label for="seed-url">Site root URL</Label>
+            <Label for="seed-url">
+              {{ t("sources.common.fields.rootUrl") }}
+            </Label>
             <Input
               id="seed-url"
               v-model="siteRootUrl"
@@ -248,7 +261,9 @@ function resetForm(): void {
           </div>
 
           <div v-else-if="entryType === 'sitemap_url'" class="grid gap-2">
-            <Label for="sitemap-url">Sitemap URL</Label>
+            <Label for="sitemap-url">
+              {{ t("sources.common.fields.sitemapUrl") }}
+            </Label>
             <Input
               id="sitemap-url"
               v-model="sitemapUrl"
@@ -257,7 +272,7 @@ function resetForm(): void {
           </div>
 
           <div v-else class="grid gap-2">
-            <Label for="url-list">URLs</Label>
+            <Label for="url-list">{{ t("sources.common.fields.urls") }}</Label>
             <Textarea
               id="url-list"
               v-model="urlsText"
@@ -269,17 +284,23 @@ function resetForm(): void {
           <!-- 限制参数 -->
           <div class="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
             <div class="grid gap-2">
-              <Label for="max-pages">Max pages</Label>
+              <Label for="max-pages">
+                {{ t("sources.common.fields.maxPages") }}
+              </Label>
               <Input id="max-pages" v-model="maxPages" type="number" />
             </div>
             <div class="grid gap-2">
-              <Label for="max-depth">Max depth</Label>
+              <Label for="max-depth">
+                {{ t("sources.common.fields.maxDepth") }}
+              </Label>
               <Input id="max-depth" v-model="maxDepth" type="number" />
             </div>
           </div>
 
           <div class="grid gap-2">
-            <Label for="allowed-domains">Allowed domains</Label>
+            <Label for="allowed-domains">
+              {{ t("sources.common.fields.allowedDomains") }}
+            </Label>
             <Input
               id="allowed-domains"
               v-model="allowedDomainsText"
@@ -289,7 +310,9 @@ function resetForm(): void {
 
           <!-- 提取选择器 -->
           <div class="grid gap-2">
-            <Label for="content-selectors">Content selectors</Label>
+            <Label for="content-selectors">
+              {{ t("sources.common.fields.contentSelectors") }}
+            </Label>
             <Input
               id="content-selectors"
               v-model="contentSelectorsText"
@@ -299,7 +322,9 @@ function resetForm(): void {
 
           <!-- 排除选择器 -->
           <div class="grid gap-2">
-            <Label for="exclude-selectors">Exclude selectors</Label>
+            <Label for="exclude-selectors">
+              {{ t("sources.common.fields.excludeSelectors") }}
+            </Label>
             <Input
               id="exclude-selectors"
               v-model="excludeSelectorsText"
@@ -309,7 +334,9 @@ function resetForm(): void {
 
           <div class="grid grid-cols-2 gap-3 max-[560px]:grid-cols-1">
             <div class="grid gap-2">
-              <Label for="include-paths">Include paths</Label>
+              <Label for="include-paths">
+                {{ t("sources.common.fields.includePaths") }}
+              </Label>
               <Input
                 id="include-paths"
                 v-model="includePathsText"
@@ -317,7 +344,9 @@ function resetForm(): void {
               />
             </div>
             <div class="grid gap-2">
-              <Label for="exclude-paths">Exclude paths</Label>
+              <Label for="exclude-paths">
+                {{ t("sources.common.fields.excludePaths") }}
+              </Label>
               <Input
                 id="exclude-paths"
                 v-model="excludePathsText"
@@ -328,7 +357,9 @@ function resetForm(): void {
 
           <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
             <div class="grid gap-2">
-              <Label for="request-delay">Request delay ms</Label>
+              <Label for="request-delay">
+                {{ t("sources.common.fields.requestDelayMs") }}
+              </Label>
               <Input
                 id="request-delay"
                 v-model="requestDelayMs"
@@ -338,7 +369,7 @@ function resetForm(): void {
             <div class="pt-6">
               <Switch
                 :model-value="respectRobotsTxt"
-                aria-label="Respect robots txt"
+                :aria-label="t('sources.common.respectRobotsAria')"
                 @update:model-value="respectRobotsTxt = Boolean($event)"
               />
             </div>
@@ -356,19 +387,19 @@ function resetForm(): void {
       >
         <Button
           type="button"
-          aria-label="Cancel create source"
+          :aria-label="t('sources.create.cancelAria')"
           variant="outline"
           @click="open = false"
         >
-          Cancel
+          {{ t("sources.common.actions.cancel") }}
         </Button>
         <Button
           type="button"
-          aria-label="Confirm create source"
+          :aria-label="t('sources.create.confirmAria')"
           :disabled="isMutating"
           @click="handleCreate"
         >
-          Create
+          {{ t("sources.common.actions.create") }}
         </Button>
       </SheetFooter>
     </SheetContent>

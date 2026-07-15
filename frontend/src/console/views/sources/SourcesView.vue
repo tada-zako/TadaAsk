@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { storeToRefs } from "pinia";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 
 import SourceCreateSheet from "@/console/components/sources/SourceCreateSheet.vue";
@@ -13,6 +14,7 @@ import type {
 import type { SourceUpdatePayload } from "@/console/api/sources";
 
 const router = useRouter();
+const { t } = useI18n();
 const sourceStore = useSourceStore();
 const { errorMessage, isLoading, isMutating, sourceRows } =
   storeToRefs(sourceStore);
@@ -63,11 +65,10 @@ async function handleOpenItems(source: SourceRow): Promise<void> {
       class="flex items-end justify-between gap-5 max-[760px]:grid max-[760px]:gap-4"
     >
       <div class="console-page-head">
-        <p class="console-kicker">Knowledge sources</p>
-        <h1 class="console-page-title">Sources</h1>
+        <p class="console-kicker">{{ t("sources.page.kicker") }}</p>
+        <h1 class="console-page-title">{{ t("sources.title") }}</h1>
         <p class="console-page-subtitle">
-          Create source containers, review visibility, and open each source item
-          workspace when upload, crawl, or indexing work is needed.
+          {{ t("sources.page.description") }}
         </p>
       </div>
 
