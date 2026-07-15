@@ -175,12 +175,14 @@ export const en = {
         enabled: "Enabled",
         created: "Created",
         updated: "Updated",
+        deploy: "Deploy",
         actions: "Actions",
       },
       widgetEnabled: "{name} widget enabled",
       widgetActions: "{name} widget actions",
-      install: "Install",
-      deployTitle: "Install widget",
+      deploy: "Deploy",
+      deployWidget: "Deploy {name}",
+      deployTitle: "Deploy widget",
       deployDescription:
         "Copy the generated Web Component markup into the allowed host site.",
       deployEnabled: "Ready",
@@ -193,9 +195,11 @@ export const en = {
       copy: "Copy",
       copied: "Copied",
       copyFailed: "Clipboard access failed. Copy the code manually.",
-      customizeTitle: "Optional theme tokens",
-      customizeHelp:
-        "Set CSS custom properties on the element; internal chat behavior remains isolated.",
+      customizationDocsTitle: "Customize the widget appearance",
+      customizationDocsHelp:
+        "Review the supported attributes and theme tokens.",
+      viewCustomizationDocs: "View guide",
+      openCustomizationDocs: "Open widget customization guide",
       editWidget: "Edit widget",
       dialogEditTitle: "Edit widget",
       dialogEditDescription:

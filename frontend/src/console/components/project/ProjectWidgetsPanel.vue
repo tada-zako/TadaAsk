@@ -6,6 +6,7 @@ import {
   Code2,
   Copy,
   Ellipsis,
+  ExternalLink,
   Pencil,
   Plus,
   Trash2,
@@ -45,10 +46,11 @@ import type {
   ProjectWidgetRow,
   ProjectWidgetUpdate,
 } from "@/console/services/project-workspace";
-import {
-  createWidgetDeploymentCode,
-  WIDGET_CUSTOMIZATION_EXAMPLE,
-} from "@/console/services/widget-deployment";
+import { createWidgetDeploymentCode } from "@/console/services/widget-deployment";
+
+// TODO: 正式文档地址确定后，只需替换这一处。
+const WIDGET_CUSTOMIZATION_DOCS_URL =
+  "https://github.com/tada-zako/ai_widget/blob/main/frontend/docs/tutorial/visitor-widget-customization.md";
 
 const props = defineProps<{
   isMutating?: boolean;
@@ -284,7 +286,10 @@ async function copyText(value: string): Promise<void> {
           <TableHead>{{ t("project.widgets.table.enabled") }}</TableHead>
           <TableHead>{{ t("project.widgets.table.created") }}</TableHead>
           <TableHead>{{ t("project.widgets.table.updated") }}</TableHead>
-          <TableHead class="w-16 text-right">
+          <TableHead class="w-40 px-5 text-center">
+            {{ t("project.widgets.table.deploy") }}
+          </TableHead>
+          <TableHead class="w-24 px-4 text-center">
             {{ t("project.widgets.table.actions") }}
           </TableHead>
         </TableRow>
@@ -307,7 +312,23 @@ async function copyText(value: string): Promise<void> {
           </TableCell>
           <TableCell>{{ widget.createdLabel }}</TableCell>
           <TableCell>{{ widget.updatedLabel }}</TableCell>
-          <TableCell class="text-right">
+          <TableCell class="w-40 px-5 text-center">
+            <Button
+              type="button"
+              :aria-label="
+                t('project.widgets.deployWidget', { name: widget.name })
+              "
+              variant="ghost"
+              size="sm"
+              class="h-8 border-(--line) bg-(--surface-panel-soft) px-2.5 text-xs text-(--text-body) hover:bg-(--surface-hover) hover:text-(--text-strong)"
+              :disabled="isMutating"
+              @click="openDeployment(widget)"
+            >
+              <Code2 class="size-4" />
+              <!-- {{ t("project.widgets.deploy") }} -->
+            </Button>
+          </TableCell>
+          <TableCell class="w-24 px-4 text-center">
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <Button
@@ -323,10 +344,6 @@ async function copyText(value: string): Promise<void> {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem @select="openDeployment(widget)">
-                  <Code2 class="size-4" />
-                  {{ t("project.widgets.install") }}
-                </DropdownMenuItem>
                 <DropdownMenuItem @select="openEdit(widget)">
                   <Pencil class="size-4" />
                   {{ t("common.actions.edit") }}
@@ -350,7 +367,7 @@ async function copyText(value: string): Promise<void> {
           </TableCell>
         </TableRow>
         <TableRow v-if="widgets.length === 0">
-          <TableCell colspan="6" class="h-28 text-center text-(--text-faint)">
+          <TableCell colspan="7" class="h-28 text-center text-(--text-faint)">
             {{ t("project.widgets.empty") }}
           </TableCell>
         </TableRow>
@@ -418,11 +435,13 @@ async function copyText(value: string): Promise<void> {
 
     <!-- 部署代码只依赖当前 project/widget 标识与构建环境地址。 -->
     <Dialog v-model:open="deploymentDialogOpen">
-      <DialogContent class="max-w-2xl gap-0 overflow-hidden p-0">
-        <DialogHeader class="border-b border-(--line-soft) px-6 py-5">
+      <DialogContent
+        class="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+      >
+        <DialogHeader class="shrink-0 border-b border-(--line-soft) px-6 py-5">
           <div class="flex items-start gap-3 pr-8">
             <span
-              class="border-primary/25 bg-primary/10 text-primary grid size-9 shrink-0 place-items-center rounded-(--console-radius-md) border"
+              class="border-primary/25 text-primary grid size-9 shrink-0 place-items-center rounded-(--console-radius-md) border"
             >
               <Code2 class="size-4" />
             </span>
@@ -435,15 +454,20 @@ async function copyText(value: string): Promise<void> {
           </div>
         </DialogHeader>
 
-        <div v-if="deployingWidget && deploymentCode" class="grid gap-5 p-6">
+        <div
+          v-if="deployingWidget && deploymentCode"
+          class="console-scrollbar grid min-h-0 flex-1 gap-4 overflow-y-auto overscroll-contain p-6 max-[620px]:p-4"
+        >
           <div
-            class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-panel-soft) px-4 py-3 max-[620px]:grid-cols-1"
+            class="flex min-w-0 items-center justify-between gap-4 border-b border-(--line-soft) px-0.5 pb-4"
           >
             <div class="min-w-0">
-              <strong class="block truncate text-sm text-(--text-strong)">
+              <strong class="block truncate text-[13px] text-(--text-strong)">
                 {{ deployingWidget.name }}
               </strong>
-              <span class="mt-1 block truncate text-xs text-(--text-faint)">
+              <span
+                class="mt-0.5 block truncate text-[11px] text-(--text-faint)"
+              >
                 {{ deployingWidget.siteOrigin }}
               </span>
             </div>
@@ -463,19 +487,10 @@ async function copyText(value: string): Promise<void> {
             </span>
           </div>
 
-          <!-- 配置缺失提示 -->
-          <div
-            v-if="deploymentCode.missingConfig.length > 0"
-            class="rounded-(--console-radius-md) border border-yellow-300/25 bg-yellow-300/10 px-4 py-3 text-sm leading-6 text-yellow-100"
+          <!-- Embed code 是部署流程的主要操作区。 -->
+          <section
+            class="grid gap-3 rounded-(--console-radius-lg) border border-(--line-soft) bg-(--surface-panel-soft) p-4"
           >
-            {{
-              t("project.widgets.deployMissingConfig", {
-                config: missingDeploymentConfig,
-              })
-            }}
-          </div>
-
-          <section class="grid gap-2">
             <div class="flex items-center justify-between gap-3">
               <div>
                 <h3 class="text-sm font-semibold text-(--text-strong)">
@@ -502,28 +517,49 @@ async function copyText(value: string): Promise<void> {
                 }}
               </Button>
             </div>
+
+            <!-- 配置提示与代码放在同一区域，避免用户找不到关键操作。 -->
+            <div
+              v-if="deploymentCode.missingConfig.length > 0"
+              class="rounded-(--console-radius-md) border border-yellow-300/25 bg-yellow-300/10 px-3 py-2.5 text-xs leading-5 text-yellow-100"
+            >
+              {{
+                t("project.widgets.deployMissingConfig", {
+                  config: missingDeploymentConfig,
+                })
+              }}
+            </div>
             <pre
-              class="console-scrollbar max-h-64 overflow-auto rounded-(--console-radius-md) border border-(--line-soft) bg-[#070809] p-4 text-[12px] leading-6 text-cyan-50 shadow-inner"
+              class="console-scrollbar max-h-56 overflow-auto rounded-(--console-radius-md) border border-(--line-soft) bg-[#070809] p-4 text-[12px] leading-6 text-cyan-50 shadow-inner"
             ><code>{{ deploymentCode.html }}</code></pre>
             <p v-if="copyState === 'failed'" class="text-xs text-red-300">
               {{ t("project.widgets.copyFailed") }}
             </p>
           </section>
-
-          <section class="grid gap-2 border-t border-(--line-soft) pt-5">
-            <div>
-              <h3 class="text-sm font-semibold text-(--text-strong)">
-                {{ t("project.widgets.customizeTitle") }}
-              </h3>
-              <p class="mt-1 text-xs leading-5 text-(--text-faint)">
-                {{ t("project.widgets.customizeHelp") }}
-              </p>
-            </div>
-            <pre
-              class="console-scrollbar max-h-44 overflow-auto rounded-(--console-radius-md) border border-(--line-soft) bg-(--surface-base) p-4 text-[12px] leading-6 text-(--text-body)"
-            ><code>{{ WIDGET_CUSTOMIZATION_EXAMPLE }}</code></pre>
-          </section>
         </div>
+
+        <footer
+          class="flex shrink-0 items-center justify-between gap-4 border-t border-(--line-soft) bg-(--surface-panel-soft) px-6 py-4 max-[620px]:items-start max-[620px]:px-4"
+        >
+          <div class="min-w-0">
+            <strong class="block text-[12px] text-(--text-body)">
+              {{ t("project.widgets.customizationDocsTitle") }}
+            </strong>
+            <span class="mt-0.5 block text-[11px] text-(--text-faint)">
+              {{ t("project.widgets.customizationDocsHelp") }}
+            </span>
+          </div>
+          <a
+            :href="WIDGET_CUSTOMIZATION_DOCS_URL"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="t('project.widgets.openCustomizationDocs')"
+            class="inline-flex shrink-0 items-center gap-1.5 rounded-(--console-radius-sm) px-2 py-1.5 text-[12px] font-medium text-(--text-muted) transition-colors hover:bg-(--surface-hover) hover:text-(--text-strong) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent)"
+          >
+            {{ t("project.widgets.viewCustomizationDocs") }}
+            <ExternalLink class="size-3.5" />
+          </a>
+        </footer>
       </DialogContent>
     </Dialog>
   </section>

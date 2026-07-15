@@ -21,11 +21,15 @@ export function createWidgetDeploymentCode(
   if (!apiBaseUrl) missingConfig.push("apiBaseUrl");
   if (!scriptUrl) missingConfig.push("scriptUrl");
 
+  // 缺少构建配置时仍展示可辨识的代码结构，但禁止直接复制部署。
+  const displayApiBaseUrl = apiBaseUrl || "YOUR_API_BASE_URL";
+  const displayScriptUrl = scriptUrl || "YOUR_WIDGET_SCRIPT_URL";
+
   const html = [
-    `<script type="module" src="${escapeHtmlAttribute(scriptUrl)}"></script>`,
+    `<script type="module" src="${escapeHtmlAttribute(displayScriptUrl)}"></script>`,
     "",
     "<tada-ask-widget",
-    `  api-base-url="${escapeHtmlAttribute(apiBaseUrl)}"`,
+    `  api-base-url="${escapeHtmlAttribute(displayApiBaseUrl)}"`,
     `  project-uid="${escapeHtmlAttribute(input.projectUid)}"`,
     `  widget-uid="${escapeHtmlAttribute(input.widgetUid)}"`,
     "></tada-ask-widget>",
@@ -33,13 +37,6 @@ export function createWidgetDeploymentCode(
 
   return { apiBaseUrl, html, missingConfig, scriptUrl };
 }
-
-export const WIDGET_CUSTOMIZATION_EXAMPLE = `tada-ask-widget {
-  --tada-widget-background: #f7f3eb;
-  --tada-widget-foreground: #26231f;
-  --tada-widget-accent: #b6533c;
-  --tada-widget-color-scheme: light;
-}`;
 
 function normalizeUrl(value: string): string {
   return value.trim().replace(/\/+$/, "");
