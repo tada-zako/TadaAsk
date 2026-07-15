@@ -72,10 +72,10 @@
   height: 1.2rem;
   place-items: center;
   margin: 0 0.1rem;
-  border: 1px solid rgba(36, 211, 196, 0.24);
+  border: 1px solid var(--chat-md-citation-border, rgba(36, 211, 196, 0.24));
   border-radius: 999px;
-  background: rgba(36, 211, 196, 0.075);
-  color: var(--primary);
+  background: var(--chat-md-citation-background, rgba(36, 211, 196, 0.075));
+  color: var(--chat-md-citation-foreground, var(--primary));
   cursor: pointer;
   font-size: 0.67rem;
   font-weight: 720;
@@ -90,9 +90,12 @@
 
 .chat-md-citation:hover,
 .chat-md-citation:focus-visible {
-  border-color: rgba(36, 211, 196, 0.48);
-  background: rgba(36, 211, 196, 0.14);
-  color: var(--text-strong);
+  border-color: var(--chat-md-citation-hover-border, rgba(36, 211, 196, 0.48));
+  background: var(
+    --chat-md-citation-hover-background,
+    rgba(36, 211, 196, 0.14)
+  );
+  color: var(--chat-md-citation-hover-foreground, var(--text-strong));
   outline: none;
   transform: translateY(-1px);
 }

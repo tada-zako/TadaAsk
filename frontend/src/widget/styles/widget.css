@@ -35,6 +35,13 @@
   --tada-widget-accent: #24d3c4;
   --tada-widget-accent-foreground: #031110;
   --tada-widget-accent-soft: rgb(36 211 196 / 0.1);
+  --tada-widget-citation-background: var(--tada-widget-accent-soft);
+  --tada-widget-citation-border: color-mix(
+    in srgb,
+    var(--tada-widget-accent) 25%,
+    transparent
+  );
+  --tada-widget-citation-foreground: var(--tada-widget-accent);
   --tada-widget-panel-width: 70vw;
   --tada-widget-panel-max-width: 980px;
   --tada-widget-panel-max-height: 700px;
@@ -465,6 +472,20 @@ svg {
   --text-faint: var(--tada-widget-faint);
   --primary: var(--tada-widget-accent);
   --line-soft: var(--tada-widget-border-soft);
+  --chat-md-citation-background: var(--tada-widget-citation-background);
+  --chat-md-citation-border: var(--tada-widget-citation-border);
+  --chat-md-citation-foreground: var(--tada-widget-citation-foreground);
+  --chat-md-citation-hover-background: color-mix(
+    in srgb,
+    var(--tada-widget-citation-background) 92%,
+    var(--tada-widget-foreground) 8%
+  );
+  --chat-md-citation-hover-border: color-mix(
+    in srgb,
+    var(--tada-widget-citation-border) 72%,
+    var(--tada-widget-foreground) 28%
+  );
+  --chat-md-citation-hover-foreground: var(--tada-widget-foreground);
   --console-radius-sm: 6px;
   --console-radius-lg: 11px;
   max-width: 94%;
@@ -519,25 +540,6 @@ svg {
   font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
   font-size: 0.88em;
   padding: 1px 5px;
-}
-
-/* ===== 引用标记（inline citation badge） ===== */
-.citation-token {
-  display: inline-grid;
-  min-width: 19px;
-  height: 19px;
-  place-items: center;
-  margin: 0 2px;
-  border: 1px solid
-    color-mix(in srgb, var(--tada-widget-accent) 25%, transparent);
-  border-radius: 999px;
-  background: var(--tada-widget-accent-soft);
-  color: var(--tada-widget-accent);
-  font-size: 10px;
-  font-weight: 760;
-  line-height: 1;
-  vertical-align: 0.12em;
-  cursor: pointer;
 }
 
 .sources-toggle {
@@ -786,9 +788,22 @@ svg {
   font-size: 10.5px;
 }
 
-.panel-footer > div {
+.panel-footer > a {
   @apply inline-flex items-center gap-1.5;
   color: inherit;
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.panel-footer > a:hover,
+.panel-footer > a:focus-visible {
+  color: var(--tada-widget-foreground);
+}
+
+.panel-footer > a:focus-visible {
+  border-radius: 4px;
+  outline: 1px solid var(--tada-widget-accent);
+  outline-offset: 3px;
 }
 
 .panel-footer i {

@@ -11,7 +11,7 @@ const props = withDefaults(
     apiBaseUrl?: string;
     projectUid?: string;
     widgetUid?: string;
-    title?: string;
+    assistantTitle?: string;
     logoUrl?: string;
     placeholder?: string;
     launcherPosition?: "bottom-left" | "bottom-right";
@@ -21,7 +21,7 @@ const props = withDefaults(
     apiBaseUrl: "",
     projectUid: "",
     widgetUid: "",
-    title: "TadaAsk Assistant",
+    assistantTitle: "TadaAsk Assistant",
     logoUrl: "",
     placeholder: "Ask anything…",
     launcherPosition: "bottom-right",
@@ -73,13 +73,13 @@ function sendMessage() {
   >
     <WidgetLauncher
       v-show="!isOpen"
-      :label="`Open ${title}`"
+      :label="`Open ${assistantTitle}`"
       @open="openPanel"
     />
     <WidgetPanel
       ref="panelRef"
       v-show="isOpen"
-      :title="title"
+      :title="assistantTitle"
       :logo-url="logoUrl"
       :placeholder="placeholder"
       :messages="chat.messages.value"

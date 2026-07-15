@@ -1,10 +1,10 @@
 # Visitor Widget customization
 
-MVP 只允许通过 Web Component 属性和 CSS custom properties 定制外观；内部消息、Markdown、Citation、Sources 与流式交互不属于公开样式 API。
+MVP 只允许通过 Web Component 属性和 CSS custom properties 定制外观；内部消息、Markdown、Citation、Sources 与流式交互逻辑不允许修改。Inline citation 的颜色可通过公开变量调整。
 
 ## 标签属性
 
-- `title`
+- `assistant-title`
 - `logo-url`
 - `placeholder`
 - `launcher-position`: `bottom-left | bottom-right`
@@ -29,6 +29,9 @@ MVP 只允许通过 Web Component 属性和 CSS custom properties 定制外观�
 - `--tada-widget-accent`
 - `--tada-widget-accent-foreground`
 - `--tada-widget-accent-soft`
+- `--tada-widget-citation-background`
+- `--tada-widget-citation-border`
+- `--tada-widget-citation-foreground`
 - `--tada-widget-color-scheme`
 - `--tada-widget-font`
 

@@ -186,6 +186,9 @@ tada-ask-widget {
   --tada-widget-accent: #d64f32;
   --tada-widget-accent-foreground: #fff9ed;
   --tada-widget-accent-soft: rgb(214 79 50 / 0.12);
+  --tada-widget-citation-background: #e7ded0;
+  --tada-widget-citation-border: #a7826d;
+  --tada-widget-citation-foreground: #8d3425;
   --tada-widget-color-scheme: light;
   --tada-widget-font: "Manrope", sans-serif;
   --tada-widget-panel-width: 72vw;

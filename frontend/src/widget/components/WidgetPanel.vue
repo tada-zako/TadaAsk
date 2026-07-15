@@ -7,6 +7,9 @@ import type { WidgetMessageViewModel } from "../services/chat";
 import WidgetComposer from "./WidgetComposer.vue";
 import WidgetMessageList from "./WidgetMessageList.vue";
 
+// TODO: 官方站点 URL 确认前先指向项目仓库；后续只需替换这一处。
+const TADAASK_HOME_URL = "https://github.com/tada-zako/ai_widget";
+
 const props = withDefaults(
   defineProps<{
     title?: string;
@@ -194,7 +197,14 @@ defineExpose({ focusComposer });
       </main>
 
       <footer class="panel-footer">
-        <div><span>Powered by</span><i>T</i><strong>TadaAsk</strong></div>
+        <a
+          :href="TADAASK_HOME_URL"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Visit TadaAsk"
+        >
+          <span>Powered by</span><i>T</i><strong>TadaAsk</strong>
+        </a>
       </footer>
     </section>
   </div>
