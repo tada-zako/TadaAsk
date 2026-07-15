@@ -44,9 +44,11 @@ async function focusComposer() {
 }
 
 /** 打开 chat panel 后立即将用户光标聚焦于 composer */
-function openPanel() {
-  isOpen.value = true;
-  void focusComposer();
+function togglePanel() {
+  isOpen.value = !isOpen.value;
+  if (isOpen.value) {
+    void focusComposer();
+  }
 }
 
 function startNewChat() {
@@ -71,11 +73,7 @@ function sendMessage() {
       { 'panel-open': isOpen },
     ]"
   >
-    <WidgetLauncher
-      v-show="!isOpen"
-      :label="`Open ${assistantTitle}`"
-      @open="openPanel"
-    />
+    <WidgetLauncher :label="`Open ${assistantTitle}`" @open="togglePanel" />
     <WidgetPanel
       ref="panelRef"
       v-show="isOpen"
