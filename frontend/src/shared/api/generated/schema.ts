@@ -396,7 +396,7 @@ export interface paths {
         };
         /**
          * Get Source Item Download
-         * @description 获取 local file source item 的下载地址；web crawl 暂不支持下载。
+         * @description 通过 Admin 鉴权直接下载 local file；web crawl 暂不支持下载。
          */
         get: operations["get_source_item_download_admin_source__source_uid__items__source_item_uid__download_get"];
         put?: never;
