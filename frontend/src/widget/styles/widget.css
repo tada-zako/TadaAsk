@@ -792,7 +792,7 @@ svg {
   @apply inline-flex items-center gap-1.5;
   color: inherit;
   text-decoration: none;
-  transition: color 150ms ease;
+  transition: color 500ms ease;
 }
 
 .panel-footer > a:hover,
@@ -814,6 +814,12 @@ svg {
   font-size: 9px;
   font-style: normal;
   font-weight: 800;
+  transition: color 800ms ease;
+}
+
+.panel-footer > a:hover i,
+.panel-footer > a:focus-visible i {
+  color: var(--tada-widget-accent);
 }
 
 .widget-error {
