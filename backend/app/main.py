@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import HTTPException as StarletteHTTPException
 from loguru import logger
@@ -51,6 +50,7 @@ from app.services.indexing import SourceItemIndexingService
 from app.services.jobs import RAGJobManager
 from app.services.sources import WebCrawlSyncService
 from app.api import admin, visitor
+from app.api.admin.cors import AdminScopedCORSMiddleware
 from app.api.visitor.widget_cors import WidgetScopedCORSMiddleware
 
 
@@ -297,22 +297,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, title="Tada Ask API")
 
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://localhost:8080",
-    "http://localhost:5173",
-]
-
-# 跨域中间件执行顺序：widget 跨域中间件 -> 全局跨域中间件
+# Admin 与 Widget 使用互斥的路径范围，避免响应头和信任策略相互叠加。
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
+    AdminScopedCORSMiddleware,
+    allow_origins=settings.admin_cors_origins,
 )
 app.add_middleware(WidgetScopedCORSMiddleware, session_factory=async_session)
 

@@ -502,6 +502,7 @@ class ChatOrchestratorService:
         stream_response: StreamedResponse | None = None
         try:
             # 1.3 注册 generation 对象
+            # TODO: generation 对象可能需要提升到 session title 创建之前
             generation = self.generation_registry.register(
                 session_uid=chat_session.uid,
                 message_uid=assistant_message.uid,

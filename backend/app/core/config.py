@@ -67,12 +67,11 @@ class Settings(BaseSettings):
     # =======================================
     # 系统配置
     # =======================================
+    # 默认支持本地 Vite 开发
     admin_cors_origins: list[str] = [
-        "http://localhost",
-        "http://localhost:3000",
-        "http://localhost:8000",
-        "http://localhost:8080",
-    ]  # 预留配置；当前全局 CORSMiddleware 暂不使用
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
     file_storage_backend: str = "local"  # 文件存储后端，默认为本地存储
     max_file_size: int = 5 * 1024 * 1024  # 最大文件上传大小
@@ -110,8 +109,7 @@ class Settings(BaseSettings):
     visitor_stream_concurrency_per_project: int = 20  # 每 project 同时 stream：20
 
     visitor_message_max_chars: int = 4000  # visitor 侧单条消息最大字符数
-
-    visitor_trust_proxy_headers: bool = False  # 是否信任代理头部信息（X-Forwarded-For）
+    visitor_trust_proxy_headers: bool = False  # 是否信任 X-Forwarded-For
 
     # =======================================
     # 权限配置
