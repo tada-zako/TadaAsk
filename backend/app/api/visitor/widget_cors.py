@@ -17,12 +17,13 @@ class WidgetScopedCORSMiddleware:
     """
     visitor 侧 widget 请求 API 的 widget scoped CORS 中间件；
 
-    该中间件只处理 /visitor/project/{project_uid}/widget/{widget_uid}/... 的请求，
+    该中间件只处理 visitor widget chat stream 请求。
     """
 
     # 路径匹配正则
     _path_pattern = re.compile(
-        r"^/visitor/project/(?P<project_uid>[^/]+)/widget/(?P<widget_uid>[^/]+)(?:/|$)"
+        r"^/visitor/project/(?P<project_uid>[^/]+)/widget/"
+        r"(?P<widget_uid>[^/]+)/chat/stream/?$"
     )
 
     def __init__(

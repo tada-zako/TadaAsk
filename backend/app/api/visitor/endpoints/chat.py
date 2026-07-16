@@ -1,6 +1,6 @@
 from typing import AsyncIterable, Annotated, cast, AsyncIterator
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Request, Response
 from fastapi.sse import ServerSentEvent, EventSourceResponse
 from loguru import logger
 
@@ -347,12 +347,16 @@ async def stream_chat(
     response_model=VisitorChatCancelResponse,
 )
 async def cancel_visitor_generation(
+    response: Response,
     _rate_limit: Annotated[None, Depends(enforce_visitor_project_rate_limit)],
     generation_registry: GenerationRegistryDeps,
     widget_uid: Annotated[str, Path(..., description="Widget UID")],
     generation_uid: Annotated[str, Path(..., description="生成任务 UID")],
 ):
     """取消 visitor 侧活跃 LLM 生成；已结束时幂等 no-op"""
+    # cancel 无请求体，openapi-fetch 发送 simple request，
+    # 可以不处理 OPTIONS preflight CORS 验证请求
+    response.headers["Access-Control-Allow-Origin"] = "*"
     cancelled = generation_registry.cancel(generation_uid)
     return VisitorChatCancelResponse(
         widget_uid=widget_uid,
