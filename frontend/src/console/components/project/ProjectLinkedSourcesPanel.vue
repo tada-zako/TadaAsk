@@ -189,7 +189,16 @@ function badgeClass(
     </div>
 
     <!-- 数据源列表表格 -->
-    <Table class="console-scrollbar">
+    <Table class="console-scrollbar min-w-[54rem] table-fixed">
+      <colgroup>
+        <col class="w-[15rem]" />
+        <col class="w-[9rem]" />
+        <col class="w-[8rem]" />
+        <col class="w-[8rem]" />
+        <col class="w-[10rem]" />
+        <col class="w-[5rem]" />
+      </colgroup>
+
       <TableHeader>
         <TableRow>
           <TableHead>{{ t("project.sources.table.source") }}</TableHead>
@@ -204,8 +213,8 @@ function badgeClass(
       </TableHeader>
       <TableBody>
         <TableRow v-for="source in sources" :key="source.uid">
-          <TableCell>
-            <strong>{{ source.name }}</strong>
+          <TableCell class="overflow-hidden">
+            <strong class="block truncate">{{ source.name }}</strong>
           </TableCell>
           <TableCell>{{ source.typeLabel }}</TableCell>
           <TableCell>

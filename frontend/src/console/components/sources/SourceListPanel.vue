@@ -115,7 +115,16 @@ function badgeClass(
       </Select>
     </div>
 
-    <Table class="console-scrollbar">
+    <Table class="console-scrollbar min-w-[58rem] table-fixed">
+      <colgroup>
+        <col class="w-[12rem]" />
+        <col class="w-[9rem]" />
+        <col class="w-[7rem]" />
+        <col class="w-[7rem]" />
+        <col class="w-[7rem]" />
+        <col class="w-[13rem]" />
+      </colgroup>
+
       <TableHeader>
         <TableRow>
           <TableHead>{{ t("sources.list.columns.source") }}</TableHead>
@@ -142,8 +151,8 @@ function badgeClass(
         </TableRow>
 
         <TableRow v-for="source in filteredSources" v-else :key="source.uid">
-          <TableCell>
-            <strong>{{ source.name }}</strong>
+          <TableCell class="overflow-hidden">
+            <strong class="block truncate">{{ source.name }}</strong>
           </TableCell>
           <TableCell>
             <span class="flex items-center gap-2">

@@ -278,7 +278,17 @@ async function copyText(value: string): Promise<void> {
     </div>
 
     <!-- Widget 部署列表表格 -->
-    <Table class="console-scrollbar">
+    <Table class="console-scrollbar min-w-[68rem] table-fixed">
+      <colgroup>
+        <col />
+        <col />
+        <col class="w-[7rem]" />
+        <col class="w-[9rem]" />
+        <col class="w-[9rem]" />
+        <col class="w-40" />
+        <col class="w-24" />
+      </colgroup>
+
       <TableHeader>
         <TableRow>
           <TableHead>{{ t("project.widgets.table.widget") }}</TableHead>
@@ -296,10 +306,12 @@ async function copyText(value: string): Promise<void> {
       </TableHeader>
       <TableBody>
         <TableRow v-for="widget in widgets" :key="widget.uid">
-          <TableCell>
-            <strong>{{ widget.name }}</strong>
+          <TableCell class="overflow-hidden">
+            <strong class="block truncate">{{ widget.name }}</strong>
           </TableCell>
-          <TableCell>{{ widget.siteOrigin }}</TableCell>
+          <TableCell class="overflow-hidden">
+            <span class="block truncate">{{ widget.siteOrigin }}</span>
+          </TableCell>
           <TableCell>
             <Switch
               :model-value="widget.isEnabled"
