@@ -1,0 +1,10 @@
+.env
+.env.*
+.git
+.gitignore
+.vite
+.vscode
+dist
+docs
+node_modules
+pnpm-debug.log*
