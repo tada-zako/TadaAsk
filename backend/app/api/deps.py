@@ -174,18 +174,14 @@ async def get_model_profile_crud(session: "SessionDeps") -> ModelProfileCRUD:
 
 # =========== 工具函数封装依赖注入接口 ===========
 def get_client_ip(request: Request) -> str:
-    """获取客户端 IP 地址"""
+    """按配置读取代理传入的客户端 IP，否则使用直连地址。"""
     if settings.visitor_trust_proxy_headers:
-        # 信任代理头部信息
-        # 优先尝试信任 Cloudflare
-        cf_ip = request.headers.get("CF-Connecting-IP")
-        if cf_ip:
-            return cf_ip.strip()
-
-        x_forwarded_for = request.headers.get("X-Forwarded-For")
-        if x_forwarded_for:
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
             # 取第一个 IP
-            return x_forwarded_for.split(",", 1)[0].strip()
+            client_ip = forwarded_for.split(",", 1)[0].strip()
+            if client_ip:
+                return client_ip
 
     # fallback 到 request.client.host
     if request.client:
