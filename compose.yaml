@@ -1,0 +1,65 @@
+name: tadaask
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_AUTO_MIGRATE: "true"
+      SQLITE_DATABASE_PATH: /app/storages/sqlite.db
+      CHROMADB_PATH: /app/storages/chromadb
+      UPLOAD_FOLDER_PATH: /app/storages/uploads
+      FASTEMBED_MODEL_CACHE_DIR: /app/storages/models/fastembed
+      LLAMACPP_MODEL_CACHE_DIR: /app/storages/models/llamacpp
+      HF_HUB_CACHE_DIR: /app/storages/models/hf_hub_cache
+      HF_HUB_DISABLE_XET: "1"
+      HF_TOKEN: ${TADAASK_HF_TOKEN:-}
+      ADMIN_CORS_ORIGINS: "${TADAASK_ADMIN_CORS_ORIGINS:-[]}"
+      VISITOR_TRUST_PROXY_HEADERS: "true"
+      HTTP_PROXY: ${TADAASK_HTTP_PROXY:-}
+      HTTPS_PROXY: ${TADAASK_HTTPS_PROXY:-}
+      NO_PROXY: localhost,127.0.0.1,backend,frontend
+    expose:
+      - "8000"
+    volumes:
+      - tadaask-data:/app/storages
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; socket.create_connection(('127.0.0.1', 8000), timeout=5).close()",
+        ]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 300s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${TADAASK_PUBLIC_URL:-http://localhost:8080}/api
+        VITE_WIDGET_SCRIPT_URL: ${TADAASK_PUBLIC_URL:-http://localhost:8080}/widget/tada-ask-widget.js
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${TADAASK_BIND_ADDRESS:-127.0.0.1}:${TADAASK_PORT:-8080}:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  tadaask-data:
