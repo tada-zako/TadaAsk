@@ -22,13 +22,6 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
-import {
   Sheet,
   SheetContent,
   SheetFooter,
@@ -69,7 +62,6 @@ const {
   maxPages,
   requestDelayMs,
   resetFromConfig: resetWebCrawlConfigForm,
-  respectRobotsTxt,
   sitemapUrl,
   siteRootUrl,
   urlsText,
@@ -78,6 +70,17 @@ const localError = ref<string | null>(null);
 
 const sourceRow = computed(() => toSourceRow(props.source));
 const isWebCrawl = computed(() => props.source.sourceType === "web_crawl");
+const isLegacyCrawlEntry = computed(
+  () => isWebCrawl.value && entryType.value !== "url_list",
+);
+const legacyEntryValue = computed(() =>
+  entryType.value === "site_root" ? siteRootUrl.value : sitemapUrl.value,
+);
+const legacyEntryLabel = computed(() =>
+  entryType.value === "site_root"
+    ? t("sources.common.fields.rootUrl")
+    : t("sources.common.fields.sitemapUrl"),
+);
 const sheetTitle = computed(() =>
   isWebCrawl.value
     ? t("sources.settings.webTitle")
@@ -251,8 +254,21 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
             </p>
           </div>
 
-          <div class="grid gap-2">
-            <Label>{{ t("sources.common.fields.entryType") }}</Label>
+          <!-- 未启用 crawl 类型 DOM 说明 -->
+          <div
+            v-if="isLegacyCrawlEntry"
+            class="grid gap-3 rounded-(--console-radius-lg) border border-amber-300/15 bg-amber-300/[0.045] p-3"
+          >
+            <div class="grid gap-1">
+              <strong class="text-[13px] font-semibold text-amber-100/90">
+                {{ t("sources.settings.legacyEntryTitle") }}
+              </strong>
+              <p class="text-xs leading-5 text-(--text-faint)">
+                {{ t("sources.settings.legacyEntryHelp") }}
+              </p>
+            </div>
+            <div class="grid gap-2">
+              <!-- <Label>{{ t("sources.common.fields.entryType") }}</Label>
             <Select v-model="entryType">
               <SelectTrigger class="w-full bg-(--surface-base)">
                 <SelectValue
@@ -270,15 +286,16 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
           <div v-if="entryType === 'site_root'" class="grid gap-2">
             <Label for="web-root-url">
               {{ t("sources.common.fields.rootUrl") }}
-            </Label>
-            <Input
-              id="web-root-url"
-              v-model="siteRootUrl"
-              placeholder="https://docs.example.com/"
-            />
-          </div>
+            </Label> -->
+              <Label>{{ legacyEntryLabel }}</Label>
+              <Input
+                :model-value="legacyEntryValue"
+                readonly
+                class="text-(--text-muted)"
+              />
+            </div>
 
-          <div v-else-if="entryType === 'sitemap_url'" class="grid gap-2">
+            <!-- <div v-else-if="entryType === 'sitemap_url'" class="grid gap-2">
             <Label for="web-sitemap-url">
               {{ t("sources.common.fields.sitemapUrl") }}
             </Label>
@@ -286,7 +303,7 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
               id="web-sitemap-url"
               v-model="sitemapUrl"
               placeholder="https://docs.example.com/sitemap.xml"
-            />
+            /> -->
           </div>
 
           <div v-else class="grid gap-2">
@@ -371,24 +388,23 @@ function badgeClass(tone: typeof sourceRow.value.statusTone) {
             />
           </div>
 
-          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-            <div class="grid gap-2">
-              <Label for="web-request-delay">
-                {{ t("sources.common.fields.requestDelayMs") }}
-              </Label>
-              <Input
-                id="web-request-delay"
-                v-model="requestDelayMs"
-                type="number"
-              />
-            </div>
+          <div class="grid gap-2">
+            <Label for="web-request-delay">
+              {{ t("sources.common.fields.requestDelayMs") }}
+            </Label>
+            <Input
+              id="web-request-delay"
+              v-model="requestDelayMs"
+              type="number"
+            />
+            <!-- </div>
             <div class="pt-6">
               <Switch
                 :model-value="respectRobotsTxt"
                 :aria-label="t('sources.common.respectRobotsAria')"
                 @update:model-value="respectRobotsTxt = Boolean($event)"
               />
-            </div>
+            </div> -->
           </div>
         </section>
 

@@ -101,10 +101,6 @@ const breadcrumbs = computed<BreadcrumbItem[]>(() => {
     navigate: route.name === "project-overview" ? undefined : goProjectOverview,
   });
 
-  if (route.name === "project-ask") {
-    items.push({ active: true, key: "ask", label: t("shell.breadcrumb.ask") });
-  }
-
   if (route.name === "project-settings") {
     items.push({
       active: true,

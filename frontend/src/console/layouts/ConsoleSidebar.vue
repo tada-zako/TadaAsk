@@ -49,8 +49,6 @@ const projectInitial = computed(
   () => selectedProject.value?.name.charAt(0) ?? "+",
 );
 const isProjectNavActive = computed(() => route.path.startsWith("/project"));
-// 项目子路由高亮状态
-const isProjectAskActive = computed(() => route.name === "project-ask");
 const isProjectSettingsActive = computed(
   () => route.name === "project-settings",
 );
@@ -116,15 +114,15 @@ async function openProjectRoot() {
   await selectProject(selectedProject.value.uid);
 }
 
-// 打开项目的子功能页面（如 Ask 或 Settings）
-async function openProjectChild(child: "ask" | "settings") {
+// 打开项目设置页面
+async function openProjectSettings() {
   if (!selectedProject.value) {
     await openProjectHome();
     return;
   }
 
   await router.push({
-    name: child === "ask" ? "project-ask" : "project-settings",
+    name: "project-settings",
     params: { projectUid: selectedProject.value.uid },
   });
 }
@@ -307,18 +305,19 @@ function getProjectUidFromRoute(): string | null {
             v-if="selectedProject"
             class="ml-7 grid gap-1 border-l border-(--line-soft) pl-2 max-[1180px]:hidden"
           >
-            <a
-              class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px]"
-              :class="
-                isProjectAskActive
-                  ? 'text-primary before:bg-primary hover:text-primary relative font-semibold before:absolute before:top-2 before:bottom-2 before:-left-[9px] before:w-0.5 before:rounded-full before:shadow-[0_0_12px_rgba(36,211,196,0.34)]'
-                  : 'text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)'
-              "
-              href="#"
-              @click.prevent="openProjectChild('ask')"
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              class="flex min-h-8 cursor-not-allowed items-center gap-2 rounded-(--console-radius-sm) px-2 text-left text-[13px] text-(--text-disabled)"
             >
-              {{ t("shell.sidebar.ask") }}
-            </a>
+              <span class="min-w-0 flex-1">
+                {{ t("shell.sidebar.ask") }}
+              </span>
+              <span class="console-planned-badge">
+                {{ t("shell.sidebar.planned") }}
+              </span>
+            </button>
             <a
               class="flex min-h-8 items-center rounded-(--console-radius-sm) px-2 text-[13px]"
               :class="
@@ -327,7 +326,7 @@ function getProjectUidFromRoute(): string | null {
                   : 'text-(--text-muted) hover:bg-(--surface-hover) hover:text-(--text-strong)'
               "
               href="#"
-              @click.prevent="openProjectChild('settings')"
+              @click.prevent="openProjectSettings"
             >
               {{ t("shell.sidebar.settings") }}
             </a>
@@ -348,36 +347,47 @@ function getProjectUidFromRoute(): string | null {
 
       <!-- 数据分析模块 -->
       <section class="grid gap-1">
-        <p class="console-nav-title max-[1180px]:hidden">
-          {{ t("shell.sidebar.analytics") }}
-        </p>
-        <a
-          class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
-          href="#"
+        <div class="mx-2 mb-1 flex items-center justify-between gap-2">
+          <p class="console-nav-title m-0 max-[1180px]:hidden">
+            {{ t("shell.sidebar.analytics") }}
+          </p>
+          <span class="console-planned-badge max-[1180px]:hidden">
+            {{ t("shell.sidebar.planned") }}
+          </span>
+        </div>
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          class="console-nav-link console-nav-link-disabled w-full max-[1180px]:justify-center max-[1180px]:px-0"
         >
           <BarChart3 class="size-4" />
           <span class="max-[1180px]:hidden">
             {{ t("shell.sidebar.conversations") }}
           </span>
-        </a>
-        <a
-          class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
-          href="#"
+        </button>
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          class="console-nav-link console-nav-link-disabled w-full max-[1180px]:justify-center max-[1180px]:px-0"
         >
           <Sparkles class="size-4" />
           <span class="max-[1180px]:hidden">
             {{ t("shell.sidebar.topQuestions") }}
           </span>
-        </a>
-        <a
-          class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
-          href="#"
+        </button>
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          class="console-nav-link console-nav-link-disabled w-full max-[1180px]:justify-center max-[1180px]:px-0"
         >
           <SquareDashed class="size-4" />
           <span class="max-[1180px]:hidden">
             {{ t("shell.sidebar.sourceAnalytics") }}
           </span>
-        </a>
+        </button>
       </section>
 
       <!-- 系统配置模块 -->
@@ -407,15 +417,20 @@ function getProjectUidFromRoute(): string | null {
             {{ t("shell.sidebar.apiKeys") }}
           </span>
         </a>
-        <a
-          class="console-nav-link max-[1180px]:justify-center max-[1180px]:px-0"
-          href="#"
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          class="console-nav-link console-nav-link-disabled w-full max-[1180px]:justify-center max-[1180px]:px-0"
         >
           <Settings class="size-4" />
-          <span class="max-[1180px]:hidden">
+          <span class="min-w-0 flex-1 text-left max-[1180px]:hidden">
             {{ t("shell.sidebar.globalSettings") }}
           </span>
-        </a>
+          <span class="console-planned-badge max-[1180px]:hidden">
+            {{ t("shell.sidebar.planned") }}
+          </span>
+        </button>
       </section>
     </nav>
 

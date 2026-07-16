@@ -19,6 +19,7 @@ import {
 import { useProjectStore } from "@/console/stores/project";
 import { getErrorMessage } from "@/console/lib/api-result";
 
+import NotFoundView from "@/console/views/NotFoundView.vue";
 import ProjectLandingState from "@/console/components/project/ProjectLandingState.vue";
 import ProjectOverviewState from "@/console/components/project/ProjectOverviewState.vue";
 
@@ -37,15 +38,11 @@ const workspace = ref<ProjectWorkspaceViewModel | null>(null);
 const isInitialLoading = ref(true);
 const isWorkspaceLoading = ref(false);
 const isMutating = ref(false);
+const isNotFound = ref(false);
 const pageErrorMessage = ref<string | null>(null);
 const actionMessage = ref<string | null>(null);
 
 const routeProjectUid = computed(() => getProjectUidFromRoute());
-const routeErrorMessage = computed(() =>
-  route.query.error === "project-not-found"
-    ? t("common.errors.projectNotFound")
-    : null,
-);
 
 onMounted(async () => {
   await handleProjectRoute(routeProjectUid.value);
@@ -71,6 +68,7 @@ watch(locale, async () => {
  */
 async function handleProjectRoute(projectUid: string | null) {
   isInitialLoading.value = true;
+  isNotFound.value = false;
   pageErrorMessage.value = null;
   actionMessage.value = null;
 
@@ -85,7 +83,7 @@ async function handleProjectRoute(projectUid: string | null) {
 
     const exists = await projectStore.selectProject(projectUid);
     if (!exists) {
-      await redirectToProjectLanding();
+      showNotFound();
       return;
     }
 
@@ -112,7 +110,7 @@ async function refreshWorkspace(projectUid = routeProjectUid.value) {
   try {
     workspace.value = await loadProjectWorkspace(projectUid);
   } catch (error) {
-    await redirectToProjectLanding();
+    showNotFound();
   } finally {
     isWorkspaceLoading.value = false;
   }
@@ -239,13 +237,10 @@ async function runProjectMutation(action: () => Promise<void>) {
   }
 }
 
-async function redirectToProjectLanding() {
-  projectStore.clearSelection(t("common.errors.projectNotFound"));
+function showNotFound() {
+  projectStore.clearSelection();
   workspace.value = null;
-  await router.replace({
-    name: "project-landing",
-    query: { error: "project-not-found" },
-  });
+  isNotFound.value = true;
 }
 
 function getProjectUidFromRoute(): string | null {
@@ -259,8 +254,12 @@ function getProjectUidFromRoute(): string | null {
 </script>
 
 <template>
+  <div v-if="isNotFound" class="fixed inset-0 z-50">
+    <NotFoundView />
+  </div>
+
   <!-- 加载骨架组件 -->
-  <section v-if="isInitialLoading" class="console-page">
+  <section v-else-if="isInitialLoading" class="console-page">
     <div class="grid gap-4">
       <div class="tadaask-skeleton h-8 w-48 rounded-md"></div>
       <div class="tadaask-skeleton h-20 w-full max-w-2xl rounded-md"></div>
@@ -276,12 +275,7 @@ function getProjectUidFromRoute(): string | null {
 
   <ProjectLandingState
     v-else-if="!routeProjectUid"
-    :error-message="
-      actionMessage ??
-      routeErrorMessage ??
-      pageErrorMessage ??
-      storeErrorMessage
-    "
+    :error-message="actionMessage ?? pageErrorMessage ?? storeErrorMessage"
     :is-loading="isLoading"
     :is-submitting="isMutating || isLoading"
     :projects="projects"

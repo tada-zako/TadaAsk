@@ -30,7 +30,7 @@ interface BuildWebCrawlConfigOptions {
 const baseDefaults = {
   allowedDomainsText: "",
   contentSelectorsText: "",
-  entryType: "site_root" as CrawlEntryType,
+  entryType: "url_list" as CrawlEntryType,
   excludePathsText: "",
   excludeSelectorsText: "",
   includePathsText: "",

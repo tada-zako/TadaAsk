@@ -9,13 +9,6 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/components/ui/select";
-import {
   Sheet,
   SheetContent,
   SheetFooter,
@@ -49,7 +42,6 @@ const {
   allowedDomainsText,
   buildWebCrawlConfig,
   contentSelectorsText,
-  entryType,
   excludePathsText,
   excludeSelectorsText,
   includePathsText,
@@ -57,9 +49,6 @@ const {
   maxPages,
   requestDelayMs,
   resetToDefaults: resetWebCrawlConfigForm,
-  respectRobotsTxt,
-  sitemapUrl,
-  siteRootUrl,
   urlsText,
 } = useWebCrawlConfigForm({
   contentSelectorsText: "main, article",
@@ -99,7 +88,7 @@ function resetForm(): void {
   sourceType.value = "local_file";
   sourceName.value = "";
   isPublic.value = true;
-  resetWebCrawlConfigForm({ entryType: "site_root" });
+  resetWebCrawlConfigForm({ entryType: "url_list" });
   localError.value = null;
 }
 </script>
@@ -233,7 +222,7 @@ function resetForm(): void {
 
           <!-- 入口类型 -->
           <div class="grid gap-2">
-            <Label>{{ t("sources.common.fields.entryType") }}</Label>
+            <!-- <Label>{{ t("sources.common.fields.entryType") }}</Label>
             <Select v-model="entryType">
               <SelectTrigger class="w-full bg-(--surface-base)">
                 <SelectValue
@@ -246,10 +235,10 @@ function resetForm(): void {
                 <SelectItem value="sitemap_url">sitemap_url</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </div> -->
 
-          <!-- 起始 URL -->
-          <div v-if="entryType === 'site_root'" class="grid gap-2">
+            <!-- 起始 URL -->
+            <!-- <div v-if="entryType === 'site_root'" class="grid gap-2">
             <Label for="seed-url">
               {{ t("sources.common.fields.rootUrl") }}
             </Label>
@@ -269,9 +258,10 @@ function resetForm(): void {
               v-model="sitemapUrl"
               placeholder="https://docs.example.com/sitemap.xml"
             />
-          </div>
+          </div> -->
 
-          <div v-else class="grid gap-2">
+            <!-- <div v-else class="grid gap-2"> -->
+            <!-- MVP 仅开放明确 URL 列表抓取。 -->
             <Label for="url-list">{{ t("sources.common.fields.urls") }}</Label>
             <Textarea
               id="url-list"
@@ -355,25 +345,22 @@ function resetForm(): void {
             </div>
           </div>
 
-          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
-            <div class="grid gap-2">
-              <Label for="request-delay">
-                {{ t("sources.common.fields.requestDelayMs") }}
-              </Label>
-              <Input
-                id="request-delay"
-                v-model="requestDelayMs"
-                type="number"
-              />
-            </div>
-            <div class="pt-6">
+          <!-- <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3"> -->
+          <div class="grid gap-2">
+            <Label for="request-delay">
+              {{ t("sources.common.fields.requestDelayMs") }}
+            </Label>
+            <Input id="request-delay" v-model="requestDelayMs" type="number" />
+          </div>
+          <!-- MVP 阶段不暴露 robots.txt 可选 -->
+          <!-- <div class="pt-6">
               <Switch
                 :model-value="respectRobotsTxt"
                 :aria-label="t('sources.common.respectRobotsAria')"
                 @update:model-value="respectRobotsTxt = Boolean($event)"
               />
-            </div>
-          </div>
+            </div> -->
+          <!-- </div> -->
         </section>
 
         <p v-if="localError" class="text-sm text-red-100">

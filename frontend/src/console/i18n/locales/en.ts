@@ -47,7 +47,6 @@ export const en = {
       sourceItems: "Source items",
       localFileItems: "Local file items",
       webCrawlItems: "Web crawl items",
-      ask: "Ask",
       settings: "Settings",
       open: "Open {label}",
     },
@@ -67,6 +66,7 @@ export const en = {
       conversations: "Conversations",
       topQuestions: "Top Questions",
       sourceAnalytics: "Source Analytics",
+      planned: "Planned",
       configuration: "Configuration",
       sources: "Sources",
       apiKeys: "API Keys",
@@ -112,14 +112,6 @@ export const en = {
       unavailableTitle: "Project unavailable",
       unavailableBody:
         "The selected project could not be loaded. Choose another project from the sidebar.",
-    },
-    reserved: {
-      ask: "Ask",
-      settings: "Settings",
-      title: "Project {label}",
-      description:
-        "This route is reserved for the project-scoped {label} page.",
-      backToOverview: "Back to project overview",
     },
     sources: {
       title: "Linked sources",
@@ -749,7 +741,6 @@ export const en = {
       fields: {
         allowedDomains: "Allowed domains",
         contentSelectors: "Content selectors",
-        entryType: "Entry type",
         excludePaths: "Exclude paths",
         excludeSelectors: "Exclude selectors",
         includePaths: "Include paths",
@@ -769,7 +760,6 @@ export const en = {
       localFile: "Local file",
       webCrawl: "Web crawl",
       nameRequired: "Source name is required.",
-      respectRobotsAria: "Respect robots.txt",
     },
     create: {
       title: "Create source",
@@ -870,6 +860,9 @@ export const en = {
       visibilityAria: "Source visibility",
       crawlHelp:
         "Updating crawl rules resets the source to pending when accepted.",
+      legacyEntryTitle: "Legacy crawl entry is read-only",
+      legacyEntryHelp:
+        "This source keeps its existing entry configuration. The MVP Console only creates and edits URL-list entries.",
       deleteAria: "Delete source",
       deleteTitle: "Delete this source?",
       deleteDescription:
@@ -946,5 +939,11 @@ export const en = {
         daysAgo: "{count} days ago",
       },
     },
+  },
+  notFound: {
+    description: "Looks like you found a page we haven't mapped yet.",
+    returnAria: "Return to a safe page",
+    returnConsole: "Return to Console",
+    returnLogin: "Return to sign in",
   },
 };

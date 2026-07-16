@@ -49,7 +49,6 @@ export const zhCN: typeof en = {
       sourceItems: "数据源条目",
       localFileItems: "本地文件条目",
       webCrawlItems: "网页爬取条目",
-      ask: "问答",
       settings: "设置",
       open: "打开 {label}",
     },
@@ -69,6 +68,7 @@ export const zhCN: typeof en = {
       conversations: "对话记录",
       topQuestions: "热门问题",
       sourceAnalytics: "数据源分析",
+      planned: "规划中",
       configuration: "配置",
       sources: "数据源",
       apiKeys: "API Keys",
@@ -110,13 +110,6 @@ export const zhCN: typeof en = {
       review: "Review",
       unavailableTitle: "项目不可用",
       unavailableBody: "无法加载选中的项目。请从侧边栏选择其他项目。",
-    },
-    reserved: {
-      ask: "问答",
-      settings: "设置",
-      title: "项目 {label}",
-      description: "该路由预留给项目范围的 {label} 页面。",
-      backToOverview: "返回项目概览",
     },
     sources: {
       title: "已关联数据源",
@@ -715,7 +708,6 @@ export const zhCN: typeof en = {
       fields: {
         allowedDomains: "允许的域名",
         contentSelectors: "内容选择器",
-        entryType: "入口类型",
         excludePaths: "排除路径",
         excludeSelectors: "排除选择器",
         includePaths: "包含路径",
@@ -735,7 +727,6 @@ export const zhCN: typeof en = {
       localFile: "本地文件",
       webCrawl: "网页抓取",
       nameRequired: "请输入数据源名称。",
-      respectRobotsAria: "遵循 robots.txt",
     },
     create: {
       title: "创建数据源",
@@ -831,6 +822,9 @@ export const zhCN: typeof en = {
       webVisibilityHelp: "检查抓取结果后再保持启用。",
       visibilityAria: "数据源可见性",
       crawlHelp: "后端接受新的抓取规则后，数据源状态将重置为待处理。",
+      legacyEntryTitle: "旧版抓取入口为只读",
+      legacyEntryHelp:
+        "该数据源会保留现有入口配置。MVP 控制台只创建和编辑 URL 列表入口。",
       deleteAria: "删除数据源",
       deleteTitle: "删除这个数据源？",
       deleteDescription:
@@ -907,5 +901,11 @@ export const zhCN: typeof en = {
         daysAgo: "{count} 天前",
       },
     },
+  },
+  notFound: {
+    description: "看起来你找到了一张未知页面呢",
+    returnAria: "返回安全页面",
+    returnConsole: "返回控制台",
+    returnLogin: "返回登录",
   },
 };

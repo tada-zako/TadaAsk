@@ -34,12 +34,6 @@ const router = createRouter({
           component: () => import("./views/project/ProjectView.vue"),
         },
         {
-          // 预留页面
-          path: "project/:projectUid/ask",
-          name: "project-ask",
-          component: () => import("./views/project/ProjectReservedView.vue"),
-        },
-        {
           // 项目设置页
           path: "project/:projectUid/settings",
           name: "project-settings",
@@ -70,6 +64,13 @@ const router = createRouter({
         },
       ],
     },
+    {
+      // 未知路径直接渲染 404，同时保留用户输入的原始 URL。
+      path: "/:pathMatch(.*)*",
+      name: "not-found",
+      component: () => import("./views/NotFoundView.vue"),
+      meta: { public: true, allowAuthenticated: true },
+    },
   ],
 });
 
@@ -84,7 +85,11 @@ router.beforeEach(async (to) => {
     await authStore.verifyToken();
   }
 
-  if (to.meta.public && authStore.isAuthenticated) {
+  if (
+    to.meta.public &&
+    !to.meta.allowAuthenticated &&
+    authStore.isAuthenticated
+  ) {
     return resolveSafeAuthRedirect(router, to.query.redirect);
   }
 
