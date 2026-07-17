@@ -1,9 +1,10 @@
 [project]
-name = "backend"
+name = "tadaask-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "TadaAsk self-hosted RAG assistant backend"
 readme = "README.md"
 requires-python = ">=3.13"
+license = "MIT"
 dependencies = [
     "aiosqlite>=0.22.1",
     "alembic>=1.18.4",
@@ -43,14 +44,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-local-gpu = [
-    "llama-cpp-python>=0.3.23",
-]
+local-gpu = ["llama-cpp-python>=0.3.23"]
 
 [dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-]
+dev = ["pytest>=9.0.2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

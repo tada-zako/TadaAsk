@@ -1,7 +1,9 @@
 {
-  "name": "frontend",
+  "name": "tadaask-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "TadaAsk admin console and visitor widget",
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@11.13.0",
   "engines": {
