@@ -472,7 +472,8 @@ function getProjectUidFromRoute(): string | null {
           side="top"
           class="w-72 rounded-(--console-radius-lg) border-(--line) bg-(--surface-shell) p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
         >
-          <DropdownMenuLabel
+          <!-- 系统主题色调菜单 -->
+          <!-- <DropdownMenuLabel
             class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
           >
             {{ t("shell.admin.theme") }}
@@ -499,7 +500,8 @@ function getProjectUidFromRoute(): string | null {
             {{ t("shell.admin.themes.light") }}
           </DropdownMenuItem>
 
-          <DropdownMenuSeparator class="my-1 bg-(--line-soft)" />
+          <DropdownMenuSeparator class="my-1 bg-(--line-soft)" /> -->
+          <!-- 系统 i18n 语言切换 -->
           <DropdownMenuLabel
             class="px-2.5 py-1 text-[10px] font-semibold text-(--text-faint) uppercase"
           >

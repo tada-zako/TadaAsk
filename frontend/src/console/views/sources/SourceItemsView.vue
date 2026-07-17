@@ -203,13 +203,6 @@ function badgeClass(tone: SourceTone): string {
         </h1>
         <p class="console-page-subtitle">
           {{ sourceSubtitle }}
-          <span v-if="sourceRow">
-            {{
-              t("sources.workspace.updated", {
-                date: sourceRow.lastUpdatedLabel,
-              })
-            }}
-          </span>
         </p>
       </div>
 

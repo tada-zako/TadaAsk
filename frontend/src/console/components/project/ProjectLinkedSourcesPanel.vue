@@ -191,11 +191,11 @@ function badgeClass(
     <!-- 数据源列表表格 -->
     <Table class="console-scrollbar min-w-[54rem] table-fixed">
       <colgroup>
-        <col class="w-[15rem]" />
+        <col class="w-[13rem]" />
         <col class="w-[9rem]" />
         <col class="w-[8rem]" />
         <col class="w-[8rem]" />
-        <col class="w-[10rem]" />
+        <col class="w-[8rem]" />
         <col class="w-[5rem]" />
       </colgroup>
 
@@ -206,7 +206,7 @@ function badgeClass(
           <TableHead>{{ t("project.sources.table.visibility") }}</TableHead>
           <TableHead>{{ t("project.sources.table.status") }}</TableHead>
           <TableHead>{{ t("project.sources.table.lastUpdated") }}</TableHead>
-          <TableHead class="w-16 text-right">
+          <TableHead class="w-16 text-center">
             {{ t("project.sources.table.actions") }}
           </TableHead>
         </TableRow>
@@ -228,7 +228,7 @@ function badgeClass(
             </Badge>
           </TableCell>
           <TableCell>{{ source.lastUpdatedLabel }}</TableCell>
-          <TableCell class="text-right">
+          <TableCell class="text-center">
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <Button

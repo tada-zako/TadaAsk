@@ -85,7 +85,7 @@ export const en = {
       projectHomeNote: "Choose an existing project or create a new workspace.",
       openProject: "Open {name}",
       createTitle: "Project Create",
-      createNote: "Minimal fields for MVP creation",
+      createNote: "Minimal fields for creation",
       nameLabel: "Project name",
       namePlaceholder: "Docs Assistant",
       nameHelp: "Must be unique. It appears in the sidebar project selector.",

@@ -278,15 +278,15 @@ async function copyText(value: string): Promise<void> {
     </div>
 
     <!-- Widget 部署列表表格 -->
-    <Table class="console-scrollbar min-w-[68rem] table-fixed">
+    <Table class="console-scrollbar min-w-[54rem] table-fixed">
       <colgroup>
-        <col />
-        <col />
         <col class="w-[7rem]" />
-        <col class="w-[9rem]" />
-        <col class="w-[9rem]" />
-        <col class="w-40" />
-        <col class="w-24" />
+        <col class="w-[7rem]" />
+        <col class="w-[3rem]" />
+        <col class="w-[5rem]" />
+        <col class="w-[5rem]" />
+        <col class="w-[3rem]" />
+        <col class="w-[3rem]" />
       </colgroup>
 
       <TableHeader>

@@ -129,7 +129,7 @@ function submitCreate() {
     </article>
 
     <!-- 右侧项目详情配置面板 -->
-    <aside class="console-panel grid gap-4 p-5">
+    <aside class="console-panel flex flex-col gap-4 p-5">
       <div class="grid gap-1">
         <h2 class="console-panel-title">
           {{ t("project.landing.createTitle") }}
@@ -139,7 +139,7 @@ function submitCreate() {
         </p>
       </div>
       <!-- 项目名称输入 -->
-      <div class="grid gap-2">
+      <div class="grid gap-1.5">
         <Label for="project-name">{{ t("project.landing.nameLabel") }}</Label>
         <Input
           id="project-name"
@@ -151,7 +151,7 @@ function submitCreate() {
         </p>
       </div>
       <!-- 项目描述输入 -->
-      <div class="grid gap-2">
+      <div class="grid gap-1.5">
         <Label for="project-description">
           {{ t("project.landing.descriptionLabel") }}
         </Label>
@@ -165,27 +165,13 @@ function submitCreate() {
           {{ t("project.landing.descriptionHelp") }}
         </p>
       </div>
-      <!-- 提示信息 -->
-      <div
-        class="border-primary/30 bg-primary/10 grid grid-cols-[24px_minmax(0,1fr)] gap-3 rounded-(--console-radius-lg) border p-3"
-      >
-        <span class="bg-primary mt-1 size-2 rounded-full"></span>
-        <div>
-          <strong class="text-sm text-(--text-strong)">
-            {{ t("project.landing.setupLaterTitle") }}
-          </strong>
-          <p class="mt-1 text-xs leading-5 text-(--text-muted)">
-            {{ t("project.landing.setupLaterBody") }}
-          </p>
-        </div>
-      </div>
       <p
         v-if="errorMessage"
         class="rounded-(--console-radius-md) border border-yellow-300/25 bg-yellow-300/10 px-3 py-2 text-xs leading-5 text-yellow-100"
       >
         {{ errorMessage }}
       </p>
-      <div class="flex justify-end gap-2">
+      <div class="mt-auto flex justify-end gap-2 pt-2">
         <Button
           type="button"
           :aria-label="t('project.landing.cancelCreate')"
