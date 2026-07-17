@@ -6,7 +6,7 @@
 
 ## 保留文档
 
-- [tutorial/openapi.json](./tutorial/openapi.json)：FastAPI 生成的接口 schema，适合查看路径、请求体和响应字段。
+- FastAPI 生成的 OpenAPI schema：开发环境启动后访问 `/openapi.json`，适合查看路径、请求体和响应字段。
 - [tutorial/source-map.md](./tutorial/source-map.md)：关键业务源文件定位说明，适合开发时快速跳转代码。
 - [tutorial/source-sourceitem-flow.md](./tutorial/source-sourceitem-flow.md)：知识源（Source）与知识子项（SourceItem）的完整生命周期与分阶段异步构建逻辑（Crawl & Indexing）。
 - [tutorial/sse-contract.md](./tutorial/sse-contract.md)：Chat 问答流与 Ingest/Crawl 的 SSE（Server-Sent Events）事件协议与前端处理策略
@@ -32,4 +32,4 @@
 2. 用 `source-map.md` 找到对应 router / service / schema。
 3. 直接阅读源代码确认当前实现细节。
 
-历史规格文档仍可能保留在 [spec/](./spec/) 下，仅作为设计背景参考，不代表全部已经实现。
+历史设计记录位于 [docs/archive/](../../docs/archive/README.md)，仅用于了解背景，不代表当前实现或对外契约。

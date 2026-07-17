@@ -79,3 +79,4 @@ Thumbs.db
 *.sqlite3
 *.local*
 backend/storages/
+z.local/
