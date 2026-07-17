@@ -1,87 +1,219 @@
+<div align="center">
+
+```text
+ ███████████               █████                █████████           █████     
+▒█▒▒▒███▒▒▒█              ▒▒███                ███▒▒▒▒▒███         ▒▒███      
+▒   ▒███  ▒   ██████    ███████   ██████      ▒███    ▒███   █████  ▒███ █████
+    ▒███     ▒▒▒▒▒███  ███▒▒███  ▒▒▒▒▒███     ▒███████████  ███▒▒   ▒███▒▒███ 
+    ▒███      ███████ ▒███ ▒███   ███████     ▒███▒▒▒▒▒███ ▒▒█████  ▒██████▒  
+    ▒███     ███▒▒███ ▒███ ▒███  ███▒▒███     ▒███    ▒███  ▒▒▒▒███ ▒███▒▒███ 
+    █████   ▒▒████████▒▒████████▒▒████████    █████   █████ ██████  ████ █████
+   ▒▒▒▒▒     ▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒  ▒▒▒▒ ▒▒▒▒▒ 
+                                                                                                                                            
+```
+
+</div>
+
 # TadaAsk
 
-定位：轻量级、可定制的开源 AI 知识库助手。
+<p align="center">
+  <img src="https://img.shields.io/badge/release-v0.1.0-FFD700?style=for-the-badge" alt="Release: v0.1.0">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
+  <a href="https://github.com/tada-zako"><img src="https://img.shields.io/badge/Built%20by-tada--zako-blueviolet?style=for-the-badge" alt="Built by tada-zako"></a>
+  <a href="docs/README.zh.md"><img src="https://img.shields.io/badge/Lang-%E4%B8%AD%E6%96%87-lightgrey?style=for-the-badge" alt="Chinese"></a>
+</p>
 
-核心价值：通过一行代码将具备 RAG 能力的 Agent 集成至个人静态站点或文档，支持自动化数据同步，且开发者拥有对底层架构的完全控制权。
+**TadaAsk is a self-hosted RAG knowledge-base service with an admin console and an embeddable visitor widget.** Build a unified knowledge base from web pages and local files, then provide answers with source citations.
 
-## 主要功能
+> [!IMPORTANT]
+> TadaAsk is currently intended for learning, demonstrations, and small self-hosted deployments. It has not been thoroughly validated for high-concurrency, multi-user, or mission-critical production workloads.
+> Back up important data, secure the deployment, and evaluate it in a private environment before using it in production.
 
-### LLM & 核心逻辑 (The "Provider" Layer)
-优化建议：抽象 BaseProvider Protocol 提供对不同 LLM 的支持，避免过早绑定特定模型。
+## Features
 
-模型支持：
-    - Gemini
-    - OpenAI
-    - DeepSeek（国内用户友好）
-    - Ollama（支持本地化私有部署）
+- **Embeddable on any website** — add a Visitor Widget to an existing site without building a separate app for visitors.
+- **One place for different sources** — upload local files, crawl web pages, and manage their processing status in the admin console.
+- **Traceable answers** — RAG answers include citations so visitors can check the original material.
+- **Organized by project** — each project keeps its own sources, model settings, and widget deployment configuration; one instance can support several small sites.
+- **Easy to get started** — Docker deployment, generated Widget embed code, and site-origin validation are available from the admin console.
+- **Widget customization** — customize the Visitor Widget's title, appearance, and basic CSS variables.
+- **Choose your own model provider** — configure providers, models, and API keys in the admin console.
 
-### RAG 与向量库 (The "Memory" Layer)
+## Architecture
 
-#### 向量库集成：
+TadaAsk consists of an admin interface, a visitor-facing widget, and a backend service. Administrators maintain sources and settings in the console; visitors ask questions through the widget embedded on a website; both use the same backend and knowledge base.
 
-已有：ChromaDB，接口简单，适合快速验证概念。
+```mermaid
+flowchart LR
+    Admin["Admin Console\nSources, models, and Widget deployments"] --> API["TadaAsk Backend"]
+    Site["Third-party website"] --> Widget["Visitor Widget"]
+    Widget --> API
 
-首选：Qdrant。它有非常出色的 Docker 支持，且自带 UI 界面方便调试，性能比 Chroma 更好。
+    API --> Sources["Web pages and local files"]
+    Sources --> Knowledge["Knowledge base\nIndexing and retrieval"]
+    API --> Knowledge
+    API --> Storage["Local storage\nSQLite / Chroma / files"]
+    API --> Model["Model providers\nLLM / Embedding / Rerank"]
+```
 
-备选：LanceDB。它是 Serverless 架构，数据直接存为文件（类似 SQLite），极其适合“个人部署”这种不需要维护数据库服务的场景。
+This setup is intended for small self-hosted deployments: data stays in your own runtime environment by default, while model providers are configured as needed.
 
-#### 数据同步优化：
+## Quick Start
 
-Sitemap 监听：通过解析 sitemap.xml，比对上次爬取的时间戳，只增量更新变动页面。（尚不清楚，回头研究）
+### Docker (recommended)
 
-GitHub 逻辑：调用 GitHub API 获取 Repo Tree，直接读取原始 Markdown 代码，实现添加 github repo 作为数据源的功能。
+Prepare the environment files first:
 
-### 存储方案 (The "Persistence" Layer)
+```bash
+cp backend/.env.example backend/.env
+cp .env.docker.example .env
+```
 
-元数据/配置：统一使用 SQLite。
+Set the administrator username and password, plus the required encryption settings (the API-key encryption key and JWT secret), then start the stack:
 
-大文件/索引文件：支持 Local File System 即可。S3 作为可选的 StorageProtocol 实现，初期不用强求。
+```bash
+docker compose up -d --build
+```
 
-### 部署与控制台 (The "Interface" Layer)
+With the default configuration, the application is available at `http://localhost:8080` and only listens on the host's `127.0.0.1` interface.
 
-#### 网站插件 (Widget)：这是项目的灵魂。
+For a public deployment, put HTTPS Nginx or Caddy in front of the application and set `TADAASK_PUBLIC_URL` correctly. See the [deployment configuration examples](deploy/).
 
-技术选型：建议用 `Web Components` 开发，这样它不依赖任何框架（Vue/React 都能用），且 CSS 样式完全隔离，不会污染用户的博客样式。
+Runtime data is stored in the `tadaask-data` Docker volume, including SQLite, Chroma, uploaded files, and model caches. Back up this volume before upgrades or migrations.
 
-#### 控制台 (Admin)：
+### Local development
 
-重点功能：
-    - RAG 数据清洗器。用户需要能看到爬下来了哪些 Chunk，并能手动删除垃圾数据（比如“关于我们”、“备案号”等信息）。'
-    - 用户对话检查，可以看到用户都问了什么，Agent 是怎么回答的，方便调试和优化。
-    - 用户使用统计分析，了解哪些文档被问得最多，哪些功能最受欢迎。
-    - 设置模型参数，主要实现默认提示词的配置，后续可以考虑加入温度、top-k 等参数的调整。
-    - 调整 Widget 样式，比如颜色、字体、中英文等，满足个性化需求。
+#### Backend
 
-### Agent 能力 (The "Intelligence" Layer)
+The backend uses [uv](https://docs.astral.sh/uv/) for Python environment and package management:
 
-集成的关键点：Agent 不仅仅是 RAG。
+```bash
+cd backend
+cp .env.example .env
+uv sync
+uv run uvicorn app.main:app --reload
+```
 
-用户侧 (Visitor)：主要能力是 "Intent Router" (意图路由)。
+At minimum, configure the following values in `backend/.env` before starting:
 
-如果用户问技术文档，走 RAG。
+- `ADMIN_USERNAME` — admin console username
+- `ADMIN_PASSWORD` — admin console password
+- `JWT_SECRET_KEY` — JWT signing secret
+- `PROVIDER_API_KEY_ENCRYPTION_KEY` — encryption key for stored provider API keys
 
-如果用户问“如何联系作者”，走固定 Action。
+Generate the two secrets with:
 
-管理者侧 (Owner)：可以集成 MCP (Model Context Protocol)。比如通过对话直接更新向量库、清理缓存，甚至让 Agent 帮你分析哪些文档被问得最多。
+```bash
+uv run python -c "import secrets; print(secrets.token_hex(32))"
+uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
 
-Web Search：MVP 阶段不建议加入。个人博客 Agent 的目标是“基于已知知识回答”，引入搜索会增加幻觉风险和 API 成本。
+The backend runs at `http://localhost:8000` by default. The first start may download embedding or reranking models.
 
-## 开发流程
+#### Frontend
 
-1. 后端重构（已完成）：
-    - 重点重构 SQL Table 设计，明确具体业务逻辑，包括如何接入用户不同的站点、文档等（重点）
-    - 抽象 VectorDB 接口，将已有的 ChromaDB 封装通过 VectorDB Protocol 暴露出来，后续方便进一步集成 Qdrant、LanceDB 等其他向量库。
-    - 用户身份鉴权设计：至少需要实现能够确认 Admin 与 Visitor 的身份鉴权逻辑。需要 Admin 权限用于 admin/api/ 的访问控制，以及 visitor 与 admin 之间不同的 API 内部业务处理方式。（MVP 基于 env 驱动实现）
-    - 封装 llama.cpp API，提供 embedding 和 hyde/hype 功能
-    - 实现基于 breakpoints 的文档切割器
-    - 网络爬取
-    - 多向量 collection 召回后的 reranking 逻辑
-2. 前端开发（重点）：前端的设计最为关键，由于我没有 widget 的开发经验，所以需要非常长的时间进行迭代设计。
-    - 首先设计 Widget 的 UI/UX，确保它足够简洁、易用，并且能够无缝集成到各种博客平台。
-    - 随后提供简单的 Admin 控制台，提供必要的功能来管理和监控 Agent 的运行状态。
-3. 新的能力开发：继续迭代增加更多的后端能力
-    - github repo 解析
-    - 集成更多的 LLM 模型和向量库
-    - Agentic Hybrid Search，不再只是检索 -> 作为 context -> LLM 生成的单项流程，而是引入 Agent 能力，由 LLM 决定是否进一步检索、调用工具等
-    - 首次运行网页端的初始化向导（初始化完成后，需要确保 login/ 相关功能锁定，避免安全风险）
-    - 考虑分布式/多进程部署情况下，代码的兼容性和逻辑优化
+The frontend uses [pnpm](https://pnpm.io/):
+
+```bash
+cd frontend
+corepack enable  # optional: installs pnpm automatically
+pnpm install
+cp .env.example .env.development
+pnpm dev
+```
+
+To preview the Widget locally:
+
+```bash
+pnpm dev:widget
+```
+
+### Widget deployment
+
+The **Widget deployments** section on a project's page in the admin console generates the actual embed code. It looks like this:
+
+```html
+<script src="https://your-domain.example/widget/tada-ask-widget.js"></script>
+
+<tada-ask-widget
+  api-base-url="https://your-domain.example/api"
+  project-uid="your-project-uid"
+  widget-uid="your-widget-uid"
+  assistant-title="TadaAsk Assistant"
+></tada-ask-widget>
+```
+
+Set the host website's exact `site_origin` in the corresponding Widget configuration. The backend performs additional cross-origin validation for Widget requests.
+
+> For customizable attributes and CSS variables, see [Visitor Widget customization](frontend/docs/tutorial/visitor-widget-customization.md).
+
+## Screenshots
+
+### Admin console
+
+The project page brings sources, Widget deployment, and core settings into one workspace:
+
+![Project page](assets/admin-console/index-01-project-view.png)
+
+Manage uploaded files and crawled pages, along with their processing status:
+
+![Source management](assets/admin-console/index-02-source-panel.png)
+
+Use global chat to test answers and citations directly from the admin console:
+
+![Global chat](assets/admin-console/index-03-global-chat.png)
+
+### Visitor Widget
+
+Visitors can ask questions without entering the admin console:
+
+![Visitor Widget](assets/visitor-widget/index-01-widget.png)
+
+The Widget supports basic appearance customization to suit the host website:
+
+![Customized Visitor Widget](assets/visitor-widget/index-02-widget-custom-theme.png)
+
+## Project scope
+
+The current implementation is a **v0.1.0 MVP** with deliberate operational limits.
+
+### Current limitations
+
+- The FastAPI backend runs as a single worker; background jobs are held in process memory.
+- Default storage is SQLite, embedded Chroma, and the local file system.
+- Web crawling is still an MVP capability: it supports simple page crawling, not a full crawler feature set.
+- A Visitor Widget session is not restored after a page refresh.
+- Analytics, Project Ask, Global Settings, GitHub sources, Sitemap/Site Root sources, S3/MinIO, and multiple administrators are not implemented yet.
+
+### Future plans
+
+- [ ] Support more source types, including GitHub, sitemaps, and site-root crawling.
+- [ ] Improve crawl scope control, update strategies, and error handling.
+- [ ] Provide more complete usage analytics and visitor-session experiences.
+- [ ] Evolve the backend architecture to support external services as needed.
+- [ ] Support object storage and a more suitable way to run long-lived background work.
+- [ ] Improve retrieval, citation rendering, and Widget interactions based on real-world feedback.
+
+Future work will follow real needs, so this list is not a promise that every item will land on schedule. 🤯
+
+## Contributing
+
+TadaAsk is still evolving. Issues, documentation improvements, and pull requests are welcome.
+
+If you run into a problem, an Issue with your deployment method, logs, and reproduction steps is much friendlier to debug than “it seems broken.” 😶‍🌫️
+
+## License
+
+TadaAsk is licensed under the [MIT License](LICENSE).
+
+---
+
+## About this project
+
+<div align="center">
+
+<p><i>这个项目是这条 <b>ただ_雑魚</b> 的一次尝试，还有很多不完美的地方，能多给点包容吗... (´･ω･`)</i></p>
+
+**Made with 😶‍🌫️ by [tada-zako](https://github.com/tada-zako)**
+
+</div>

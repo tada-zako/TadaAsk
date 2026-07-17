@@ -74,5 +74,8 @@ Thumbs.db
 # Optional app runtime files
 # =========================
 *.pid
+*.db
+*.sqlite
 *.sqlite3
 *.local*
+backend/storages/
