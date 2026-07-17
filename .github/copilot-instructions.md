@@ -28,9 +28,12 @@ The sections below are Copilot-specific supplements.
 
 | Purpose | Path |
 |---------|------|
-| Project requirements (Chinese) | `docs/requirements.md` |
-| RAG pipeline implementation notes | `backend/docs/rag-pipeline.md` |
+| Backend API contract | Runtime `/openapi.json` or `/docs` |
+| Backend source map | `backend/docs/tutorial/source-map.md` |
+| Backend documentation entry | `backend/docs/README.md` |
 | ORM models | `backend/app/db/models.py` |
-| Service layer — RAG | `backend/app/services/rag/rag.py` |
-| Service layer — upload | `backend/app/services/rag/source_item.py` |
+| Search and retrieval services | `backend/app/services/search/` |
+| Source and upload services | `backend/app/services/sources/` |
+| Indexing services | `backend/app/services/indexing/` |
 | Admin endpoints — source | `backend/app/api/admin/endpoints/source.py` |
+| Visitor Widget endpoints | `backend/app/api/visitor/endpoints/chat.py` |

@@ -29,9 +29,8 @@ The project name is **TadaAsk**. Do not introduce or restore old project names.
 
 - Source code is the primary source of truth.
 - Backend API behavior should be checked against the FastAPI implementation and
-  generated OpenAPI output.
+  the runtime `/openapi.json` or `/docs` output.
 - Lightweight backend integration notes live under `backend/docs/`.
-- `backend/docs/tutorial/openapi.json` is the generated API reference artifact.
 - `backend/docs/tutorial/source-map.md` is the preferred backend file-location
   guide for frontend/backend integration work.
 
@@ -143,7 +142,7 @@ For frontend code:
 Documentation should help navigation and integration, not slow MVP development.
 
 - Keep backend docs lightweight.
-- Prefer entry documents, source maps, and generated OpenAPI over large manual
+- Prefer entry documents, source maps, and runtime OpenAPI over large manual
   specs.
 - Do not create or expand business-contract documents unless requested.
 - When adding documentation, make it clear whether it is current behavior,
