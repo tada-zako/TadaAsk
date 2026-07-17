@@ -50,7 +50,7 @@ import { createWidgetDeploymentCode } from "@/console/services/widget-deployment
 
 // TODO: 正式文档地址确定后，只需替换这一处。
 const WIDGET_CUSTOMIZATION_DOCS_URL =
-  "https://github.com/tada-zako/ai_widget/blob/main/frontend/docs/tutorial/visitor-widget-customization.md";
+  "https://github.com/tada-zako/ai_widget/blob/main/docs/visitor-widget-customization.md";
 
 const props = defineProps<{
   isMutating?: boolean;

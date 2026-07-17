@@ -145,7 +145,7 @@ The **Widget deployments** section on a project's page in the admin console gene
 
 Set the host website's exact `site_origin` in the corresponding Widget configuration. The backend performs additional cross-origin validation for Widget requests.
 
-> For customizable attributes and CSS variables, see [Visitor Widget customization](frontend/docs/tutorial/visitor-widget-customization.md).
+> For customizable attributes and CSS variables, see [Visitor Widget customization](docs/visitor-widget-customization.md).
 
 ## Screenshots
 

@@ -6,8 +6,8 @@
 
 - [tutorial/frontend-ts-code-style.md](./tutorial/frontend-ts-code-style.md)：TypeScript 代码风格与注释约定。
 - [console-ui-code-guidelines.md](./console-ui-code-guidelines.md)：管理控制台的 UI 组件、样式与布局倾向。
-- [console-ui-code-guidelines-zh.md](./console-ui-code-guidelines-zh.md)：上述 UI 指南的中文版本。
-- [tutorial/visitor-widget-customization.md](./tutorial/visitor-widget-customization.md)：Visitor Widget 的公开定制属性与 CSS variables。
+- [../../docs/visitor-widget-customization.md](../../docs/visitor-widget-customization.md)：Visitor Widget 的公开定制属性与 CSS variables（英文）。
+- [../../docs/visitor-widget-customization.zh.md](../../docs/visitor-widget-customization.zh.md)：Visitor Widget 的公开定制属性与 CSS variables（中文）。
 - [tutorial/visitor-widget-rag-chat.md](./tutorial/visitor-widget-rag-chat.md)：Visitor Widget 问答流程的实现边界。
 - [../../backend/docs/tutorial/sse-contract.md](../../backend/docs/tutorial/sse-contract.md)：流式事件协议。
 - [../../backend/docs/tutorial/source-source-item-flow.md](../../backend/docs/tutorial/source-source-item-flow.md)：知识源与索引流程。

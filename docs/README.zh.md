@@ -148,7 +148,7 @@ pnpm dev:widget
 
 部署前需要在对应 Widget 配置中填写宿主网站的准确 `site_origin`，后端会对 Widget 发起的请求进行额外的跨域验证。
 
-> 可定制属性和 CSS variables 参见 [Visitor Widget customization](../frontend/docs/tutorial/visitor-widget-customization.md)。
+> 可定制属性和 CSS variables 参见 [Visitor Widget 自定义](./visitor-widget-customization.zh.md)。
 
 
 
