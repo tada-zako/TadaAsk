@@ -42,7 +42,6 @@ const {
   selectedItemUids,
   setSelection,
   source,
-  sourceRow,
   syncBadgeLabel,
   syncBadgeTone,
   syncCounters,

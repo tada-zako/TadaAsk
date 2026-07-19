@@ -13,13 +13,13 @@ import {
   LayoutDashboard,
   LogOut,
   MessageSquare,
-  Monitor,
-  Moon,
+  // Monitor,
+  // Moon,
   Plus,
   Settings,
   Sparkles,
   SquareDashed,
-  Sun,
+  // Sun,
 } from "@lucide/vue";
 
 import { Button } from "@/shared/components/ui/button";
