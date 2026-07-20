@@ -23,7 +23,6 @@ dependencies = [
     "markitdown[docx]>=0.1.6",
     "openai>=2.30.0",
     "pwdlib[argon2]>=0.3.0",
-    "pydantic-ai>=1.99.0",
     "pydantic-extra-types==2.11.1",
     "pydantic-settings>=2.14.2",
     "pyjwt>=2.13.0",
@@ -43,8 +42,6 @@ dependencies = [
     "tree-sitter-typescript>=0.23.2",
 ]
 
-[project.optional-dependencies]
-local-gpu = ["llama-cpp-python>=0.3.23"]
 
 [dependency-groups]
 dev = ["pytest>=9.0.3"]
