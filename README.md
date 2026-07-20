@@ -17,7 +17,7 @@
 # TadaAsk
 
 <p align="center">
-  <img src="https://img.shields.io/badge/release-v0.1.0-FFD700?style=for-the-badge" alt="Release: v0.1.0">
+  <a href="https://github.com/tada-zako/TadaAsk/releases/tag/v0.1.0"><img src="https://img.shields.io/badge/release-v0.1.0-FFD700?style=for-the-badge" alt="Release: v0.1.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
   <a href="https://github.com/tada-zako"><img src="https://img.shields.io/badge/Built%20by-tada--zako-blueviolet?style=for-the-badge" alt="Built by tada-zako"></a>
   <a href="docs/README.zh.md"><img src="https://img.shields.io/badge/Lang-%E4%B8%AD%E6%96%87-lightgrey?style=for-the-badge" alt="Chinese"></a>
