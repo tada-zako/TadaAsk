@@ -1,6 +1,7 @@
 from typing import Protocol
 
 from app.db.schemas import ProviderWithModelInternalRead
+from .official import OFFICIAL_PROVIDER_BY_NAME
 from .base import (
     Message,
     StreamedResponse,
@@ -61,6 +62,8 @@ def completer_factory(
     if provider_with_model.api_key:
         api_key = provider_with_model.api_key.get_secret_value()
 
+    provider_definition = OFFICIAL_PROVIDER_BY_NAME.get(provider)
+
     if provider == "google":
         from .gemini import GeminiModel
 
@@ -73,18 +76,26 @@ def completer_factory(
             base_url=provider_with_model.base_url,
         )
 
-    elif provider in ("openai", "deepseek", "ollama"):
+    elif provider_definition and provider_definition.protocol == "openai_compatible":
         from .openai_compatible import OpenAIChatModel, OpenAIEndpoint
 
-        if provider != "ollama" and api_key is None:
+        if api_key is None:
             raise ValueError(f"API key is required for {provider} provider.")
 
-        endpoint_map = {
-            "openai": OpenAIEndpoint.openai,
-            "deepseek": OpenAIEndpoint.deepseek,
-            "ollama": OpenAIEndpoint.ollama,
-        }
-        endpoint = endpoint_map[provider](
+        endpoint = OpenAIEndpoint.official(
+            endpoint_name=provider_definition.name,
+            api_key=api_key,
+            base_url=provider_with_model.base_url or provider_definition.base_url,
+            supports_reasoning_effort=provider_definition.supports_reasoning_effort,
+            supports_stream_usage=provider_definition.supports_stream_usage,
+        )
+
+        return OpenAIChatModel(model_perf=model, endpoint=endpoint)
+
+    elif provider == "ollama":
+        from .openai_compatible import OpenAIChatModel, OpenAIEndpoint
+
+        endpoint = OpenAIEndpoint.ollama(
             api_key=api_key,
             base_url=provider_with_model.base_url,
         )

@@ -15,11 +15,19 @@ class OfficialProviderDefinition:
     catalog_name: str
     protocol: ProviderProtocol
     base_url: str | None = None
+    supports_reasoning_effort: bool = False
+    supports_stream_usage: bool = False
 
 
 # catalog_name 来自 models.dev；同一厂商的地域入口各自保存 API key 和启用状态。
 OFFICIAL_PROVIDERS: tuple[OfficialProviderDefinition, ...] = (
-    OfficialProviderDefinition("openai", "openai", "openai_compatible"),
+    OfficialProviderDefinition(
+        "openai",
+        "openai",
+        "openai_compatible",
+        supports_reasoning_effort=True,
+        supports_stream_usage=True,
+    ),
     OfficialProviderDefinition("google", "google", "gemini"),
     OfficialProviderDefinition("anthropic", "anthropic", "anthropic"),
     OfficialProviderDefinition(
@@ -27,6 +35,8 @@ OFFICIAL_PROVIDERS: tuple[OfficialProviderDefinition, ...] = (
         "deepseek",
         "openai_compatible",
         "https://api.deepseek.com",
+        supports_reasoning_effort=True,
+        supports_stream_usage=True,
     ),
     OfficialProviderDefinition(
         "kimi",

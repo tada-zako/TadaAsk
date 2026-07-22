@@ -24,9 +24,6 @@ from app.core.constants import ChatMessageRole
 
 
 DEFAULT_RESPONSE_FORMAT_NAME = "response_format"
-BUILT_IN_OPENAI_COMPATIBLE_PROVIDERS = {"openai", "deepseek", "ollama"}
-
-
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -37,6 +34,8 @@ class OpenAIEndpoint:
     endpoint_name: str
     api_key: str
     base_url: str | None = None
+    supports_reasoning_effort: bool = False
+    supports_stream_usage: bool = False
 
     @classmethod
     def deepseek(cls, api_key: str, base_url: str | None = None) -> "OpenAIEndpoint":
@@ -45,6 +44,8 @@ class OpenAIEndpoint:
             api_key=api_key,
             base_url=base_url or "https://api.deepseek.com",
             endpoint_name="deepseek",
+            supports_reasoning_effort=True,
+            supports_stream_usage=True,
         )
 
     @classmethod
@@ -54,6 +55,8 @@ class OpenAIEndpoint:
             api_key=api_key,
             base_url=base_url,  # OpenAI 官方 API 使用默认 base URL，无需配置
             endpoint_name="openai",
+            supports_reasoning_effort=True,
+            supports_stream_usage=True,
         )
 
     @classmethod
@@ -65,6 +68,25 @@ class OpenAIEndpoint:
             api_key="ollama",  # Ollama 本地服务通常不需要 API Key
             base_url=base_url or "http://localhost:11434",
             endpoint_name="ollama",
+        )
+
+    @classmethod
+    def official(
+        cls,
+        *,
+        endpoint_name: str,
+        api_key: str,
+        base_url: str | None,
+        supports_reasoning_effort: bool,
+        supports_stream_usage: bool,
+    ) -> "OpenAIEndpoint":
+        """创建使用预设 endpoint 的官方 OpenAI-compatible Provider。"""
+        return cls(
+            api_key=api_key,
+            base_url=base_url,
+            endpoint_name=endpoint_name,
+            supports_reasoning_effort=supports_reasoning_effort,
+            supports_stream_usage=supports_stream_usage,
         )
 
     @classmethod
@@ -133,6 +155,8 @@ class OpenAIChatModel:
         self._model = model_perf
         self._base_url = endpoint.base_url
         self._provider_name = endpoint.endpoint_name
+        self._supports_reasoning_effort = endpoint.supports_reasoning_effort
+        self._supports_stream_usage = endpoint.supports_stream_usage
         self._client = AsyncOpenAI(base_url=endpoint.base_url, api_key=endpoint.api_key)
 
     @property
@@ -146,14 +170,10 @@ class OpenAIChatModel:
         return self._provider_name
 
     @property
-    def is_custom_provider(self) -> bool:
-        """是否为用户自定义 OpenAI-compatible provider。"""
-        return self.provider_name not in BUILT_IN_OPENAI_COMPATIBLE_PROVIDERS
-
     def _translate_thinking(self, thinking: ThinkingLevel) -> ReasoningEffort | Omit:
         """通用的 thinking 配置转换为 Openai Compatible LLM 内部 thinking_config 格式"""
-        if self.is_custom_provider:
-            # 自定义 provider 仅假设为广义 OpenAI-compatible，不默认支持 reasoning_effort。
+        if not self._supports_reasoning_effort:
+            # 兼容接口不默认接受 OpenAI 的 reasoning_effort 参数。
             return omit
 
         level_map = {
@@ -255,7 +275,9 @@ class OpenAIChatModel:
             timeout=model_settings.timeout,
             reasoning_effort=self._translate_thinking(model_settings.thinking),
             stream=stream,
-            stream_options={"include_usage": True} if stream else omit,
+            stream_options={"include_usage": True}
+            if stream and self._supports_stream_usage
+            else omit,
         )
 
     def _map_json_schema(
