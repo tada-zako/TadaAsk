@@ -16,6 +16,7 @@ from app.db.schemas import (
     ProviderUpdate,
 )
 from app.core.security import ProviderAPIKeyCipher
+from app.providers.official import OFFICIAL_PROVIDERS
 
 
 # 保留最近一段时间内发布的模型，避免启动时缓存过多历史型号。
@@ -97,8 +98,18 @@ class TargetCatalog(BaseModel):
     alibaba: CatalogProviderData | None = None
     deepseek: CatalogProviderData | None = None
     minimax: CatalogProviderData | None = None
+    minimax_cn: CatalogProviderData | None = Field(default=None, alias="minimax-cn")
+    moonshotai: CatalogProviderData | None = None
+    groq: CatalogProviderData | None = None
+    zhipuai: CatalogProviderData | None = None
+    alibaba_cn: CatalogProviderData | None = Field(default=None, alias="alibaba-cn")
 
     model_config = ConfigDict(extra="ignore")
+
+    def get(self, provider_name: str) -> CatalogProviderData | None:
+        """按 models.dev 的原始 Provider ID 读取目录项。"""
+        field_name = provider_name.replace("-", "_")
+        return getattr(self, field_name, None)
 
 
 class ModelProfileService:
@@ -118,15 +129,16 @@ class ModelProfileService:
         # provider 与 model_profile 的批量更新数据
         catalog_items: list[tuple[ProviderCreate, list[ModelProfileCreate]]] = []
 
-        for provider_id, provider_catalog in catalog:
+        for provider_definition in OFFICIAL_PROVIDERS:
+            provider_catalog = catalog.get(provider_definition.catalog_name)
             if provider_catalog is None:
                 continue
 
             provider_catalog = cast(CatalogProviderData, provider_catalog)
             # 创建 provider 数据
             provider_create = ProviderCreate(
-                name=provider_id.lower(),
-                base_url=provider_catalog.api,
+                name=provider_definition.name,
+                base_url=provider_definition.base_url,
                 is_enabled=False,
                 is_custom=False,  # 模型目录同步的 provider，默认不是自定义 provider
             )
