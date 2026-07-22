@@ -165,7 +165,7 @@ class ProjectSettingsBase(BaseModel):
     visitor_temperature: float
     visitor_top_p: float
     visitor_timeout: float
-    visitor_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"]
+    visitor_thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh", "max"]
 
     rag_mode: SearchMode
     rag_top_k: int
@@ -190,7 +190,7 @@ class ProjectSettingsUpdate(BaseModel):
     visitor_top_p: float | None = None
     visitor_timeout: float | None = None
     visitor_thinking: (
-        bool | Literal["minimal", "low", "medium", "high", "xhigh"] | None
+        bool | Literal["minimal", "low", "medium", "high", "xhigh", "max"] | None
     ) = None
 
     rag_mode: SearchMode | None = None

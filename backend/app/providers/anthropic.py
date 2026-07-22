@@ -13,7 +13,6 @@ from .base import Message, ModelResponse, ModelSettings, StreamedResponse, Token
 
 
 T = TypeVar("T", bound=BaseModel)
-STRUCTURED_OUTPUT_TOOL_NAME = "structured_output"
 
 
 class AnthropicStreamedResponse(StreamedResponse):
@@ -106,19 +105,63 @@ class AnthropicModel:
         *,
         messages: list[Message],
         model_settings: ModelSettings,
+        output_format: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         system, anthropic_messages = self._map_messages(messages)
         kwargs: dict[str, Any] = {
             "model": self._model,
             "max_tokens": model_settings.max_tokens,
             "messages": anthropic_messages,
-            "temperature": model_settings.temperature,
-            "top_p": model_settings.top_p,
             "timeout": model_settings.timeout,
         }
         if system:
             kwargs["system"] = system
+
+        thinking = self._thinking_config(model_settings.thinking)
+        if thinking is not None:
+            kwargs["thinking"] = thinking
+        else:
+            kwargs["temperature"] = model_settings.temperature
+            kwargs["top_p"] = model_settings.top_p
+
+        output_config: dict[str, Any] = {}
+        effort = self._translate_effort(model_settings.thinking)
+        if effort is not None:
+            output_config["effort"] = effort
+        if output_format is not None:
+            output_config["format"] = output_format
+        if output_config:
+            kwargs["output_config"] = output_config
         return kwargs
+
+    def _translate_effort(self, thinking: bool | str) -> str | None:
+        if thinking is False:
+            return None
+        if thinking is True:
+            return "high"
+        if thinking == "minimal":
+            return "low"
+        return thinking
+
+    def _thinking_config(self, thinking: bool | str) -> dict[str, str] | None:
+        """只在模型支持的情况下传入 adaptive/disabled thinking 配置。"""
+        model = self._model.lower()
+        always_on = model.startswith(("claude-fable-5", "claude-mythos"))
+        if always_on:
+            return None
+        if thinking is False:
+            return {"type": "disabled"}
+
+        adaptive_models = (
+            "claude-opus-4-6",
+            "claude-opus-4-7",
+            "claude-opus-4-8",
+            "claude-sonnet-4-6",
+            "claude-sonnet-5",
+        )
+        if model.startswith(adaptive_models):
+            return {"type": "adaptive"}
+        return None
 
     @staticmethod
     def _to_model_response(response: Any) -> ModelResponse:
@@ -180,32 +223,20 @@ class AnthropicModel:
         model_settings: ModelSettings,
         schema: type[T],
     ) -> T:
-        """强制模型调用 schema 对应的工具，获得可校验的结构化结果。"""
+        """使用 Anthropic 原生 JSON Schema 约束结构化输出。"""
         response = await self._client.messages.create(
             **self._request_kwargs(
                 messages=messages,
                 model_settings=model_settings,
+                output_format={
+                    "type": "json_schema",
+                    "schema": schema.model_json_schema(),
+                },
             ),
-            tools=[
-                {
-                    "name": STRUCTURED_OUTPUT_TOOL_NAME,
-                    "description": "Return the requested structured response.",
-                    "input_schema": schema.model_json_schema(),
-                }
-            ],
-            tool_choice={"type": "tool", "name": STRUCTURED_OUTPUT_TOOL_NAME},
         )
-
-        tool_block = next(
-            (
-                block
-                for block in response.content
-                if block.type == "tool_use"
-                and block.name == STRUCTURED_OUTPUT_TOOL_NAME
-            ),
-            None,
+        content = "".join(
+            block.text for block in response.content if block.type == "text"
         )
-        if tool_block is None:
+        if not content:
             raise ValueError("Anthropic response does not contain structured output.")
-
-        return schema.model_validate(tool_block.input)
+        return schema.model_validate_json(content)

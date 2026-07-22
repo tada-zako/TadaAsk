@@ -51,6 +51,8 @@ class CatalogModelData(BaseModel):
     family: str | None = None
     release_date: date | None = None
     tool_call: bool | None = None
+    reasoning: bool | None = None
+    structured_output: bool | None = None
     modalities: dict[str, list[str]] | None = None
     limit: CatalogModelLimit | None = None
 
@@ -137,11 +139,7 @@ class ModelProfileService:
                         model_data.limit.output if model_data.limit else None
                     ),
                     supports_stream=True,
-                    supports_structured=(
-                        model_data.tool_call
-                        if model_data.tool_call is not None
-                        else True
-                    ),
+                    supports_structured=bool(model_data.structured_output),
                     is_enabled=False,
                 )
                 for model_id, model_data in self._select_recent_chat_models(

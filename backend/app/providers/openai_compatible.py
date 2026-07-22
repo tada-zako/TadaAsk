@@ -21,6 +21,24 @@ from .base import Message, ModelResponse, ModelSettings, StreamedResponse, Token
 DEFAULT_RESPONSE_FORMAT_NAME = "response_format"
 T = TypeVar("T", bound=BaseModel)
 StreamUsageReader = Callable[[ChatCompletionChunk, TokenUsage], None]
+StreamContentReader = Callable[[ChatCompletionChunk], str | None]
+
+
+def _usage_field(value: Any, name: str, default: Any = 0) -> Any:
+    if isinstance(value, dict):
+        return value.get(name, default)
+    return getattr(value, name, default)
+
+
+def _update_token_usage(usage: TokenUsage, raw_usage: Any) -> None:
+    """兼容 SDK 对象与厂商扩展字典，并避免重复计算 reasoning token。"""
+    completion_tokens = _usage_field(raw_usage, "completion_tokens", 0) or 0
+    details = _usage_field(raw_usage, "completion_tokens_details", None)
+    reasoning_tokens = _usage_field(details, "reasoning_tokens", 0) or 0
+    usage.input_tokens = _usage_field(raw_usage, "prompt_tokens", 0) or 0
+    usage.reasoning_tokens = reasoning_tokens
+    usage.output_tokens = max(completion_tokens - reasoning_tokens, 0)
+    usage.raw_usage = raw_usage
 
 
 class OpenAIStreamedResponse(StreamedResponse):
@@ -28,22 +46,18 @@ class OpenAIStreamedResponse(StreamedResponse):
         self,
         stream_iter: AsyncStream[ChatCompletionChunk],
         usage_reader: StreamUsageReader,
+        content_reader: StreamContentReader,
     ) -> None:
         super().__init__()
         self.stream_iter = stream_iter
         self._usage_reader = usage_reader
+        self._content_reader = content_reader
 
     async def _get_stream_iter(self) -> AsyncIterator[str]:
         async for chunk in self.stream_iter:
             self._usage_reader(chunk, self._usage)
 
-            if not chunk.choices:
-                continue
-            choice = chunk.choices[0]
-            if choice.delta is None:
-                continue
-
-            content = choice.delta.content
+            content = self._content_reader(chunk)
             if content:
                 self._text_buffer.append(content)
                 yield content
@@ -90,6 +104,9 @@ class OpenAICompatibleModel:
         """兼容接口默认不发送厂商扩展参数。"""
         return {}
 
+    def _max_tokens_parameter(self) -> str:
+        return "max_completion_tokens"
+
     def _update_stream_usage(
         self,
         chunk: ChatCompletionChunk,
@@ -98,9 +115,15 @@ class OpenAICompatibleModel:
         raw_usage = chunk.usage
         if raw_usage is None:
             return
-        usage.input_tokens = raw_usage.prompt_tokens or 0
-        usage.output_tokens = raw_usage.completion_tokens or 0
-        usage.raw_usage = raw_usage
+        _update_token_usage(usage, raw_usage)
+
+    def _read_stream_content(self, chunk: ChatCompletionChunk) -> str | None:
+        if not chunk.choices or chunk.choices[0].delta is None:
+            return None
+        return chunk.choices[0].delta.content
+
+    def _stream_content_reader(self) -> StreamContentReader:
+        return self._read_stream_content
 
     def _map_messages(
         self,
@@ -175,10 +198,10 @@ class OpenAICompatibleModel:
             "response_format": response_format if response_format is not None else omit,
             "temperature": model_settings.temperature,
             "top_p": model_settings.top_p,
-            "max_completion_tokens": model_settings.max_tokens,
             "timeout": model_settings.timeout,
             "stream": stream,
         }
+        request_kwargs[self._max_tokens_parameter()] = model_settings.max_tokens
         request_kwargs.update(
             self._provider_request_kwargs(model_settings, stream=stream)
         )
@@ -197,21 +220,20 @@ class OpenAICompatibleModel:
         }
         return response_format
 
+    def _map_json_object(
+        self,
+        schema: type[T],
+    ) -> chat.completion_create_params.ResponseFormat:
+        del schema
+        return {"type": "json_object"}
+
     def _process_response(self, response: ChatCompletion) -> ModelResponse:
         content = response.choices[0].message.content or ""
         raw_usage = response.usage
-        return ModelResponse(
-            text=content,
-            usage=(
-                TokenUsage(
-                    input_tokens=raw_usage.prompt_tokens or 0,
-                    output_tokens=raw_usage.completion_tokens or 0,
-                    raw_usage=raw_usage,
-                )
-                if raw_usage
-                else TokenUsage()
-            ),
-        )
+        usage = TokenUsage()
+        if raw_usage:
+            _update_token_usage(usage, raw_usage)
+        return ModelResponse(text=content, usage=usage)
 
     async def chat(
         self,
@@ -237,7 +259,11 @@ class OpenAICompatibleModel:
             model_settings=model_settings,
             stream=True,
         )
-        response = OpenAIStreamedResponse(stream_iter, self._update_stream_usage)
+        response = OpenAIStreamedResponse(
+            stream_iter,
+            self._update_stream_usage,
+            self._stream_content_reader(),
+        )
         try:
             yield response
         finally:

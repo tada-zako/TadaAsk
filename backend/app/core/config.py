@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     llm_default_top_p: float = 0.95
     llm_default_timeout: float = 60.0
     llm_default_thinking: (
-        bool | Literal["minimal", "low", "medium", "high", "xhigh"]
+        bool | Literal["minimal", "low", "medium", "high", "xhigh", "max"]
     ) = "medium"
     models_url: str = "https://models.dev/api.json"
 
