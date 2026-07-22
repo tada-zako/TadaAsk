@@ -469,6 +469,9 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     const targetMessage = messages.value.find(
       (message) => message.uid === messageUid,
     );
+    // 只有已加载完整时间线时，才能确认回退目标确实是会话第一条消息。
+    const willEmptySession =
+      !hasMoreBefore.value && messages.value[0]?.uid === messageUid;
 
     if (
       !sessionUid ||
@@ -481,8 +484,19 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
     }
 
     await withMutation(chatStoreError("revertMessage"), async () => {
-      draft.value = targetMessage.content;
       await revertChatMessage(sessionUid, messageUid);
+
+      if (willEmptySession) {
+        // 首条消息被回退后不保留无消息的持久 session，避免 UI 误呈现为新对话。
+        await deleteChatSession(sessionUid);
+        removeSessionLocally(sessionKey);
+        activeSessionUid.value = null;
+        setDraft(NEW_CHAT_DRAFT_KEY, targetMessage.content);
+        ensureTimelineState(NEW_CHAT_DRAFT_KEY);
+        return;
+      }
+
+      draft.value = targetMessage.content;
       await loadMessages(sessionUid);
       await loadSessions({ silent: true });
     });
