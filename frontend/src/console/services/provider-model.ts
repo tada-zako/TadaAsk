@@ -517,10 +517,17 @@ function formatTokenCount(value: number | null): string | null {
 function formatProviderDisplayName(name: string): string {
   const normalized = name.trim().toLowerCase();
   const specialNames: Record<string, string> = {
+    alibaba: "Alibaba Model Studio",
+    "alibaba-cn": "Alibaba Model Studio (China)",
     anthropic: "Anthropic",
     google: "Google AI",
     "google-ai": "Google AI",
     googleai: "Google AI",
+    glm: "Zhipu GLM",
+    groq: "Groq",
+    kimi: "Kimi",
+    minimax: "MiniMax (minimax.io)",
+    "minimax-cn": "MiniMax (minimaxi.com)",
     ollama: "Ollama",
     openai: "OpenAI",
   };

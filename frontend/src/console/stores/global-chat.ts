@@ -1681,6 +1681,21 @@ function dateValue(value: string): number {
 }
 
 function formatProviderDisplayName(name: string): string {
+  const normalized = name.trim().toLowerCase();
+  const specialNames: Record<string, string> = {
+    alibaba: "Alibaba Model Studio",
+    "alibaba-cn": "Alibaba Model Studio (China)",
+    anthropic: "Anthropic",
+    glm: "Zhipu GLM",
+    groq: "Groq",
+    kimi: "Kimi",
+    minimax: "MiniMax (minimax.io)",
+    "minimax-cn": "MiniMax (minimaxi.com)",
+  };
+  if (specialNames[normalized]) {
+    return specialNames[normalized];
+  }
+
   return name
     .split(/([\s_-]+)/)
     .map((part) =>
