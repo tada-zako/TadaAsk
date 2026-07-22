@@ -3,7 +3,7 @@ from typing import cast
 
 import httpx
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, TypeAdapter, field_validator
 
 from app.crud import ModelProfileCRUD
 from app.db.models import ModelProfile, Provider
@@ -91,25 +91,8 @@ class CatalogProviderData(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-class TargetCatalog(BaseModel):
-    openai: CatalogProviderData | None = None
-    google: CatalogProviderData | None = None
-    anthropic: CatalogProviderData | None = None
-    alibaba: CatalogProviderData | None = None
-    deepseek: CatalogProviderData | None = None
-    minimax: CatalogProviderData | None = None
-    minimax_cn: CatalogProviderData | None = Field(default=None, alias="minimax-cn")
-    moonshotai: CatalogProviderData | None = None
-    groq: CatalogProviderData | None = None
-    zhipuai: CatalogProviderData | None = None
-    alibaba_cn: CatalogProviderData | None = Field(default=None, alias="alibaba-cn")
-
-    model_config = ConfigDict(extra="ignore")
-
-    def get(self, provider_name: str) -> CatalogProviderData | None:
-        """按 models.dev 的原始 Provider ID 读取目录项。"""
-        field_name = provider_name.replace("-", "_")
-        return getattr(self, field_name, None)
+type TargetCatalog = dict[str, CatalogProviderData]
+TARGET_CATALOG_ADAPTER = TypeAdapter(TargetCatalog)
 
 
 class ModelProfileService:
@@ -349,7 +332,7 @@ class ModelProfileService:
             response = await client.get(models_url)
             response.raise_for_status()
 
-        return TargetCatalog.model_validate_json(response.content)
+        return TARGET_CATALOG_ADAPTER.validate_json(response.content)
 
     def _select_recent_chat_models(
         self,

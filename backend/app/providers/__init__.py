@@ -1,7 +1,6 @@
 from typing import Protocol
 
 from app.db.schemas import ProviderWithModelInternalRead
-from .official import OFFICIAL_PROVIDER_BY_NAME
 from .base import (
     Message,
     StreamedResponse,
@@ -62,8 +61,6 @@ def completer_factory(
     if provider_with_model.api_key:
         api_key = provider_with_model.api_key.get_secret_value()
 
-    provider_definition = OFFICIAL_PROVIDER_BY_NAME.get(provider)
-
     if provider == "google":
         from .gemini import GeminiModel
 
@@ -76,7 +73,7 @@ def completer_factory(
             base_url=provider_with_model.base_url,
         )
 
-    elif provider_definition and provider_definition.protocol == "anthropic":
+    elif provider == "anthropic":
         from .anthropic import AnthropicModel
 
         if api_key is None:
@@ -88,45 +85,107 @@ def completer_factory(
             base_url=provider_with_model.base_url,
         )
 
-    elif provider_definition and provider_definition.protocol == "openai_compatible":
-        from .openai_compatible import OpenAIChatModel, OpenAIEndpoint
+    elif provider == "openai":
+        from .openai import OpenAIModel
 
         if api_key is None:
-            raise ValueError(f"API key is required for {provider} provider.")
-
-        endpoint = OpenAIEndpoint.official(
-            endpoint_name=provider_definition.name,
-            api_key=api_key,
-            base_url=provider_with_model.base_url or provider_definition.base_url,
-            supports_reasoning_effort=provider_definition.supports_reasoning_effort,
-            supports_stream_usage=provider_definition.supports_stream_usage,
-        )
-
-        return OpenAIChatModel(model_perf=model, endpoint=endpoint)
-
-    elif provider == "ollama":
-        from .openai_compatible import OpenAIChatModel, OpenAIEndpoint
-
-        endpoint = OpenAIEndpoint.ollama(
+            raise ValueError("API key is required for OpenAI provider.")
+        return OpenAIModel(
+            model_perf=model,
             api_key=api_key,
             base_url=provider_with_model.base_url,
         )
 
-        return OpenAIChatModel(model_perf=model, endpoint=endpoint)
+    elif provider == "deepseek":
+        from .deepseek import DeepSeekModel
+
+        if api_key is None:
+            raise ValueError("API key is required for DeepSeek provider.")
+        return DeepSeekModel(
+            model_perf=model,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
+    elif provider == "kimi":
+        from .kimi import KimiModel
+
+        if api_key is None:
+            raise ValueError("API key is required for Kimi provider.")
+        return KimiModel(
+            model_perf=model,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
+    elif provider in {"alibaba", "alibaba-cn"}:
+        from .alibaba import AlibabaModel
+
+        if api_key is None:
+            raise ValueError("API key is required for Alibaba provider.")
+        return AlibabaModel(
+            model_perf=model,
+            provider_name=provider,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
+    elif provider in {"minimax", "minimax-cn"}:
+        from .minimax import MiniMaxModel
+
+        if api_key is None:
+            raise ValueError("API key is required for MiniMax provider.")
+        return MiniMaxModel(
+            model_perf=model,
+            provider_name=provider,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
+    elif provider == "glm":
+        from .glm import GLMModel
+
+        if api_key is None:
+            raise ValueError("API key is required for GLM provider.")
+        return GLMModel(
+            model_perf=model,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
+    elif provider == "groq":
+        from .groq import GroqModel
+
+        if api_key is None:
+            raise ValueError("API key is required for Groq provider.")
+        return GroqModel(
+            model_perf=model,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
+    elif provider == "ollama":
+        from .openai_compatible import OpenAICompatibleModel
+
+        return OpenAICompatibleModel(
+            model_perf=model,
+            provider_name="ollama",
+            api_key=api_key or "ollama",
+            base_url=provider_with_model.base_url or "http://localhost:11434",
+        )
 
     else:
         # custom provider
-        from .openai_compatible import OpenAIChatModel, OpenAIEndpoint
+        from .openai_compatible import OpenAICompatibleModel
 
         if api_key is None:
             raise ValueError(f"API key is required for custom provider {provider}.")
         if not provider_with_model.base_url:
             raise ValueError(f"Base URL is required for custom provider {provider}.")
 
-        endpoint = OpenAIEndpoint.custom(
-            endpoint_name=provider,
+        return OpenAICompatibleModel(
+            model_perf=model,
+            provider_name=provider,
             api_key=api_key,
             base_url=provider_with_model.base_url,
         )
-
-        return OpenAIChatModel(model_perf=model, endpoint=endpoint)
