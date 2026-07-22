@@ -76,6 +76,18 @@ def completer_factory(
             base_url=provider_with_model.base_url,
         )
 
+    elif provider_definition and provider_definition.protocol == "anthropic":
+        from .anthropic import AnthropicModel
+
+        if api_key is None:
+            raise ValueError("API key is required for Anthropic provider.")
+
+        return AnthropicModel(
+            model_perf=model,
+            api_key=api_key,
+            base_url=provider_with_model.base_url,
+        )
+
     elif provider_definition and provider_definition.protocol == "openai_compatible":
         from .openai_compatible import OpenAIChatModel, OpenAIEndpoint
 
