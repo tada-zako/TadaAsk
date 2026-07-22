@@ -27,6 +27,7 @@ import type { ModelProfileRead } from "@/console/api/provider-model";
 import { translate as t } from "@/console/i18n";
 import { getErrorMessage } from "@/console/lib/api-result";
 import { parseApiDate } from "@/console/lib/date-format";
+import { formatProviderDisplayName } from "@/console/lib/provider-display";
 import { useProviderModelStore } from "@/console/stores/provider-model";
 import { useSourceStore } from "@/console/stores/source";
 
@@ -1678,32 +1679,4 @@ function maxMessageSequence(messages: ChatMessageViewModel[]): number | null {
 function dateValue(value: string): number {
   const date = parseApiDate(value);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function formatProviderDisplayName(name: string): string {
-  const normalized = name.trim().toLowerCase();
-  const specialNames: Record<string, string> = {
-    alibaba: "Alibaba Model Studio",
-    "alibaba-cn": "Alibaba Model Studio (China)",
-    anthropic: "Anthropic",
-    glm: "Zhipu GLM",
-    groq: "Groq",
-    kimi: "Kimi",
-    minimax: "MiniMax (minimax.io)",
-    "minimax-cn": "MiniMax (minimaxi.com)",
-  };
-  if (specialNames[normalized]) {
-    return specialNames[normalized];
-  }
-
-  return name
-    .split(/([\s_-]+)/)
-    .map((part) =>
-      /^[\s_-]+$/.test(part)
-        ? " "
-        : part.charAt(0).toUpperCase() + part.slice(1),
-    )
-    .join("")
-    .replace(/\s+/g, " ")
-    .trim();
 }

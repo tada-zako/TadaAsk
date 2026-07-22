@@ -1439,7 +1439,7 @@ export interface components {
             /** Visitortimeout */
             visitorTimeout: number;
             /** Visitorthinking */
-            visitorThinking: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh");
+            visitorThinking: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh" | "max");
             ragMode: components["schemas"]["SearchMode"];
             /** Ragtopk */
             ragTopK: number;
@@ -1475,7 +1475,7 @@ export interface components {
             /** Visitortimeout */
             visitorTimeout?: number | null;
             /** Visitorthinking */
-            visitorThinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh") | null;
+            visitorThinking?: boolean | ("minimal" | "low" | "medium" | "high" | "xhigh" | "max") | null;
             ragMode?: components["schemas"]["SearchMode"] | null;
             /** Ragtopk */
             ragTopK?: number | null;
@@ -1940,7 +1940,7 @@ export interface components {
             webCrawlConfig?: components["schemas"]["WebCrawlConfig-Input"] | null;
         };
         /** @enum {string} */
-        ThinkingEffort: "minimal" | "low" | "medium" | "high" | "xhigh";
+        ThinkingEffort: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
         ThinkingLevel: boolean | components["schemas"]["ThinkingEffort"];
         /**
          * Token
