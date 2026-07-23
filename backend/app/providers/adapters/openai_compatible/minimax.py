@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from .base import ModelSettings
-from .openai_compatible import OpenAICompatibleModel, StreamContentReader
+from ...base import ModelSettings
+from .base import OpenAICompatibleModel, StreamContentReader
 
 
 class MiniMaxModel(OpenAICompatibleModel):

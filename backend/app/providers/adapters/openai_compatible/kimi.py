@@ -5,8 +5,8 @@ from typing import Any
 from openai import omit
 from openai.types.chat import ChatCompletionChunk
 
-from .base import ModelSettings, TokenUsage
-from .openai_compatible import OpenAICompatibleModel, _update_token_usage
+from ...base import ModelSettings, TokenUsage
+from .base import OpenAICompatibleModel, _update_token_usage
 
 
 class KimiModel(OpenAICompatibleModel):

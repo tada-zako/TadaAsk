@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from .base import ModelSettings
-from .openai_compatible import OpenAICompatibleModel
+from ...base import ModelSettings
+from .base import OpenAICompatibleModel
 
 
 class GLMModel(OpenAICompatibleModel):

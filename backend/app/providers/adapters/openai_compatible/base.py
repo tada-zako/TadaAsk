@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from app.core.constants import ChatMessageRole
 
-from .base import Message, ModelResponse, ModelSettings, StreamedResponse, TokenUsage
+from ...base import Message, ModelResponse, ModelSettings, StreamedResponse, TokenUsage
 
 
 DEFAULT_RESPONSE_FORMAT_NAME = "response_format"

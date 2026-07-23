@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.core.constants import ChatMessageRole
 
-from .base import Message, ModelResponse, ModelSettings, StreamedResponse, TokenUsage
+from ..base import Message, ModelResponse, ModelSettings, StreamedResponse, TokenUsage
 
 
 T = TypeVar("T", bound=BaseModel)
