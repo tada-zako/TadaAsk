@@ -126,10 +126,10 @@ def completer_factory(
             base_url=provider_with_model.base_url,
         )
 
-    from .adapters.openai_compatible.base import OpenAICompatibleModel
+    from .adapters.openai_compatible.standard import StandardOpenAICompatibleModel
 
     if provider == "ollama":
-        return OpenAICompatibleModel(
+        return StandardOpenAICompatibleModel(
             model_perf=model,
             provider_name="ollama",
             api_key=api_key or "ollama",
@@ -141,7 +141,7 @@ def completer_factory(
     if not provider_with_model.base_url:
         raise ValueError(f"Base URL is required for custom provider {provider}.")
 
-    return OpenAICompatibleModel(
+    return StandardOpenAICompatibleModel(
         model_perf=model,
         provider_name=provider,
         api_key=api_key,

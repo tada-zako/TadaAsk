@@ -2,11 +2,13 @@
 
 from typing import Any
 
+from pydantic import BaseModel
+
 from ...base import ModelSettings
-from .base import OpenAICompatibleModel
+from .standard import StandardOpenAICompatibleModel
 
 
-class GroqModel(OpenAICompatibleModel):
+class GroqModel(StandardOpenAICompatibleModel):
     def __init__(self, *, model_perf: str, api_key: str, base_url: str | None = None):
         super().__init__(
             model_perf=model_perf,
@@ -15,27 +17,39 @@ class GroqModel(OpenAICompatibleModel):
             base_url=base_url,
         )
 
-    def _provider_request_kwargs(
+    def _build_completion_params(
         self,
-        model_settings: ModelSettings,
         *,
+        model_settings: ModelSettings,
         stream: bool,
+        schema: type[BaseModel] | None,
     ) -> dict[str, Any]:
+        params = super()._build_completion_params(
+            model_settings=model_settings,
+            stream=stream,
+            schema=schema,
+        )
+        params.update(self._thinking_params(model_settings))
+        if stream:
+            params.update(self._stream_params())
+        return params
+
+    def _thinking_params(self, model_settings: ModelSettings) -> dict[str, Any]:
         thinking = model_settings.thinking
         model = self._model.lower()
-        kwargs: dict[str, Any] = {}
+        params: dict[str, Any] = {}
 
         if "qwen" in model:
-            kwargs["reasoning_effort"] = "none" if thinking is False else "default"
+            params["reasoning_effort"] = "none" if thinking is False else "default"
         elif "gpt-oss" in model and thinking is not False:
             level = "medium" if thinking is True else thinking
             if level in {"minimal", "low"}:
-                kwargs["reasoning_effort"] = "low"
+                params["reasoning_effort"] = "low"
             elif level == "medium":
-                kwargs["reasoning_effort"] = "medium"
+                params["reasoning_effort"] = "medium"
             else:
-                kwargs["reasoning_effort"] = "high"
+                params["reasoning_effort"] = "high"
+        return params
 
-        if stream:
-            kwargs["stream_options"] = {"include_usage": True}
-        return kwargs
+    def _stream_params(self) -> dict[str, Any]:
+        return {"stream_options": {"include_usage": True}}

@@ -2,11 +2,13 @@
 
 from typing import Any
 
+from pydantic import BaseModel
+
 from ...base import ModelSettings
-from .base import OpenAICompatibleModel
+from .standard import StandardOpenAICompatibleModel
 
 
-class GLMModel(OpenAICompatibleModel):
+class GLMModel(StandardOpenAICompatibleModel):
     def __init__(self, *, model_perf: str, api_key: str, base_url: str | None = None):
         super().__init__(
             model_perf=model_perf,
@@ -15,25 +17,31 @@ class GLMModel(OpenAICompatibleModel):
             base_url=base_url,
         )
 
-    def _max_tokens_parameter(self) -> str:
-        return "max_tokens"
-
-    def _provider_request_kwargs(
+    def _build_completion_params(
         self,
-        model_settings: ModelSettings,
         *,
+        model_settings: ModelSettings,
         stream: bool,
+        schema: type[BaseModel] | None,
     ) -> dict[str, Any]:
         del stream
+        params: dict[str, Any] = {
+            "temperature": model_settings.temperature,
+            "top_p": model_settings.top_p,
+            "max_tokens": model_settings.max_tokens,
+        }
+        params.update(self._thinking_params(model_settings))
+        if schema is not None:
+            params["response_format"] = self._json_object_format()
+        return params
+
+    def _thinking_params(self, model_settings: ModelSettings) -> dict[str, Any]:
         thinking = model_settings.thinking
-        kwargs: dict[str, Any] = {
+        params: dict[str, Any] = {
             "extra_body": {
                 "thinking": {"type": "disabled" if thinking is False else "enabled"}
             }
         }
         if self._model.lower().startswith("glm-5.2") and thinking is not False:
-            kwargs["reasoning_effort"] = "max" if thinking is True else thinking
-        return kwargs
-
-    def _map_json_schema(self, schema):
-        return self._map_json_object(schema)
+            params["reasoning_effort"] = "max" if thinking is True else thinking
+        return params

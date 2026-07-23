@@ -2,11 +2,34 @@
 
 from typing import Any
 
+from openai import AsyncStream
+from openai.types.chat import ChatCompletionChunk
+from pydantic import BaseModel
+
 from ...base import ModelSettings
-from .base import OpenAICompatibleModel, StreamContentReader
+from .standard import StandardOpenAICompatibleModel, StandardOpenAIStreamedResponse
 
 
-class MiniMaxModel(OpenAICompatibleModel):
+class MiniMaxStreamedResponse(StandardOpenAIStreamedResponse):
+    """将 MiniMax 可能返回的累计文本转换为增量。"""
+
+    def __init__(self, stream: AsyncStream[ChatCompletionChunk]) -> None:
+        super().__init__(stream)
+        self._previous_content = ""
+
+    def _read_content(self, chunk: ChatCompletionChunk) -> str | None:
+        content = super()._read_content(chunk)
+        if not content:
+            return None
+        if content.startswith(self._previous_content):
+            incremental = content[len(self._previous_content) :]
+            self._previous_content = content
+            return incremental or None
+        self._previous_content += content
+        return content
+
+
+class MiniMaxModel(StandardOpenAICompatibleModel):
     def __init__(
         self,
         *,
@@ -22,34 +45,33 @@ class MiniMaxModel(OpenAICompatibleModel):
             base_url=base_url,
         )
 
-    def _provider_request_kwargs(
+    def _build_completion_params(
         self,
-        model_settings: ModelSettings,
         *,
+        model_settings: ModelSettings,
         stream: bool,
+        schema: type[BaseModel] | None,
     ) -> dict[str, Any]:
-        del model_settings
-        kwargs: dict[str, Any] = {
-            "extra_body": {"reasoning_split": True},
+        params: dict[str, Any] = {
+            "temperature": model_settings.temperature,
+            "top_p": model_settings.top_p,
+            "max_completion_tokens": model_settings.max_tokens,
         }
+        params.update(self._reasoning_params())
         if stream:
-            kwargs["stream_options"] = {"include_usage": True}
-        return kwargs
+            params.update(self._stream_params())
+        if schema is not None:
+            params["response_format"] = self._json_schema_format(schema)
+        return params
 
-    def _stream_content_reader(self) -> StreamContentReader:
-        # MiniMax OpenAI-compatible 流可能返回累计文本，在单次响应内转换为增量。
-        previous = ""
+    def _reasoning_params(self) -> dict[str, Any]:
+        return {"extra_body": {"reasoning_split": True}}
 
-        def read_content(chunk):
-            nonlocal previous
-            content = self._read_stream_content(chunk)
-            if not content:
-                return None
-            if content.startswith(previous):
-                incremental = content[len(previous) :]
-                previous = content
-                return incremental or None
-            previous += content
-            return content
+    def _stream_params(self) -> dict[str, Any]:
+        return {"stream_options": {"include_usage": True}}
 
-        return read_content
+    def _to_streamed_response(
+        self,
+        stream: AsyncStream[ChatCompletionChunk],
+    ) -> MiniMaxStreamedResponse:
+        return MiniMaxStreamedResponse(stream)
