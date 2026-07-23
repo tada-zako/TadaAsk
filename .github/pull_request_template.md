@@ -27,7 +27,7 @@ Closes #
 - [ ] 所有现有单元测试通过（`npm test` / `go test` 等）
 - [ ] 为核心改动补充了新的单元测试或集成测试（如适用）
 - [ ] 在真实场景（或 demo 项目）中手动验证了主流程
-- 
+
 ## 额外备注 (Additional Notes)
 
 > 此处可填写：潜在破坏性变更（Breaking Changes）、后续待办事项（TODO）、依赖的 PR 等。
