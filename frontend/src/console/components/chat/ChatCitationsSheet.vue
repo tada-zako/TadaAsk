@@ -34,7 +34,7 @@ const emit = defineEmits<{
 
 const citationsContentRef = ref<HTMLElement | null>(null);
 const highlightedCitationId = ref<number | null>(null);
-const MAX_CITATION_TITLE_LENGTH = 80;
+const MAX_CITATION_TITLE_LENGTH = 40;
 let highlightResetTimer: ReturnType<typeof setTimeout> | null = null;
 
 const { t } = useI18n();
