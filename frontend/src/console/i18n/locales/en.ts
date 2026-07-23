@@ -624,6 +624,10 @@ export const en = {
       loadingOlder: "Loading earlier messages...",
       newChat: "Ready to start at any time",
       restartAria: "Restart from this message",
+      restartConfirmAction: "Reset",
+      restartConfirmDescription:
+        "Reset the message to the current position and restart..",
+      restartConfirmTitle: "Reset message",
       scrollToBottom: "Scroll to latest",
       scrollToBottomAria: "Scroll to the latest message",
       stopped: "Interrupted",
@@ -636,7 +640,9 @@ export const en = {
     },
     sessions: {
       collapseAria: "Collapse sessions",
-      deleteConfirm: 'Delete "{title}"?',
+      deleteConfirmDescription:
+        "The conversation cannot be recovered after deletion.",
+      deleteConfirmTitle: "Delete conversation",
       deleteSessionAria: "Delete session {title}",
       empty: "No chat sessions yet.",
       expandAria: "Expand sessions",

@@ -10,6 +10,7 @@ import type {
 import { translate as t } from "@/console/i18n";
 import { unwrapApiData } from "@/console/lib/api-result";
 import { normalizeOptionalText } from "@/console/lib/normalize";
+import { formatProviderDisplayName } from "@/console/lib/provider-display";
 
 // === ViewModel 类型：供 UI 层消费 ===
 
@@ -512,33 +513,6 @@ function formatTokenCount(value: number | null): string | null {
   }
 
   return new Intl.NumberFormat("en-US").format(value);
-}
-
-function formatProviderDisplayName(name: string): string {
-  const normalized = name.trim().toLowerCase();
-  const specialNames: Record<string, string> = {
-    anthropic: "Anthropic",
-    google: "Google AI",
-    "google-ai": "Google AI",
-    googleai: "Google AI",
-    ollama: "Ollama",
-    openai: "OpenAI",
-  };
-
-  if (specialNames[normalized]) {
-    return specialNames[normalized];
-  }
-
-  return name
-    .split(/([\s_-]+)/)
-    .map((part) =>
-      /^[\s_-]+$/.test(part)
-        ? " "
-        : part.charAt(0).toUpperCase() + part.slice(1),
-    )
-    .join("")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function providerInitial(displayName: string): string {

@@ -3,7 +3,7 @@ from typing import cast
 
 import httpx
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, TypeAdapter, field_validator
 
 from app.crud import ModelProfileCRUD
 from app.db.models import ModelProfile, Provider
@@ -16,6 +16,7 @@ from app.db.schemas import (
     ProviderUpdate,
 )
 from app.core.security import ProviderAPIKeyCipher
+from app.providers.official import OFFICIAL_PROVIDERS
 
 
 # 保留最近一段时间内发布的模型，避免启动时缓存过多历史型号。
@@ -50,6 +51,8 @@ class CatalogModelData(BaseModel):
     family: str | None = None
     release_date: date | None = None
     tool_call: bool | None = None
+    reasoning: bool | None = None
+    structured_output: bool | None = None
     modalities: dict[str, list[str]] | None = None
     limit: CatalogModelLimit | None = None
 
@@ -90,15 +93,8 @@ class CatalogProviderData(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-class TargetCatalog(BaseModel):
-    openai: CatalogProviderData | None = None
-    google: CatalogProviderData | None = None
-    anthropic: CatalogProviderData | None = None
-    alibaba: CatalogProviderData | None = None
-    deepseek: CatalogProviderData | None = None
-    minimax: CatalogProviderData | None = None
-
-    model_config = ConfigDict(extra="ignore")
+type TargetCatalog = dict[str, CatalogProviderData]
+TARGET_CATALOG_ADAPTER = TypeAdapter(TargetCatalog)
 
 
 class ModelProfileService:
@@ -118,15 +114,16 @@ class ModelProfileService:
         # provider 与 model_profile 的批量更新数据
         catalog_items: list[tuple[ProviderCreate, list[ModelProfileCreate]]] = []
 
-        for provider_id, provider_catalog in catalog:
+        for provider_definition in OFFICIAL_PROVIDERS:
+            provider_catalog = catalog.get(provider_definition.catalog_name)
             if provider_catalog is None:
                 continue
 
             provider_catalog = cast(CatalogProviderData, provider_catalog)
             # 创建 provider 数据
             provider_create = ProviderCreate(
-                name=provider_id.lower(),
-                base_url=provider_catalog.api,
+                name=provider_definition.name,
+                base_url=provider_definition.base_url,
                 is_enabled=False,
                 is_custom=False,  # 模型目录同步的 provider，默认不是自定义 provider
             )
@@ -142,11 +139,7 @@ class ModelProfileService:
                         model_data.limit.output if model_data.limit else None
                     ),
                     supports_stream=True,
-                    supports_structured=(
-                        model_data.tool_call
-                        if model_data.tool_call is not None
-                        else True
-                    ),
+                    supports_structured=bool(model_data.structured_output),
                     is_enabled=False,
                 )
                 for model_id, model_data in self._select_recent_chat_models(
@@ -337,7 +330,7 @@ class ModelProfileService:
             response = await client.get(models_url)
             response.raise_for_status()
 
-        return TargetCatalog.model_validate_json(response.content)
+        return TARGET_CATALOG_ADAPTER.validate_json(response.content)
 
     def _select_recent_chat_models(
         self,

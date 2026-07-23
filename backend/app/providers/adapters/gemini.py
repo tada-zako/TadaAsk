@@ -13,7 +13,7 @@ from google.genai.types import (
 )
 from pydantic import BaseModel
 
-from .base import (
+from ..base import (
     StreamedResponse,
     Message,
     TokenUsage,

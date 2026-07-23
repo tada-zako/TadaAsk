@@ -26,6 +26,15 @@ import ChatContextSettingsSheet from "./ChatContextSettingsSheet.vue";
 import ChatMarkdownRenderer from "./ChatMarkdownRenderer.vue";
 import { useGlobalChatStore } from "@/console/stores/global-chat.ts";
 import type { ThinkingLevel } from "@/console/services/chat";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
 import { Button } from "@/shared/components/ui/button";
 import {
   DropdownMenu,
@@ -103,6 +112,8 @@ const isComposerComposing = ref(false);
 const isPinnedToBottom = ref(true);
 // 进入/切换 session 后需要等待消息就绪，再强制定位到底部
 const shouldForceScrollToBottom = ref(false);
+// 待回退的用户消息；确认前不修改当前对话时间线。
+const messagePendingRestart = ref<string | null>(null);
 let copiedResetTimer: ReturnType<typeof setTimeout> | null = null;
 // 防止加载旧消息时重复触发
 let isPreservingOlderScroll = false;
@@ -150,8 +161,18 @@ const showScrollToBottom = computed(
     !isPinnedToBottom.value,
 );
 
-// 从指定 user message 重新开始（回退并预填草稿）
-function restartFromMessage(messageUid: string) {
+// 请求从指定 user message 重新开始（确认后才回退并预填草稿）
+function requestRestartFromMessage(messageUid: string) {
+  messagePendingRestart.value = messageUid;
+}
+
+function confirmRestartFromMessage() {
+  const messageUid = messagePendingRestart.value;
+  if (!messageUid) {
+    return;
+  }
+
+  messagePendingRestart.value = null;
   void globalChatStore.restartFromMessage(messageUid).catch(() => undefined);
 }
 
@@ -521,7 +542,7 @@ onBeforeUnmount(() => {
                   :aria-label="t('chat.thread.restartAria')"
                   class="grid size-6 place-items-center rounded-(--console-radius-sm) text-(--text-faint) hover:bg-white/[0.05] hover:text-(--text-strong)"
                   :disabled="isStreaming"
-                  @click="restartFromMessage(message.uid)"
+                  @click="requestRestartFromMessage(message.uid)"
                 >
                   <Undo2 class="size-3.5" />
                 </button>
@@ -837,6 +858,41 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <!-- 消息回退 dialog -->
+    <AlertDialog
+      :open="messagePendingRestart !== null"
+      @update:open="
+        (open) => {
+          if (!open) messagePendingRestart = null;
+        }
+      "
+    >
+      <AlertDialogContent
+        class="border-(--line) bg-[#101113] shadow-[0_28px_90px_rgba(0,0,0,0.54)]"
+      >
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {{ t("chat.thread.restartConfirmTitle") }}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t("chat.thread.restartConfirmDescription") }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{{
+            t("common.actions.cancel")
+          }}</AlertDialogCancel>
+          <Button
+            type="button"
+            :disabled="isStreaming"
+            @click="confirmRestartFromMessage"
+          >
+            {{ t("chat.thread.restartConfirmAction") }}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </section>
 </template>
 

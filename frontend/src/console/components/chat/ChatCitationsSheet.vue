@@ -34,6 +34,7 @@ const emit = defineEmits<{
 
 const citationsContentRef = ref<HTMLElement | null>(null);
 const highlightedCitationId = ref<number | null>(null);
+const MAX_CITATION_TITLE_LENGTH = 40;
 let highlightResetTimer: ReturnType<typeof setTimeout> | null = null;
 
 const { t } = useI18n();
@@ -83,12 +84,16 @@ onBeforeUnmount(() => {
 
 // 引用条目标题：优先 title → filename → originUrl → 回退 ID
 function citationTitle(item: RAGSnapshotItem): string {
-  return (
+  const title =
     item.title ??
     item.filename ??
     item.originUrl ??
-    t("chat.citations.fallbackTitle", { id: item.citationId })
-  );
+    t("chat.citations.fallbackTitle", { id: item.citationId });
+  const characters = Array.from(title);
+
+  return characters.length > MAX_CITATION_TITLE_LENGTH
+    ? `${characters.slice(0, MAX_CITATION_TITLE_LENGTH).join("")}…`
+    : title;
 }
 
 // 引用条目元信息：来源名 / 章节 / 页码 / 是否被上下文使用
@@ -180,14 +185,14 @@ function citationScore(item: RAGSnapshotItem): string {
             v-for="item in message.citationItems"
             :key="`${item.citationId}-${item.chunkId}`"
             :data-citation-card-id="item.citationId"
-            class="grid gap-2 rounded-(--console-radius-lg) border bg-(--surface-panel-soft) px-3 py-2.5 transition-[border-color,background-color,box-shadow] duration-300"
+            class="grid min-w-0 gap-2 rounded-(--console-radius-lg) border bg-(--surface-panel-soft) px-3 py-2.5 transition-[border-color,background-color,box-shadow] duration-300"
             :class="
               highlightedCitationId === item.citationId
                 ? 'border-primary/45 bg-primary/[0.07] shadow-[0_0_0_1px_rgba(36,211,196,0.08)]'
                 : 'border-(--line-soft)'
             "
           >
-            <div class="flex items-center gap-2">
+            <div class="flex min-w-0 items-center gap-2">
               <span
                 class="bg-primary/15 text-primary grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-semibold"
               >

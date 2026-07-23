@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 # LLM 思考等级定义
-type ThinkingEffort = Literal["minimal", "low", "medium", "high", "xhigh"]
+type ThinkingEffort = Literal["minimal", "low", "medium", "high", "xhigh", "max"]
 type ThinkingLevel = bool | ThinkingEffort
 
 # LLM 响应状态定义
@@ -155,7 +155,7 @@ class ModelSettings:
 
     - `True`: Enable thinking with the provider's default effort level.
     - `False`: Disable thinking (silently ignored if the model always thinks).
-    - `'minimal'`/`'low'`/`'medium'`/`'high'`/`'xhigh'`: Enable thinking at a specific effort level.
+    - `'minimal'`/`'low'`/`'medium'`/`'high'`/`'xhigh'`/`'max'`: Enable thinking at a specific effort level.
 
     When omitted, the model uses its default behavior (which may include thinking
     for reasoning models).

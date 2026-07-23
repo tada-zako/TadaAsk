@@ -8,6 +8,7 @@ license = "MIT"
 dependencies = [
     "aiosqlite>=0.22.1",
     "alembic>=1.18.4",
+    "anthropic>=0.117.1",
     "beautifulsoup4>=4.15.0",
     "chromadb>=1.5.9",
     "cryptography>=48.0.1",

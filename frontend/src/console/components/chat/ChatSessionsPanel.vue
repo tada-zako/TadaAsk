@@ -6,11 +6,21 @@ import {
   PanelLeft,
 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
+import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import ChatContextSettingsSheet from "./ChatContextSettingsSheet.vue";
 import { useGlobalChatStore } from "@/console/stores/global-chat.ts";
 import { Button } from "@/shared/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -36,6 +46,9 @@ const globalChatStore = useGlobalChatStore();
 const { activeSessionUid, isLoadingSessions, isMutating, sessions } =
   storeToRefs(globalChatStore);
 
+// 待删除会话：保留目标信息，供单个确认弹窗展示与执行
+const sessionPendingDeletion = ref<string | null>(null);
+
 function openSession(sessionUid: string) {
   void globalChatStore.selectSession(sessionUid).catch(() => undefined);
 }
@@ -44,13 +57,19 @@ function startNewSession() {
   globalChatStore.startNewSession();
 }
 
+function requestSessionDeletion(sessionUid: string) {
+  sessionPendingDeletion.value = sessionUid;
+}
+
 // 删除 session：确认后通过 store action 执行，自动处理 active session 切换
-function deleteSession(sessionUid: string, title: string) {
-  const confirmed = window.confirm(t("chat.sessions.deleteConfirm", { title }));
-  if (!confirmed) {
+function confirmSessionDeletion() {
+  const sessionUid = sessionPendingDeletion.value;
+
+  if (!sessionUid) {
     return;
   }
 
+  sessionPendingDeletion.value = null;
   void globalChatStore.deleteSession(sessionUid).catch(() => undefined);
 }
 
@@ -191,7 +210,7 @@ function collapseSessions() {
                     isMutating ||
                     globalChatStore.isSessionStreaming(session.uid)
                   "
-                  @click="deleteSession(session.uid, session.title)"
+                  @click="requestSessionDeletion(session.uid)"
                 >
                   <Archive class="size-3.5" />
                 </button>
@@ -201,5 +220,42 @@ function collapseSessions() {
         </template>
       </nav>
     </div>
+
+    <!-- session delete dialog -->
+    <AlertDialog
+      :open="sessionPendingDeletion !== null"
+      @update:open="
+        (open) => {
+          if (!open) sessionPendingDeletion = null;
+        }
+      "
+    >
+      <AlertDialogContent
+        class="border-(--line) bg-[#101113] shadow-[0_28px_90px_rgba(0,0,0,0.54)]"
+      >
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {{ t("chat.sessions.deleteConfirmTitle") }}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t("chat.sessions.deleteConfirmDescription") }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{{
+            t("common.actions.cancel")
+          }}</AlertDialogCancel>
+          <Button
+            type="button"
+            variant="destructive"
+            class="bg-red-500 text-white hover:bg-red-500/90"
+            :disabled="isMutating"
+            @click="confirmSessionDeletion"
+          >
+            {{ t("common.actions.delete") }}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </aside>
 </template>
