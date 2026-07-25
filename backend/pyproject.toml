@@ -53,6 +53,17 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+]
+markers = [
+    "integration: 使用真实数据库、文件存储或多层业务组件的集成测试",
+    "slow: 需要本地重型组件或执行时间较长的测试",
+    "live: 需要网络、外部服务凭据或可能产生费用的手动测试",
+]
 norecursedirs = [
     ".venv",
     ".pytest_cache",
@@ -60,3 +71,23 @@ norecursedirs = [
     "storages",
     "models--*",
 ]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+omit = [
+    "app/agent/*",
+]
+
+[tool.coverage.report]
+fail_under = 50
+show_missing = true
+skip_covered = false
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
