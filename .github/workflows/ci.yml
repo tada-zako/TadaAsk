@@ -43,7 +43,7 @@ jobs:
         run: pnpm run build
 
   backend:
-    name: Backend check
+    name: Backend tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -61,7 +61,7 @@ jobs:
           cache-dependency-glob: uv.lock
 
       - name: Install dependencies
-        run: uv sync --frozen --no-dev
+        run: uv sync --frozen --group dev
 
       # 快速语法检查
       - name: Compile backend source
@@ -70,3 +70,7 @@ jobs:
       # 简单冒烟测试
       - name: Import FastAPI application
         run: uv run --no-sync python -c "from app.main import app; assert app"
+
+      # 默认包含 unit 与 integration，显式排除需要外部凭据的 live 测试
+      - name: Run backend tests
+        run: uv run --no-sync pytest -m "not live" --cov=app --cov-report=term-missing -q
