@@ -1,12 +1,15 @@
 from contextlib import asynccontextmanager
+from functools import partial
+from typing import Any, Mapping
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import HTTPException as StarletteHTTPException
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from loguru import logger
 
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.core.exceptions import RateLimitExceededError
 from app.core.security import (
     get_password_hash,
@@ -15,7 +18,13 @@ from app.core.security import (
 )
 from app.core.rate_limit import VisitorRateLimiter
 from app.crud import AdminCRUD, ModelProfileCRUD
-from app.db import init_db, run_migrations, async_session
+from app.db import (
+    async_session,
+    get_db,
+    get_session_factory,
+    init_db,
+    run_migrations,
+)
 from app.db.schemas import AdminCreate
 from app.storage import FileStorage, file_storage_factory
 from app.ingestion.parser import (
@@ -54,13 +63,17 @@ from app.api.admin.cors import AdminScopedCORSMiddleware
 from app.api.visitor.widget_cors import WidgetScopedCORSMiddleware
 
 
-async def sync_admin_credentials():
+async def sync_admin_credentials(
+    *,
+    session_factory: async_sessionmaker[AsyncSession] = async_session,
+    app_settings: Settings = settings,
+) -> None:
     """启动时创建或同步由 Settings 管理的单一管理员凭据。"""
-    async with async_session() as session:
+    async with session_factory() as session:
         async with session.begin():
             admin_crud = AdminCRUD(session)
             existing_admin = await admin_crud.get_admin_by_username(
-                username=settings.admin_username
+                username=app_settings.admin_username
             )
 
             # 修改 ADMIN_USERNAME 后无法按新名称命中，此时复用最早创建的账号，
@@ -70,32 +83,34 @@ async def sync_admin_credentials():
 
             if existing_admin is None:
                 # 不存在历史 admin 账号，创建新账号
-                password_hash = get_password_hash(settings.admin_password)
+                password_hash = get_password_hash(app_settings.admin_password)
                 default_admin_data = AdminCreate(
-                    username=settings.admin_username,
+                    username=app_settings.admin_username,
                     password_hash=password_hash,
                 )
                 new_admin = await admin_crud.create_admin(default_admin_data)
                 logger.info(f"默认管理员账号已创建，用户名：{new_admin.username}")
                 return
 
-            username_changed = existing_admin.username != settings.admin_username
+            username_changed = existing_admin.username != app_settings.admin_username
             password_changed = not verify_password(
-                settings.admin_password,
+                app_settings.admin_password,
                 existing_admin.password_hash,
             )
 
             if not username_changed and not password_changed:
                 # 用户名以及密码未更新
-                logger.info(f"管理员账号配置已同步，用户名：{settings.admin_username}")
+                logger.info(
+                    f"管理员账号配置已同步，用户名：{app_settings.admin_username}"
+                )
                 return
 
             # 更新 username 或 password
             await admin_crud.update_credentials(
                 existing_admin,
-                username=settings.admin_username if username_changed else None,
+                username=app_settings.admin_username if username_changed else None,
                 password_hash=(
-                    get_password_hash(settings.admin_password)
+                    get_password_hash(app_settings.admin_password)
                     if password_changed
                     else None
                 ),
@@ -106,50 +121,82 @@ async def sync_admin_credentials():
             )
 
 
-async def sync_model_catalog():
+async def sync_model_catalog(
+    *,
+    session_factory: async_sessionmaker[AsyncSession] = async_session,
+    app_settings: Settings = settings,
+) -> None:
     """在应用启动时同步 provider/model_profile 模型目录。"""
-    async with async_session() as session:
+    async with session_factory() as session:
         async with session.begin():
             model_profile_service = ModelProfileService(
                 model_profile_crud=ModelProfileCRUD(session=session)
             )
             await model_profile_service.sync_model_catalog(
-                models_url=settings.models_url
+                models_url=app_settings.models_url
             )
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(
+    app: FastAPI,
+    *,
+    session_factory: async_sessionmaker[AsyncSession] = async_session,
+    app_settings: Settings = settings,
+    initialize_runtime: bool = True,
+    state_overrides: Mapping[str, Any] | None = None,
+):
     """
     FastAPI 生命周期管理器，
     负责在应用启动时初始化数据库连接
     """
 
     logger.info("Starting up the application...")
+
+    if not initialize_runtime:
+        # NOTE: 测试环境只挂载显式注入的组件，避免初始化模型、向量库和外部目录。
+        # 该分支只服务于 tests 使用，避免全量初始化项目配置。
+        for name, value in (state_overrides or {}).items():
+            setattr(app.state, name, value)
+        yield
+        job_manager = getattr(app.state, "rag_job_manager", None)
+        shutdown = getattr(job_manager, "shutdown", None)
+        if shutdown:
+            await shutdown()
+        logger.info("Shutting down the application...")
+        return
+
     # ======= 系统重要配置挂载 =======
-    if settings.database_auto_migrate:
+    if app_settings.database_auto_migrate:
         logger.info("Running database migrations...")
         await run_migrations()
 
     await init_db()
     # MVP：管理员凭据以启动配置为准，暂不提供运行时修改 API。
-    await sync_admin_credentials()
-    await sync_model_catalog()
+    await sync_admin_credentials(
+        session_factory=session_factory,
+        app_settings=app_settings,
+    )
+    await sync_model_catalog(
+        session_factory=session_factory,
+        app_settings=app_settings,
+    )
 
     # 挂载 visitor 限流器实例
     app.state.visitor_rate_limiter = VisitorRateLimiter(
-        enabled=settings.visitor_rate_limit_enabled,
-        ip_project_per_minute=settings.visitor_rate_limit_ip_project_per_minute,
-        ip_project_per_hour=settings.visitor_rate_limit_ip_project_per_hour,
-        ip_per_minute=settings.visitor_rate_limit_ip_per_minute,
-        project_per_minute=settings.visitor_rate_limit_project_per_minute,
-        stream_per_ip=settings.visitor_stream_concurrency_per_ip,
-        stream_per_project=settings.visitor_stream_concurrency_per_project,
+        enabled=app_settings.visitor_rate_limit_enabled,
+        ip_project_per_minute=app_settings.visitor_rate_limit_ip_project_per_minute,
+        ip_project_per_hour=app_settings.visitor_rate_limit_ip_project_per_hour,
+        ip_per_minute=app_settings.visitor_rate_limit_ip_per_minute,
+        project_per_minute=app_settings.visitor_rate_limit_project_per_minute,
+        stream_per_ip=app_settings.visitor_stream_concurrency_per_ip,
+        stream_per_project=app_settings.visitor_stream_concurrency_per_project,
     )
 
     # 挂载文件存储实例
     file_storage: FileStorage = file_storage_factory(
-        storage_backend=settings.file_storage_backend,
+        storage_backend=app_settings.file_storage_backend,
+        base_path=app_settings.upload_folder_path,
     )
     app.state.file_storage = file_storage
 
@@ -168,8 +215,8 @@ async def lifespan(app: FastAPI):
 
     # 挂载密钥加密器实例
     api_key_cipher = ProviderAPIKeyCipher(
-        encryption_key=settings.provider_api_key_encryption_key,
-        previous_keys=settings.provider_api_key_previous_encryption_keys,
+        encryption_key=app_settings.provider_api_key_encryption_key,
+        previous_keys=app_settings.provider_api_key_previous_encryption_keys,
     )
     app.state.api_key_cipher = api_key_cipher
 
@@ -180,23 +227,23 @@ async def lifespan(app: FastAPI):
     # ======= 初始化 RAG 组件实例 =======
     # 挂载向量库实例
     vector_db: VectorDatabase = vector_db_factory(
-        vector_store=settings.vector_store_perf
+        vector_store=app_settings.vector_store_perf
     )
     app.state.vector_db = vector_db
 
     # 创建 embedding tokenizer 实例
     embedding_tokenizer: EmbeddingTokenizer = embedding_tokenizer_factory(
-        embedding_mode=settings.embedding_backend,
-        model_name=settings.embedding_model_name,
-        cache_dir=settings.hf_hub_cache_dir,
+        embedding_mode=app_settings.embedding_backend,
+        model_name=app_settings.embedding_model_name,
+        cache_dir=app_settings.hf_hub_cache_dir,
     )
 
     # 挂载文本分割器实例
     text_splitter: TextSplitter = TokenAwareTextSplitter(
         tokenizer=embedding_tokenizer,
-        chunk_tokens=settings.chunk_size_tokens,
-        overlap_tokens=settings.chunk_overlap_tokens,
-        window_tokens=settings.chunk_window_tokens,
+        chunk_tokens=app_settings.chunk_size_tokens,
+        overlap_tokens=app_settings.chunk_overlap_tokens,
+        window_tokens=app_settings.chunk_window_tokens,
         splitter_strategy="ast",
     )
     app.state.text_splitter = text_splitter
@@ -216,7 +263,7 @@ async def lifespan(app: FastAPI):
 
     # 挂载 EmbeddingProvider 实例
     embedding_provider: EmbeddingProvider = embedding_provider_factory(
-        settings=settings
+        settings=app_settings
     )
     app.state.embedding = embedding_provider
     # 挂载 QueryExpander 实例
@@ -228,7 +275,7 @@ async def lifespan(app: FastAPI):
     )
     app.state.query_expander = query_expander
     # 挂载 RerankProvider 实例
-    rerank_provider: RerankProvider = rerank_provider_factory(settings=settings)
+    rerank_provider: RerankProvider = rerank_provider_factory(settings=app_settings)
     app.state.rerank = rerank_provider
 
     # 挂载 TokenCounter 实例
@@ -240,13 +287,13 @@ async def lifespan(app: FastAPI):
     app.state.chat_context_builder = context_builder
 
     compaction_service = CompactionService(
-        session_factory=async_session,
+        session_factory=session_factory,
         token_counter=token_counter,
     )
     app.state.compaction_service = compaction_service
 
     hybrid_search_service = HybridSearchService(
-        session_factory=async_session,
+        session_factory=session_factory,
         vector_db=vector_db,
         query_expander=query_expander,
         embedding=embedding_provider,
@@ -262,7 +309,7 @@ async def lifespan(app: FastAPI):
     app.state.rag_retrieval_service = rag_retrieval_service
 
     app.state.chat_orchestrator_service = ChatOrchestratorService(
-        session_factory=async_session,
+        session_factory=session_factory,
         context_builder=context_builder,
         generation_registry=generation_registry,
         compaction_service=compaction_service,
@@ -270,7 +317,7 @@ async def lifespan(app: FastAPI):
 
     # ======= RAG 后台任务相关服务挂载 =======
     indexing_service = SourceItemIndexingService(
-        session_factory=async_session,
+        session_factory=session_factory,
         file_storage=file_storage,
         file_parser_factory=file_parser_factory,
         vector_db=vector_db,
@@ -280,72 +327,123 @@ async def lifespan(app: FastAPI):
     )
     app.state.source_item_indexing_service = indexing_service
     app.state.web_crawl_sync_service = WebCrawlSyncService(
-        session_factory=async_session,
+        session_factory=session_factory,
         crawler=app.state.web_crawler,
         html_parser=app.state.html_page_parser,
         vector_db=vector_db,
     )
     app.state.rag_job_manager = RAGJobManager()
 
+    for name, value in (state_overrides or {}).items():
+        setattr(app.state, name, value)
+
     yield  # 运行应用
 
     # await drop_db()  # 应用关闭时清理数据库连接
     # job manager 清理操作
-    await app.state.rag_job_manager.shutdown()
+    job_manager = getattr(app.state, "rag_job_manager", None)
+    shutdown = getattr(job_manager, "shutdown", None)
+    if shutdown:
+        await shutdown()
     logger.info("Shutting down the application...")
 
 
-app = FastAPI(lifespan=lifespan, title="Tada Ask API")
+def register_exception_handlers(app: FastAPI) -> None:
+    """
+    注册 FastAPI 自定义异常处理；
+    使用装饰器语法糖进行自定义异常处理配置，集中注册应用异常处理器。
+    """
 
-# Admin 与 Widget 使用互斥的路径范围，避免响应头和信任策略相互叠加。
-app.add_middleware(
-    AdminScopedCORSMiddleware,
-    allow_origins=settings.admin_cors_origins,
-)
-app.add_middleware(WidgetScopedCORSMiddleware, session_factory=async_session)
+    @app.exception_handler(ValueError)
+    async def value_error_handler(_: Request, exc: ValueError) -> JSONResponse:
+        logger.warning(f"业务异常：{exc}")
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
+    @app.exception_handler(RateLimitExceededError)
+    async def rate_limit_exceeded_handler(
+        _: Request, exc: RateLimitExceededError
+    ) -> JSONResponse:
+        """处理请求被限流的异常"""
+        logger.warning(
+            f"请求被限流：{exc.message}，请在 {exc.retry_after_seconds} 秒后重试"
+        )
+        return JSONResponse(
+            status_code=429,
+            content={"detail": exc.message},
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        )
 
-@app.exception_handler(ValueError)
-async def value_error_handler(_: Request, exc: ValueError) -> JSONResponse:
-    logger.warning(f"业务异常：{exc}")
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler_override(
+        request: Request, exc: StarletteHTTPException
+    ):
+        logger.warning(f"HTTP异常：{exc.detail}，请求路径：{request.url.path}")
+        return await http_exception_handler(request, exc)  # 调用默认的 HTTP 异常处理
 
-
-@app.exception_handler(RateLimitExceededError)
-async def rate_limit_exceeded_handler(
-    _: Request, exc: RateLimitExceededError
-) -> JSONResponse:
-    """处理请求被限流的异常"""
-    logger.warning(
-        f"请求被限流：{exc.message}，请在 {exc.retry_after_seconds} 秒后重试"
-    )
-    return JSONResponse(
-        status_code=429,
-        content={"detail": exc.message},
-        headers={"Retry-After": str(exc.retry_after_seconds)},
-    )
-
-
-@app.exception_handler(StarletteHTTPException)
-async def http_exception_handler_override(
-    request: Request, exc: StarletteHTTPException
-):
-    logger.warning(f"HTTP异常：{exc.detail}，请求路径：{request.url.path}")
-    return await http_exception_handler(request, exc)  # 调用默认的 HTTP 异常处理
-
-
-@app.exception_handler(Exception)
-async def generic_error_handler(_: Request, exc: Exception) -> JSONResponse:
-    logger.exception(f"未处理异常：{exc}")
-    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+    @app.exception_handler(Exception)
+    async def generic_error_handler(_: Request, exc: Exception) -> JSONResponse:
+        logger.exception(f"未处理异常：{exc}")
+        return JSONResponse(
+            status_code=500, content={"detail": "Internal Server Error"}
+        )
 
 
-# 注册路由
-app.include_router(admin.router, prefix="/admin", tags=["Admin"])
-app.include_router(visitor.router, prefix="/visitor", tags=["Visitor"])
-
-
-@app.get("/")
 async def root():
     logger.info("访问根路径 /")
     return {"message": "Hello World"}
+
+
+def create_app(
+    *,
+    session_factory: async_sessionmaker[AsyncSession] = async_session,
+    app_settings: Settings = settings,
+    initialize_runtime: bool = True,
+    state_overrides: Mapping[str, Any] | None = None,
+) -> FastAPI:
+    """
+    创建 FastAPI 应用；
+    测试可注入隔离 session 和轻量运行时组件。
+    """
+    app = FastAPI(
+        lifespan=partial(
+            lifespan,
+            session_factory=session_factory,
+            app_settings=app_settings,
+            initialize_runtime=initialize_runtime,
+            state_overrides=state_overrides,
+        ),
+        title="Tada Ask API",
+    )
+
+    # Admin 与 Widget 使用互斥的路径范围，避免响应头和信任策略相互叠加。
+    app.add_middleware(
+        AdminScopedCORSMiddleware,
+        allow_origins=app_settings.admin_cors_origins,
+    )
+    app.add_middleware(
+        WidgetScopedCORSMiddleware,
+        session_factory=session_factory,
+    )
+
+    # 注册自定义异常处理函数
+    register_exception_handlers(app)
+
+    app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+    app.include_router(visitor.router, prefix="/visitor", tags=["Visitor"])
+    app.add_api_route("/", root, methods=["GET"])
+
+    if session_factory is not async_session:
+        # 测试环境手动覆盖数据库会话连接注入。
+        async def get_test_db():
+            async with session_factory() as session:
+                async with session.begin():
+                    yield session
+
+        # 路由已经绑定原依赖函数，因此通过 FastAPI override 切换测试数据库。
+        app.dependency_overrides[get_db] = get_test_db
+        app.dependency_overrides[get_session_factory] = lambda: session_factory
+
+    return app
+
+
+app = create_app()
