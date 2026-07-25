@@ -110,6 +110,15 @@ uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_
 
 The backend runs at `http://localhost:8000` by default. The first start may download embedding or reranking models.
 
+Run the maintained backend unit and integration test suite with:
+
+```bash
+uv run pytest -m "not live"
+```
+
+See the [backend testing notes](backend/README.md#tests) for coverage and optional
+live-test commands.
+
 #### Frontend
 
 The frontend uses [pnpm](https://pnpm.io/):

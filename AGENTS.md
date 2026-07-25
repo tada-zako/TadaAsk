@@ -154,12 +154,20 @@ Documentation should help navigation and integration, not slow MVP development.
 
 ## Testing And Validation
 
-- `backend/tests` is not a trusted correctness source.
-- This project is not TDD, and tests are not kept up to date in real time.
-- Do not use tests for debugging, review, or development validation unless the
-  user explicitly asks for it.
-- For code changes, prefer targeted validation that matches the change: syntax
-  checks, type checks, focused smoke checks, or direct inspection.
+- `backend/tests` contains the maintained core backend regression suite.
+- The suite covers the most important unit and integration paths for security,
+  Source/indexing, retrieval, chat, jobs, database behavior, and representative
+  APIs/provider contracts.
+- This project is not TDD, and the tests are not a complete business
+  specification. Confirm changing or unclear behavior against the current source
+  code and runtime OpenAPI.
+- For backend code changes, run the relevant focused tests first, then run the
+  default backend suite when the change can affect shared behavior.
+- Tests marked `live` require an explicit `--run-live` opt-in and may require
+  network access, credentials, or incur provider costs. Do not run them by
+  default.
+- Prefer validation proportional to the change: tests plus syntax checks, type
+  checks, focused smoke checks, or direct inspection as appropriate.
 - For documentation-only changes, tests are usually unnecessary.
 
 ---

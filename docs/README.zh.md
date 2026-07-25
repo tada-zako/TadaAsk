@@ -113,6 +113,14 @@ uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_
 
 后端默认运行于 `http://localhost:8000`。首次启动可能需要下载 embedding 或 rerank 模型，请耐心等待 desu~。
 
+可以使用以下命令运行后端单元测试以及集成测试:
+
+```bash
+uv run pytest -m "not live"
+```
+
+请参阅 [backend testing notes](backend/README.md#tests)，了解后端测试覆盖率以及可选的 live-test（涉及到外部服务的真实测试） 指令。
+
 #### Frontend
 
 前端使用 [pnpm](https://pnpm.io/) 作为包管理器，首次运行请执行如下命令：
