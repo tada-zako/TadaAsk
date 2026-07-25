@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import SourceItemProcessStatus, SourceType
+from app.core.exceptions import DocumentPausedException
 from app.crud import SourceCRUD
 from app.db.models import DocumentChunk, DocumentContent, Source, SourceItem
 from app.ingestion import ParsedDocument, ParsedSection
@@ -140,7 +141,7 @@ async def test_pause_checkpoint_and_resume_restore_terminal_status(
         fts_provider=FakeFTSProvider(),
     )
 
-    with pytest.raises(Exception, match="paused by user request"):
+    with pytest.raises(DocumentPausedException, match="paused by user request"):
         await service._pause_checkpoint(source_item_id=item.id)
 
     async with session_factory() as session:

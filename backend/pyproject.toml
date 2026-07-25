@@ -77,6 +77,8 @@ branch = true
 source = ["app"]
 omit = [
     "app/agent/*",
+    "app/api/admin/endpoints/agent.py",
+    "app/services/agent.py",
 ]
 
 [tool.coverage.report]

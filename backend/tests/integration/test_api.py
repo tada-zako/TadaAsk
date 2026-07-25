@@ -10,6 +10,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.mark.asyncio
 async def test_admin_auth_project_source_upload_and_job_entrypoint(
+    app,
     client,
     db_session,
 ) -> None:
@@ -47,12 +48,19 @@ async def test_admin_auth_project_source_upload_and_job_entrypoint(
     job_state = await client.get(
         f"/admin/source/jobs/{job.json()['jobUid']}", headers=headers
     )
+    running_job = app.state.rag_job_manager.get_job(job.json()["jobUid"])
+    assert running_job is not None
+    await running_job.task
+    completed_job_state = await client.get(
+        f"/admin/source/jobs/{job.json()['jobUid']}", headers=headers
+    )
 
     assert login.status_code == me.status_code == project.status_code == 200
     assert source.status_code == uploaded.status_code == 200
     assert job.status_code == 202
     assert job_state.status_code == 200
     assert job_state.json()["sourceUid"] == source_uid
+    assert completed_job_state.json()["status"] == "completed"
 
 
 @pytest.mark.asyncio

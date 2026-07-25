@@ -187,6 +187,8 @@ async def test_openai_compatible_mock_transport_streams_usage_and_propagates_err
         assert chunks == ["hello", " world"]
         assert streamed.get().usage.output_tokens == 3
 
+        # 关闭成功场景使用的 client，再切换到错误响应 client。
+        await model._client.close()
         model._client = AsyncOpenAI(
             api_key="test-key",
             base_url="https://mock.test/v1",
