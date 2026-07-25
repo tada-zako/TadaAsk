@@ -19,6 +19,7 @@ changelog:
         - dependencies
         - ci
         - documentation
+        - tests
         - refactor
 
     - title: "📦 其他变更（Other Changes）"

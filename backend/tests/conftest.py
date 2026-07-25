@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.core.config import settings
 from app.core.rate_limit import VisitorRateLimiter
 from app.core.security import ProviderAPIKeyCipher
 from app.db.fts import init_fts_tables
@@ -66,6 +67,17 @@ def pytest_collection_modifyitems(
     for item in items:
         if "live" in item.keywords:
             item.add_marker(skip_live)
+
+
+@pytest.fixture(autouse=True)
+def configure_test_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """测试使用独立 JWT 配置，不依赖开发者本地 .env 或 CI secrets"""
+    monkeypatch.setattr(
+        settings,
+        "jwt_secret_key",
+        "tadaask-test-only-jwt-secret-key",
+    )
+    monkeypatch.setattr(settings, "jwt_algorithm", "HS256")
 
 
 @pytest.fixture
