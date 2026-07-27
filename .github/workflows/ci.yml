@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   frontend:
-    name: Frontend build
+    name: Frontend tests and build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -38,9 +38,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # build 包含 TS 检查
-      - name: Build frontend
-        run: pnpm run build
+      - name: Run frontend tests
+        run: pnpm run test:coverage
+
+      - name: Type-check frontend
+        run: pnpm run typecheck
+
+      - name: Build admin console
+        run: pnpm run build:console
+
+      - name: Build visitor widget
+        run: pnpm run build:widget
 
   backend:
     name: Backend tests
