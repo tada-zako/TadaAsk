@@ -45,6 +45,13 @@ export default defineConfig({
         "src/**/*.d.ts",
         "src/**/index.ts",
       ],
+      // 阈值只约束相对稳定的核心逻辑范围，并为 MVP 阶段的快速迭代保留余量。
+      thresholds: {
+        statements: 50,
+        branches: 40,
+        functions: 45,
+        lines: 50,
+      },
     },
   },
 });
