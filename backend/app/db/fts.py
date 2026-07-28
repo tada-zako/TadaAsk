@@ -5,18 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 _FTS_DDLS: list[str] = [
     # 1. 创建 FTS5 虚表 (external content 模式)
     """
-    CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts 
+    CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts
     USING fts5(
         -- 实际存储应用层分词后的结果
         chunk_tokens,
-        content='document_chunks', 
+        content='document_chunks',
         content_rowid='id',
         tokenize='unicode61'
     )
     """,
     # 2. INSERT 触发器
     """
-    CREATE TRIGGER IF NOT EXISTS documents_fts_ai 
+    CREATE TRIGGER IF NOT EXISTS documents_fts_ai
     AFTER INSERT ON document_chunks BEGIN
         INSERT INTO documents_fts(rowid, chunk_tokens)
         VALUES (new.id, new.chunk_tokens);

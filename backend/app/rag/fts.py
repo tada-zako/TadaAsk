@@ -127,7 +127,7 @@ class SQLiteFTSProvider:
         rows = await session.execute(
             text(
                 """
-                SELECT 
+                SELECT
                     document_chunks.id AS chunk_id,
                     bm25(documents_fts) AS bm25_score
                 FROM documents_fts

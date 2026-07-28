@@ -12,6 +12,19 @@
 - [../../backend/docs/tutorial/sse-contract.md](../../backend/docs/tutorial/sse-contract.md)：流式事件协议。
 - [../../backend/docs/tutorial/source-source-item-flow.md](../../backend/docs/tutorial/source-source-item-flow.md)：知识源与索引流程。
 
+## 前端测试
+
+维护中的核心回归测试位于 [`frontend/tests`](../tests)。默认测试不连接真实后端或外部 Provider。
+
+从 `frontend/` 运行：
+
+```powershell
+pnpm test:run
+pnpm test:coverage
+```
+
+当前测试重点是 Shared 协议与安全渲染、Console service/store、Widget service/composable，以及少量 Router、Pinia 和组件集成路径。测试不是完整业务规格，也不要求冻结尚未稳定的页面结构、视觉样式或所有 API 包装函数。
+
 ## 开发建议
 
 1. 先从后端的 OpenAPI 或运行中的 `/docs` 确认接口形状。
