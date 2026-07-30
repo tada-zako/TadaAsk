@@ -52,6 +52,8 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 def _run_alembic_upgrade() -> None:
     """同步执行 Alembic upgrade"""
     alembic_cfg = Config(str(ALEMBIC_INI_PATH))
+    # 应用内迁移沿用已配置的统一日志；Alembic CLI 仍使用 alembic.ini。
+    alembic_cfg.attributes["configure_logger"] = False
     command.upgrade(alembic_cfg, "head")
 
 
