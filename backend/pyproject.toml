@@ -57,25 +57,13 @@ target-version = "py313"
 line-length = 88
 
 [tool.ruff.lint]
-select = [
-    "E4",
-    "E7",
-    "E9",
-    "F",
-    "W",
-    "ASYNC",
-    "C4",
-    "Q",
-]
+select = ["E4", "E7", "E9", "F", "W", "ASYNC", "C4", "Q"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = [
-    "--strict-config",
-    "--strict-markers",
-]
+addopts = ["--strict-config", "--strict-markers"]
 markers = [
     "integration: 使用真实数据库、文件存储或多层业务组件的集成测试",
     "slow: 需要本地重型组件或执行时间较长的测试",
@@ -86,6 +74,7 @@ norecursedirs = [
     ".pytest_cache",
     ".ruff_cache",
     "storages",
+    "data",
     "models--*",
 ]
 

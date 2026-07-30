@@ -76,9 +76,7 @@ class Settings(BaseSettings):
     file_storage_backend: str = "local"  # 文件存储后端，默认为本地存储
     max_file_size: int = 5 * 1024 * 1024  # 最大文件上传大小
     max_file_count: int = 8  # 最大文件上传数量
-    upload_folder_path: str = str(
-        PROJECT_ROOT / "storages" / "uploads"
-    )  # 文件上传存储路径
+    upload_folder_path: str = str(PROJECT_ROOT / "data" / "uploads")  # 文件上传存储路径
     vector_store_perf: str = "chromadb"  # 向量库配置
 
     # 模型缓存路径
@@ -87,10 +85,10 @@ class Settings(BaseSettings):
     hf_hub_cache_dir: str | None = None  # HuggingFace Hub 模型缓存目录
 
     chromadb_path: str = str(
-        PROJECT_ROOT / "storages" / "chromadb"
+        PROJECT_ROOT / "data" / "chromadb"
     )  # ChromaDB 数据存储路径
     sqlite_database_path: str = str(
-        PROJECT_ROOT / "storages" / "sqlite.db"
+        PROJECT_ROOT / "data" / "sqlite.db"
     )  # SQLite FTS 数据库路径
     sqlalchemy_echo: bool = False  # 是否输出 SQLAlchemy SQL 日志
     database_auto_migrate: bool = True  # FastAPI 启动时自动执行 Alembic upgrade head
