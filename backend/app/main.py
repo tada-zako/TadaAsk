@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from loguru import logger
 
 from app.core.config import Settings, settings
+from app.core.logging import complete_logging, configure_logging
 from app.core.exceptions import RateLimitExceededError
 from app.core.security import (
     get_password_hash,
@@ -164,6 +165,7 @@ async def lifespan(
         if shutdown:
             await shutdown()
         logger.info("Shutting down the application...")
+        await complete_logging()
         return
 
     # ======= 系统重要配置挂载 =======
@@ -346,6 +348,7 @@ async def lifespan(
     if shutdown:
         await shutdown()
     logger.info("Shutting down the application...")
+    await complete_logging()
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -404,6 +407,8 @@ def create_app(
     创建 FastAPI 应用；
     测试可注入隔离 session 和轻量运行时组件。
     """
+    configure_logging(app_settings)
+
     app = FastAPI(
         lifespan=partial(
             lifespan,

@@ -15,6 +15,16 @@ DEFAULT_RERANK_MODEL_NAME = "Xenova/ms-marco-MiniLM-L-6-v2"
 # 类型别名
 type EmbeddingBackend = Literal["fastembed", "llamacpp"]  # 文本嵌入后端
 type RerankBackend = Literal["fastembed", "llamacpp"]  # Rerank 后端
+type LogLevel = Literal[
+    "TRACE",
+    "DEBUG",
+    "INFO",
+    "SUCCESS",
+    "WARNING",
+    "ERROR",
+    "CRITICAL",
+]
+type LogFormat = Literal["console", "json"]
 
 
 class Settings(BaseSettings):
@@ -93,6 +103,12 @@ class Settings(BaseSettings):
     sqlalchemy_echo: bool = False  # 是否输出 SQLAlchemy SQL 日志
     database_auto_migrate: bool = True  # FastAPI 启动时自动执行 Alembic upgrade head
 
+    # 日志配置
+    log_level: LogLevel = "INFO"
+    log_format: LogFormat = "console"
+    log_file_enabled: bool = False
+    log_file_path: str = str(PROJECT_ROOT / "data" / "logs" / "tadaask.log")
+
     # =======================================
     # visitor 侧请求限制
     # =======================================
@@ -127,6 +143,18 @@ class Settings(BaseSettings):
     # ================================
     # 验证逻辑
     # ================================
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def normalize_log_level(cls, value: str) -> str:
+        """日志级别统一使用 Loguru 的大写名称。"""
+        return str(value).strip().upper()
+
+    @field_validator("log_format", mode="before")
+    @classmethod
+    def normalize_log_format(cls, value: str) -> str:
+        """日志格式环境变量转换为小写。"""
+        return str(value).strip().lower()
+
     @model_validator(mode="after")
     def normalize_model_defaults(self) -> "Settings":
         """允许 .env 显式留空时继续使用内置默认模型。"""
@@ -253,6 +281,12 @@ class Settings(BaseSettings):
         path = cls._resolve_path(v, info)
         path.parent.mkdir(parents=True, exist_ok=True)
         return str(path)
+
+    @field_validator("log_file_path", mode="before")
+    @classmethod
+    def process_log_file_path(cls, v: str | None, info: ValidationInfo) -> str:
+        """解析日志文件路径；仅在启用文件 sink 时创建父目录。"""
+        return str(cls._resolve_path(v, info))
 
 
 settings = Settings()
