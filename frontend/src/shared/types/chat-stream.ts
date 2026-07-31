@@ -47,4 +47,5 @@ export type ChatStreamEvent =
   | {
       event: "error";
       message: string;
+      errorId: string;
     };
