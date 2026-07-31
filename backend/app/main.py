@@ -11,6 +11,11 @@ from loguru import logger
 
 from app.core.config import Settings, settings
 from app.core.logging import complete_logging, configure_logging
+from app.core.request_logging import (
+    RequestLoggingMiddleware,
+    UnhandledExceptionMiddleware,
+    internal_server_error_response,
+)
 from app.core.exceptions import RateLimitExceededError
 from app.core.security import (
     get_password_hash,
@@ -420,6 +425,8 @@ def create_app(
         title="Tada Ask API",
     )
 
+    # 未处理异常边界位于 CORS 内侧，使跨域前端也能读取安全的 500 响应。
+    app.add_middleware(UnhandledExceptionMiddleware)
     # Admin 与 Widget 使用互斥的路径范围，避免响应头和信任策略相互叠加。
     app.add_middleware(
         AdminScopedCORSMiddleware,
@@ -429,6 +436,8 @@ def create_app(
         WidgetScopedCORSMiddleware,
         session_factory=session_factory,
     )
+    # 最后添加以包裹其他用户中间件，确保 CORS 预检和流式响应也具备请求日志。
+    app.add_middleware(RequestLoggingMiddleware)
 
     # 注册自定义异常处理函数
     register_exception_handlers(app)
