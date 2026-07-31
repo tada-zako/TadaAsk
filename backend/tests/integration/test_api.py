@@ -59,6 +59,19 @@ async def test_admin_auth_project_source_upload_and_job_entrypoint(
     assert source.status_code == uploaded.status_code == 200
     assert job.status_code == 202
     assert job_state.status_code == 200
+    assert all(
+        response.headers.get("X-Request-ID")
+        for response in (
+            login,
+            me,
+            project,
+            source,
+            uploaded,
+            job,
+            job_state,
+            completed_job_state,
+        )
+    )
     assert job_state.json()["sourceUid"] == source_uid
     assert completed_job_state.json()["status"] == "completed"
 
@@ -100,6 +113,7 @@ async def test_rag_job_sse_replays_events_after_last_event_id(
     )
 
     assert replay.status_code == 200
+    assert replay.headers.get("X-Request-ID")
     assert "id: 2" in replay.text
     assert "event: sync_progress" in replay.text
     assert '"message": "second"' in replay.text
