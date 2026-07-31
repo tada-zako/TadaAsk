@@ -145,10 +145,12 @@ def _configure_standard_logging(app_settings: "Settings") -> None:
         standard_logger = logging.getLogger(logger_name)
         # 移除标准 logging 可能安装的独立 handler，并向 root 传播 message。
         standard_logger.handlers.clear()
+        standard_logger.disabled = False
         standard_logger.propagate = True
         standard_logger.setLevel(logging.NOTSET)
 
     # 抬高标准 logging 默认输出级别以减少噪声和泄露。
+    logging.getLogger("uvicorn.access").disabled = True
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
