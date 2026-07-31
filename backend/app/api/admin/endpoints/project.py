@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Query, HTTPException, Path
-from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
 from ...deps import (
@@ -146,7 +145,6 @@ async def create_project(
     try:
         project = await project_crud.create_project(project_data=payload)
     except IntegrityError as exc:
-        logger.warning(f"创建 project 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=400,
             detail="project with the same name already exists",
@@ -205,7 +203,6 @@ async def update_project(
             project_data=payload,
         )
     except IntegrityError as exc:
-        logger.warning(f"更新 project 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=400,
             detail="project with the same name already exists",
@@ -264,7 +261,6 @@ async def create_project_widget(
             widget_data=payload,
         )
     except IntegrityError as exc:
-        logger.warning(f"创建 project widget 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=400,
             detail="project widget with the same name already exists",
@@ -294,7 +290,6 @@ async def update_project_widget(
             widget_data=payload,
         )
     except IntegrityError as exc:
-        logger.warning(f"更新 project widget 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=400,
             detail="project widget with the same name already exists",
@@ -357,7 +352,6 @@ async def update_project_settings(
             visitor_default_model_profile=model_profile,
         )
     except IntegrityError as exc:
-        logger.warning(f"更新 project settings 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=400,
             detail="failed to update project settings",
@@ -392,7 +386,6 @@ async def bind_project_sources(
             source_ids=source_ids,
         )
     except IntegrityError as exc:
-        logger.warning(f"绑定 sources 到 project 失败：{exc}")
         raise HTTPException(
             status_code=400,
             detail="failed to bind sources to project",

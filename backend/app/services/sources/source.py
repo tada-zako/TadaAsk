@@ -54,9 +54,6 @@ class SourceService:
             source_name=source_data.source_name
         )
         if existing_source:
-            logger.warning(
-                f"数据源名称 '{source_data.source_name}' 已存在，无法创建重复名称的数据源"
-            )
             raise SourceCreateConflictError("source with the same name already exists")
 
         source_internal = SourceInternal(**source_data.model_dump())

@@ -12,7 +12,6 @@ from fastapi import (
     status,
 )
 from fastapi.responses import FileResponse, RedirectResponse
-from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
 from ...deps import (
@@ -92,7 +91,6 @@ def valid_files(files: list[UploadFile]) -> list[UploadFile]:
         # 2. 检验后缀名合法性
         ext = Path(file.filename).suffix.lower()
         if ext not in ALLOWED_FILE_TYPES:
-            logger.warning(f"文件 '{file.filename}' 的类型 '{ext}' 不受支持")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File type '{ext}' is not supported",
@@ -101,9 +99,6 @@ def valid_files(files: list[UploadFile]) -> list[UploadFile]:
         # 3. 校验文件大小
         file_size = file.size or 0
         if file_size > MAX_FILE_SIZE:
-            logger.warning(
-                f"文件 '{file.filename}' 的大小 {file_size} 超过限制 {MAX_FILE_SIZE}"
-            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File '{file.filename}' exceeds the maximum allowed size of {MAX_FILE_SIZE} bytes",
@@ -113,7 +108,6 @@ def valid_files(files: list[UploadFile]) -> list[UploadFile]:
 
     # 4. 校验文件数量
     if len(validated_files) > MAX_FILE_COUNT:
-        logger.warning(f"上传文件数量 {len(validated_files)} 超过限制 {MAX_FILE_COUNT}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Number of uploaded files exceeds the maximum allowed count of {MAX_FILE_COUNT}",
@@ -121,7 +115,6 @@ def valid_files(files: list[UploadFile]) -> list[UploadFile]:
 
     # 5. 如果没有合法文件，抛出异常
     if not validated_files:
-        logger.warning("未上传有效文件")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="No valid files uploaded"
         )
@@ -170,9 +163,6 @@ async def valid_source_item(
     )
 
     if not result:
-        logger.warning(
-            f"数据项 UID '{source_item_uid}' 在数据源 '{source.source_name}' 中未找到"
-        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Source item not found",
@@ -194,9 +184,6 @@ async def valid_source_item_from_path(
     )
 
     if not result:
-        logger.warning(
-            f"数据项 UID '{source_item_uid}' 在数据源 '{source.source_name}' 中未找到"
-        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Source item not found",
@@ -220,9 +207,6 @@ async def valid_source_items(
 ) -> list[SourceItem]:
     """验证数据项 UID 列表，返回数据项实例列表或抛出 HTTPException"""
     if len(source_item_uids) > MAX_INGEST_SOURCE_ITEMS:
-        logger.warning(
-            f"请求 ingest 的数据项数量 {len(source_item_uids)} 超过限制 {MAX_INGEST_SOURCE_ITEMS}"
-        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Number of source items to ingest exceeds the maximum allowed count of {MAX_INGEST_SOURCE_ITEMS}",
@@ -236,9 +220,6 @@ async def valid_source_items(
     valid_uids = [item.uid for item in result]
     missing_uids = [uid for uid in source_item_uids if uid not in valid_uids]
     if missing_uids:
-        logger.warning(
-            f"数据项 UID 列表中有无效 UID，source '{source.source_name}' 中未找到的 UID: {missing_uids}"
-        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Source items not found for UIDs: {missing_uids}",
@@ -262,9 +243,6 @@ async def valid_source_item_uids(
 ) -> list[str]:
     """验证数据项 UID 列表，返回有效的 UID 列表或抛出 HTTPException"""
     if len(source_item_uids) > MAX_INGEST_SOURCE_ITEMS:
-        logger.warning(
-            f"请求 ingest 的数据项数量 {len(source_item_uids)} 超过限制 {MAX_INGEST_SOURCE_ITEMS}"
-        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Number of source items to ingest exceeds the maximum allowed count of {MAX_INGEST_SOURCE_ITEMS}",
@@ -278,9 +256,6 @@ async def valid_source_item_uids(
     valid_uids = [item.uid for item in result]
     missing_uids = [uid for uid in source_item_uids if uid not in valid_uids]
     if missing_uids:
-        logger.warning(
-            f"数据项 UID 列表中有无效 UID，source '{source.source_name}' 中未找到的 UID: {missing_uids}"
-        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Source items not found for UIDs: {missing_uids}",
@@ -354,8 +329,6 @@ async def list_sources(
         limit: 分页参数，返回结果的最大数量，默认为 10，范围 1-100
         offset: 分页参数，返回结果的偏移量，默认为 0，必须为非负整数
     """
-    logger.info(f"获取数据源列表，limit={limit}, offset={offset}")
-
     sources = await source_crud.list_sources(limit=limit, offset=offset)
     return [SourceRead.model_validate(source) for source in sources]
 
@@ -393,7 +366,6 @@ async def update_source(
     except SourceUpdateValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:
-        logger.warning(f"更新 source 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=400,
             detail="source with the same name already exists",
@@ -434,9 +406,6 @@ async def valid_local_file_source(
 ) -> Source:
     """验证数据源是否为本地文件类型，返回 source 实例或抛出 HTTPException"""
     if source.source_type != SourceType.LOCAL_FILE:
-        logger.warning(
-            f"数据源 '{source.source_name}' 的类型 '{source.source_type}' 不支持文件上传"
-        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Source type does not support file upload",
@@ -572,9 +541,6 @@ async def valid_web_crawl_source(
 ) -> Source:
     """验证数据源是否为 Web Crawl 类型，返回 source 实例或抛出 HTTPException"""
     if source.source_type != SourceType.WEB_CRAWL:
-        logger.warning(
-            f"数据源 '{source.source_name}' 的类型 '{source.source_type}' 不支持 Web Crawl 同步"
-        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Source type does not support web crawl sync",
@@ -588,9 +554,6 @@ async def get_web_crawl_config(
     """依赖注入接口：获取已验证的 WebCrawlConfig 实例"""
     # 获取对应配置
     if not source.web_crawl_config:
-        logger.warning(
-            f"数据源 '{source.source_name}' 的 Web Crawl 配置为空，无法进行同步"
-        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Web crawl config is empty for this source",
