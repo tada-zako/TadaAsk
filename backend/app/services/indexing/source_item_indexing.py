@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from typing import AsyncIterable
 from pathlib import Path
 from dataclasses import dataclass, asdict
@@ -97,9 +98,12 @@ class SourceItemIndexingService:
                 source=source,
                 source_item_uids=processing_uids,
             )
-            logger.info(
-                f"SourceItems {processing_uids} 已标记为 PAUSE_REQUESTED，等待处理流程检查点生效"
-            )
+            logger.bind(
+                event="rag.ingest.pause_requested",
+                source_uid=source.uid,
+                source_item_uids=processing_uids,
+                source_item_count=len(processing_uids),
+            ).info("Document ingest pause requested")
 
         # 返回所有请求暂停的 source_items 的状态
         responses = []
@@ -344,7 +348,14 @@ class SourceItemIndexingService:
                     message="Document ingest paused",
                 )
             except Exception as exc:
-                logger.exception(f"Document ingest failed: {source_item_uid}: {exc}")
+                error_id = uuid.uuid4().hex
+                logger.bind(
+                    event="rag.ingest.item.failed",
+                    error_id=error_id,
+                    source_uid=source_uid,
+                    source_item_uid=source_item_uid,
+                    exception_type=type(exc).__name__,
+                ).opt(exception=exc).error("Document ingest failed")
 
                 try:
                     await session.commit()
@@ -373,7 +384,8 @@ class SourceItemIndexingService:
                     source_item_status=SourceItemProcessStatus.FAILED,
                     ingest_stage=IngestStage.FAILED,
                     message="Document ingest failed",
-                    error=str(exc),
+                    error="Document ingest failed",
+                    error_id=error_id,
                 )
 
     async def _resolve_source_and_item(
@@ -405,9 +417,12 @@ class SourceItemIndexingService:
                 )
             source, source_item = result
 
-            logger.warning(
-                f"SourceItem {source_item.uid} 状态为 {source_item.status}，不执行处理"
-            )
+            logger.bind(
+                event="rag.ingest.item.skipped",
+                source_uid=source.uid,
+                source_item_uid=source_item.uid,
+                source_item_status=source_item.status.value,
+            ).info("Document ingest skipped due to current status")
             return source, source_item, False
 
         # 查询完整数据
@@ -555,7 +570,10 @@ class SourceItemIndexingService:
         # 在 session 上下文之外 raise DocumentPausedException，
         # 避免 session 内部异常，导致 PAUSED 状态未正确提交到数据库
         if paused_uid:
-            logger.info(f"SourceItem {paused_uid} 已标记为 PAUSED，触发暂停事件")
+            logger.bind(
+                event="rag.ingest.item.paused",
+                source_item_uid=paused_uid,
+            ).info("Document ingest paused")
             raise DocumentPausedException(
                 f"Document {paused_uid} paused by user request"
             )

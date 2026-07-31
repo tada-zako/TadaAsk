@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from dataclasses import asdict, dataclass
 from typing import AsyncIterable, cast
 
@@ -167,9 +168,13 @@ class WebCrawlSyncService:
                 except Exception as exc:
                     # 抓取或解析失败，记录日志并发送失败事件
                     counters.failed += 1
-                    logger.exception(
-                        f"Failed to crawl page {discovered.discovered_url}: {exc}"
-                    )
+                    error_id = uuid.uuid4().hex
+                    logger.bind(
+                        event="rag.web_crawl.page.failed",
+                        error_id=error_id,
+                        source_uid=source_ref.uid,
+                        exception_type=type(exc).__name__,
+                    ).opt(exception=exc).error("Web page crawl failed")
 
                     await queue.put(
                         RAGSyncEvent(
@@ -177,7 +182,8 @@ class WebCrawlSyncService:
                             source_uid=source_ref.uid,
                             ingest_stage=IngestStage.FAILED,
                             message=f"Failed to crawl page: {discovered.discovered_url}",
-                            error=str(exc),
+                            error="Web page crawl failed",
+                            error_id=error_id,
                             counters=counters,
                         )
                     )
@@ -408,10 +414,13 @@ class WebCrawlSyncService:
 
         # 如果目标 source_item 正在 index 中，跳过修改
         if existing_item and existing_item.status in _INDEX_BUSY_STATUSES:
-            logger.warning(
-                f"SourceItem {existing_item.uid} is busy ({existing_item.status}); "
-                "skip web materialization to avoid content/index mismatch"
-            )
+            logger.bind(
+                event="rag.web_crawl.item.skipped",
+                source_uid=source.uid,
+                source_item_uid=existing_item.uid,
+                source_item_status=existing_item.status.value,
+                skip_reason="index_busy",
+            ).info("Web page materialization skipped")
             counters.skipped += 1
             return None
 
@@ -526,16 +535,21 @@ class WebCrawlSyncService:
             try:
                 (
                     deleted_vector_count,
-                    vector_cleanup_error,
+                    vector_cleanup_error_id,
                 ) = await self._delete_stale_source_item(
                     source_ref=source_ref,
                     stale_item=stale_item,
                 )
             except Exception as exc:
                 counters.cleanup_failed += 1
-                logger.exception(
-                    f"Failed to prune stale source item {stale_item.uid}: {exc}"
-                )
+                error_id = uuid.uuid4().hex
+                logger.bind(
+                    event="rag.web_crawl.prune.failed",
+                    error_id=error_id,
+                    source_uid=source_ref.uid,
+                    source_item_uid=stale_item.uid,
+                    exception_type=type(exc).__name__,
+                ).opt(exception=exc).error("Stale web page pruning failed")
                 yield RAGSyncEvent(
                     event=RAGSyncEventType.ITEM_FAILED,
                     source_uid=source_ref.uid,
@@ -545,12 +559,13 @@ class WebCrawlSyncService:
                     sync_progress=0.9,
                     counters=counters,
                     message=f"Failed to prune stale web page: {stale_item.item_key}",
-                    error=str(exc),
+                    error="Stale web page pruning failed",
+                    error_id=error_id,
                 )
                 continue
 
             counters.pruned += 1
-            if vector_cleanup_error:
+            if vector_cleanup_error_id:
                 counters.cleanup_failed += 1
 
             # 传输清理操作事务
@@ -565,7 +580,12 @@ class WebCrawlSyncService:
                     "Pruned stale web page source item: "
                     f"{stale_item.item_key}; removed {deleted_vector_count} vector(s)"
                 ),
-                error=vector_cleanup_error,
+                error=(
+                    "Stale web page vector cleanup failed"
+                    if vector_cleanup_error_id
+                    else None
+                ),
+                error_id=vector_cleanup_error_id,
             )
 
     async def _load_stale_source_items(
@@ -631,10 +651,16 @@ class WebCrawlSyncService:
         except Exception as exc:
             # DB 已删除，RAG 不会再召回该 item；
             # 向量残留单独记录，后续增加可重试或全量重建兜底逻辑
-            logger.warning(
-                f"Failed to delete vectors for stale source item {stale_item.uid}: {exc}"
-            )
-            return len(vector_ids), str(exc)
+            error_id = uuid.uuid4().hex
+            logger.bind(
+                event="rag.web_crawl.vector_cleanup.failed",
+                error_id=error_id,
+                source_uid=source_ref.uid,
+                source_item_uid=stale_item.uid,
+                vector_count=len(vector_ids),
+                exception_type=type(exc).__name__,
+            ).opt(exception=exc).warning("Stale web page vector cleanup failed")
+            return len(vector_ids), error_id
 
         return len(vector_ids), None
 

@@ -237,6 +237,7 @@ class RAGSyncEvent(BaseModel):
 
     message: str | None = None
     error: str | None = None
+    error_id: str | None = None
 
     model_config = ConfigDict(
         alias_generator=to_camel,

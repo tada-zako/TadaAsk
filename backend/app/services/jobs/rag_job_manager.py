@@ -1,4 +1,5 @@
 import asyncio
+import time
 import uuid
 from collections import deque
 from collections.abc import AsyncIterable, Callable
@@ -87,6 +88,13 @@ class RAGJobManager:
                     RAGJobStatus.RUNNING,
                 ):
                     # 目标 job 已经存在并且处于运行中
+                    logger.bind(
+                        event="rag.job.reused",
+                        job_uid=active_job.job_uid,
+                        job_type=active_job.job_type.value,
+                        source_uid=active_job.source_uid,
+                        source_item_count=len(active_job.source_item_uids),
+                    ).info("Active RAG job reused")
                     return active_job
 
             # 创建新的 job 对象
@@ -102,6 +110,13 @@ class RAGJobManager:
                 self._active_by_group[active_group] = job.job_uid
 
             job.task = asyncio.create_task(self._run_job(job=job, runner=runner))
+            logger.bind(
+                event="rag.job.queued",
+                job_uid=job.job_uid,
+                job_type=job.job_type.value,
+                source_uid=job.source_uid,
+                source_item_count=len(job.source_item_uids),
+            ).info("RAG job queued")
             return job
 
     def get_job(self, job_uid: str) -> RAGJob | None:
@@ -186,8 +201,16 @@ class RAGJobManager:
 
     async def _run_job(self, *, job: RAGJob, runner: RAGJobRunner) -> None:
         """后台消费业务 runner 事件，并广播给 SSE 订阅者。"""
+        started_at = time.perf_counter()
+        job_log = logger.bind(
+            job_uid=job.job_uid,
+            job_type=job.job_type.value,
+            source_uid=job.source_uid,
+            source_item_count=len(job.source_item_uids),
+        )
         job.status = RAGJobStatus.RUNNING
         job.started_at = datetime.now(UTC)
+        job_log.bind(event="rag.job.started").info("RAG job started")
 
         try:
             async for event in runner(job):
@@ -196,15 +219,32 @@ class RAGJobManager:
 
             # job 执行完成
             job.status = RAGJobStatus.COMPLETED
+            job_log.bind(
+                event="rag.job.completed",
+                emitted_event_count=job.next_event_sequence - 1,
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            ).info("RAG job completed")
 
         except asyncio.CancelledError:
             # job 被取消
             job.status = RAGJobStatus.CANCELLED
+            job_log.bind(
+                event="rag.job.cancelled",
+                emitted_event_count=job.next_event_sequence - 1,
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            ).info("RAG job cancelled")
             raise
 
         except Exception as exc:
             # job 出现异常
-            logger.exception(f"RAG job {job.job_uid} failed: {exc}")
+            error_id = uuid.uuid4().hex
+            job_log.bind(
+                event="rag.job.failed",
+                error_id=error_id,
+                exception_type=type(exc).__name__,
+                emitted_event_count=job.next_event_sequence - 1,
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            ).opt(exception=exc).error("RAG job failed")
             job.status = RAGJobStatus.FAILED
             job.error = str(exc)
             await self._emit(
@@ -214,7 +254,8 @@ class RAGJobManager:
                     source_uid=job.source_uid,
                     ingest_stage=IngestStage.FAILED,
                     message="RAG job failed",
-                    error=str(exc),
+                    error="RAG job failed",
+                    error_id=error_id,
                 ),
             )
 
