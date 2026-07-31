@@ -96,7 +96,10 @@ async def sync_admin_credentials(
                     password_hash=password_hash,
                 )
                 new_admin = await admin_crud.create_admin(default_admin_data)
-                logger.info(f"默认管理员账号已创建，用户名：{new_admin.username}")
+                logger.bind(
+                    event="admin.credentials.created",
+                    admin_uid=new_admin.uid,
+                ).info("Admin credentials created from startup configuration")
                 return
 
             username_changed = existing_admin.username != app_settings.admin_username
@@ -107,8 +110,8 @@ async def sync_admin_credentials(
 
             if not username_changed and not password_changed:
                 # 用户名以及密码未更新
-                logger.info(
-                    f"管理员账号配置已同步，用户名：{app_settings.admin_username}"
+                logger.bind(event="admin.credentials.unchanged").debug(
+                    "Admin credentials already match startup configuration"
                 )
                 return
 
@@ -122,10 +125,12 @@ async def sync_admin_credentials(
                     else None
                 ),
             )
-            logger.info(
-                "管理员账号已按启动配置更新，"
-                f"用户名变更：{username_changed}，密码变更：{password_changed}"
-            )
+            logger.bind(
+                event="admin.credentials.updated",
+                admin_uid=existing_admin.uid,
+                username_changed=username_changed,
+                password_changed=password_changed,
+            ).info("Admin credentials updated from startup configuration")
 
 
 async def sync_model_catalog(
@@ -158,26 +163,35 @@ async def lifespan(
     负责在应用启动时初始化数据库连接
     """
 
-    logger.info("Starting up the application...")
+    logger.bind(event="application.starting").info("Application starting")
 
     if not initialize_runtime:
         # NOTE: 测试环境只挂载显式注入的组件，避免初始化模型、向量库和外部目录。
         # 该分支只服务于 tests 使用，避免全量初始化项目配置。
         for name, value in (state_overrides or {}).items():
             setattr(app.state, name, value)
+        logger.bind(
+            event="application.started",
+            runtime_initialized=False,
+        ).info("Application started")
         yield
         job_manager = getattr(app.state, "rag_job_manager", None)
         shutdown = getattr(job_manager, "shutdown", None)
         if shutdown:
             await shutdown()
-        logger.info("Shutting down the application...")
+        logger.bind(event="application.stopping").info("Application stopping")
         await complete_logging()
         return
 
     # ======= 系统重要配置挂载 =======
     if app_settings.database_auto_migrate:
-        logger.info("Running database migrations...")
+        logger.bind(event="database.migration.started").info(
+            "Database migration started"
+        )
         await run_migrations()
+        logger.bind(event="database.migration.completed").info(
+            "Database migration completed"
+        )
 
     await init_db()
     # MVP：管理员凭据以启动配置为准，暂不提供运行时修改 API。
@@ -345,6 +359,10 @@ async def lifespan(
     for name, value in (state_overrides or {}).items():
         setattr(app.state, name, value)
 
+    logger.bind(
+        event="application.started",
+        runtime_initialized=True,
+    ).info("Application started")
     yield  # 运行应用
 
     # await drop_db()  # 应用关闭时清理数据库连接
@@ -353,7 +371,7 @@ async def lifespan(
     shutdown = getattr(job_manager, "shutdown", None)
     if shutdown:
         await shutdown()
-    logger.info("Shutting down the application...")
+    logger.bind(event="application.stopping").info("Application stopping")
     await complete_logging()
 
 

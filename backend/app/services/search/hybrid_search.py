@@ -1,9 +1,11 @@
 import asyncio
+import time
 from dataclasses import dataclass
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 import numpy as np
+from loguru import logger
 from numpy.typing import NDArray
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..schemas import RawSearchConfidence, SearchDebugInfo
 from ..utils import track_latency
@@ -628,6 +630,7 @@ class HybridSearchService:
         Hybrid Search 主方法
         """
 
+        started_at = time.perf_counter()
         debug = SearchDebugInfo() if enable_debug else None
 
         # ======= 1. RAW search 阶段 =======
@@ -640,31 +643,45 @@ class HybridSearchService:
 
         # ======= 2. 基于 option.mode 进行分支判断 =======
         if options.mode == SearchMode.FAST:
-            # 2.1 快速模式：直接返回
-            return raw_hits
+            # 2.1 快速模式：直接使用 raw search 结果
+            execution_mode = "raw_fast"
+            results = raw_hits
+        else:
+            # 2.2.0 计算 confidence；
+            raw_confidence = self._estimate_confidence(
+                fts_results=ranked_lists[0].items,
+                vector_results=ranked_lists[1].items,
+                raw_hits=raw_hits,
+                debug=debug,
+            )
 
-        # 2.2.0 计算 confidence；
-        raw_confidence = self._estimate_confidence(
-            fts_results=ranked_lists[0].items,
-            vector_results=ranked_lists[1].items,
-            raw_hits=raw_hits,
-            debug=debug,
-        )
+            if options.mode == SearchMode.ADAPTIVE and self._is_confident_enough(
+                raw_confidence, options
+            ):
+                # 2.2 自适应模式：据 raw search 结果的质量判断是否直接返回
+                execution_mode = "raw_adaptive"
+                results = raw_hits
+            else:
+                # ======= 3. FULL search 阶段 =======
+                execution_mode = "full"
+                results = await self._full_hybrid_search(
+                    query=query,
+                    sources=sources,
+                    # 复用 raw search 的 ranked list 结果，避免重复计算
+                    raw_ranked_lists=ranked_lists,
+                    options=options,
+                    completer=completer,
+                    debug=debug,
+                )
 
-        if options.mode == SearchMode.ADAPTIVE and self._is_confident_enough(
-            raw_confidence, options
-        ):
-            # 2.2 自适应模式：据 raw search 结果的质量判断是否直接返回
-            return raw_hits
-
-        # ======= 3. FULL search 阶段 =======
-        full_hits = await self._full_hybrid_search(
-            query=query,
-            sources=sources,
-            raw_ranked_lists=ranked_lists,  # 复用 raw search 的 ranked list 结果，避免重复计算
-            options=options,
-            completer=completer,
-            debug=debug,
-        )
-
-        return full_hits
+        logger.bind(
+            event="rag.search.completed",
+            requested_mode=options.mode.value,
+            execution_mode=execution_mode,
+            source_count=len(sources),
+            source_item_count=sum(len(source.source_item_ids) for source in sources),
+            result_count=len(results),
+            rerank_enabled=options.rerank_enabled,
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+        ).info("RAG search completed")
+        return results

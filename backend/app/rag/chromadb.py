@@ -147,4 +147,7 @@ class ChromaDB:
     def delete_collection(self, collection_name: str):
         """删除指定名称的集合"""
         self._client.delete_collection(name=collection_name)
-        logger.debug(f"集合 '{collection_name}' 已删除")
+        logger.bind(
+            event="vector.collection.deleted",
+            collection_name=collection_name,
+        ).debug("Vector collection deleted")

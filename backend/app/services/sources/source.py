@@ -65,7 +65,6 @@ class SourceService:
                 collection_name=source_internal.collection_name,
             )
         except Exception as exc:
-            logger.error(f"创建向量集合失败：{exc}")
             raise SourceCreateStorageError(
                 "Failed to create vector collection"
             ) from exc
@@ -74,21 +73,20 @@ class SourceService:
             new_source = await self.source_crud.create_source(
                 source_data=source_internal
             )
-            logger.info(
-                f"数据源 '{source_data.source_name}' 创建成功，UID：{new_source.uid}"
-            )
+            logger.bind(
+                event="source.created",
+                source_uid=new_source.uid,
+                source_type=new_source.source_type.value,
+            ).info("Source created")
             return new_source
         except Exception as exc:
             # 回滚向量集合
-            logger.error(f"创建数据源记录失败：{exc}，正在回滚向量集合...")
             try:
                 await asyncio.to_thread(
                     self.vector_db.delete_collection,
                     collection_name=source_internal.collection_name,
                 )
-                logger.info(f"已回滚向量集合 '{source_internal.collection_name}'")
             except Exception as rollback_exc:
-                logger.error(f"回滚向量集合失败：{rollback_exc}")
                 raise SourceCreateStorageError(
                     "Failed to create source and rollback vector collection"
                 ) from rollback_exc
@@ -170,18 +168,29 @@ class SourceService:
                     file_deleted_count += 1
             except Exception as exc:
                 file_delete_failed_count += 1
-                cleanup_errors.append(f"failed to delete file: {storage_key}")
-                logger.warning(
-                    f"Failed to delete storage file for source {source.uid}: {exc}"
-                )
+                cleanup_errors.append("failed to delete a source file")
+                logger.bind(
+                    event="source.file_cleanup.failed",
+                    source_uid=source.uid,
+                    exception_type=type(exc).__name__,
+                ).opt(exception=exc).warning("Source file cleanup failed")
 
-        return SourceDeleteResult(
+        result = SourceDeleteResult(
             deleted_source_item_count=source_item_count,
             file_deleted_count=file_deleted_count,
             file_delete_failed_count=file_delete_failed_count,
             vector_collection_deleted=vector_collection_deleted,
             cleanup_errors=cleanup_errors,
         )
+        logger.bind(
+            event="source.deleted",
+            source_uid=source.uid,
+            deleted_source_item_count=result.deleted_source_item_count,
+            file_deleted_count=result.file_deleted_count,
+            file_delete_failed_count=result.file_delete_failed_count,
+            vector_collection_deleted=result.vector_collection_deleted,
+        ).info("Source deleted")
+        return result
 
     async def _delete_vector_collection(self, *, collection_name: str) -> bool:
         """删除向量集合；集合已不存在时视为无需清理。"""
@@ -194,9 +203,9 @@ class SourceService:
         except Exception as exc:
             message = str(exc).lower()
             if "not found" in message or "does not exist" in message:
-                logger.warning(
-                    f"Vector collection '{collection_name}' already missing: {exc}"
-                )
+                logger.bind(
+                    event="source.vector_collection.missing",
+                ).info("Source vector collection already missing during deletion")
                 return False
             raise SourceDeleteStorageError(
                 "Failed to delete vector collection"

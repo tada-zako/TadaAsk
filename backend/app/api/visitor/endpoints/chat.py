@@ -195,7 +195,11 @@ async def get_rag_plugin(
     """根据项目配置动态生成 RAGChatPlugin"""
     settings = project.project_settings
     if not settings.visitor_rag_enabled:
-        logger.info(f"Project {project.uid} RAG plugin not enabled for visitor chat")
+        logger.bind(
+            event="chat.rag.disabled",
+            project_uid=project.uid,
+            requester_type="visitor",
+        ).debug("RAG disabled for chat")
         return None
 
     # Options 策略检查和调整

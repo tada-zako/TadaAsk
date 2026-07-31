@@ -247,7 +247,11 @@ class ASTBreakpointScanner:
         except Exception as e:
             self._failed_languages.add(language)  # 记录加载失败的语言
             self._grammar_task_cache.pop(language, None)  # 移除失败的缓存项
-            logger.error(f"Failed to load grammar for language {language}: {e}")
+            logger.bind(
+                event="text_splitter.grammar_load_failed",
+                language=language,
+                exception_type=type(e).__name__,
+            ).opt(exception=e).error("Text splitter grammar load failed")
             return None
 
     def _get_query_cursor(
@@ -320,7 +324,10 @@ class ASTBreakpointScanner:
         # 载入对应的 tree-sitter grammar
         grammar: Language | None = await self._load_grammar(language)
         if grammar is None:
-            logger.warning(f"Grammar for language {language} is not available.")
+            logger.bind(
+                event="text_splitter.grammar_unavailable",
+                language=language,
+            ).warning("Text splitter grammar unavailable")
             return False
         return True  # grammar 已成功加载
 
@@ -334,7 +341,10 @@ class ASTBreakpointScanner:
             parser = Parser(grammar)
             tree = parser.parse(bytes(text, "utf8"))
             if not tree:
-                logger.warning(f"Failed to parse code for language {language}.")
+                logger.bind(
+                    event="text_splitter.code_parse_failed",
+                    language=language,
+                ).warning("Text splitter failed to parse code")
                 return []
 
             query_cursor = self._get_query_cursor(language, grammar)
@@ -343,5 +353,9 @@ class ASTBreakpointScanner:
             )
 
         except Exception as e:
-            logger.error(f"Error scanning AST for language {language}: {e}")
+            logger.bind(
+                event="text_splitter.ast_scan_failed",
+                language=language,
+                exception_type=type(e).__name__,
+            ).opt(exception=e).error("Text splitter AST scan failed")
             return []  # 扫描过程中发生错误，返回空列表

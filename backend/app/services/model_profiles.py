@@ -3,7 +3,14 @@ from typing import cast
 
 import httpx
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, TypeAdapter, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    TypeAdapter,
+    field_validator,
+)
 
 from app.crud import ModelProfileCRUD
 from app.db.models import ModelProfile, Provider
@@ -108,7 +115,10 @@ class ModelProfileService:
         try:
             catalog = await self._fetch_model_catalog(models_url=models_url)
         except Exception as exc:
-            logger.warning(f"拉取模型目录失败，跳过本次同步：{exc}")
+            logger.bind(
+                event="model_catalog.sync_failed",
+                exception_type=type(exc).__name__,
+            ).opt(exception=exc).warning("Model catalog sync failed; sync skipped")
             return
 
         # provider 与 model_profile 的批量更新数据
@@ -150,7 +160,9 @@ class ModelProfileService:
             catalog_items.append((provider_create, model_creates))
 
         if not catalog_items:
-            logger.warning("模型目录中没有可同步的目标 provider，跳过本次同步")
+            logger.bind(event="model_catalog.sync_skipped").warning(
+                "Model catalog has no supported providers; sync skipped"
+            )
             return
 
         # 一并对 provider-model 进行写库操作
@@ -164,11 +176,11 @@ class ModelProfileService:
                 provider_names=[provider.name for provider, _ in catalog_items],
             )
         )
-        logger.info(
-            "模型目录同步完成："
-            f"providers={len(catalog_items)}, "
-            f"cleaned_providers={deleted_count}"
-        )
+        logger.bind(
+            event="model_catalog.synced",
+            provider_count=len(catalog_items),
+            cleaned_provider_count=deleted_count,
+        ).info("Model catalog synchronized")
 
     async def create_custom_provider(
         self,

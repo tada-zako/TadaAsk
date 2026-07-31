@@ -81,9 +81,11 @@ class TokenAwareTextSplitter:
             )
 
         if self.window_tokens >= self.chunk_tokens:
-            logger.warning(
-                "Window size is larger than chunk size, checking if this is intentional."
-            )
+            logger.bind(
+                event="text_splitter.invalid_window",
+                window_tokens=self.window_tokens,
+                chunk_tokens=self.chunk_tokens,
+            ).warning("Text splitter window is not smaller than chunk size")
 
         # 实例化 ASTAware 文本切割引擎，复用内部处理逻辑
         self.ast_engine = _ASTAwareSplittingEngine(splitter_strategy=splitter_strategy)
@@ -122,10 +124,11 @@ class TokenAwareTextSplitter:
 
         # 回落机制：如果切割结果失效，执行 Token 暴力切割
         if len(sub_chunks) == 1 and len(sub_chunks[0].content) == len(chunk.content):
-            logger.debug(
-                f"Chunk at pos {chunk.pos} with length {len(chunk.content)} chars "
-                f"exceeds token limit but no breakpoints found, applying token-based fallback."
-            )
+            logger.bind(
+                event="text_splitter.token_fallback",
+                chunk_position=chunk.pos,
+                chunk_chars=len(chunk.content),
+            ).debug("Text splitter applying token fallback")
             fallback_tokens = tokens[: self.chunk_tokens]
             fallback_content = self.tokenizer.detokenize(fallback_tokens)
             final_chunks.append(
@@ -204,9 +207,11 @@ class ASTAwareTextSplitter:
                 f"({self.chunk_size})"
             )
         if self.window_size >= self.chunk_size:
-            logger.warning(
-                "Window size is larger than chunk size, checking if this is intentional."
-            )
+            logger.bind(
+                event="text_splitter.invalid_window",
+                window_size=self.window_size,
+                chunk_size=self.chunk_size,
+            ).warning("Text splitter window is not smaller than chunk size")
 
         # 实例化基于断点的文本切割器
         self.breakpoint_engine = _ASTAwareSplittingEngine(splitter_strategy)
@@ -311,10 +316,10 @@ class _ASTAwareSplittingEngine:
         if splitter_strategy == "ast" and self.ast_scanner is not None:
             language = detect_language_from_extension(file_path)
             if language is None:
-                logger.warning(
-                    f"Could not detect language from file extension: {file_path}, "
-                    f"AST-based splitting will be skipped."
-                )
+                logger.bind(
+                    event="text_splitter.ast_fallback",
+                    fallback_strategy="markdown",
+                ).warning("File language unavailable; AST splitting skipped")
                 splitter_strategy = "markdown"  # 回退到 Markdown 断点扫描
             else:
                 await self.ast_scanner.ensure_grammar_loaded(language)
@@ -426,9 +431,11 @@ class _BreakpointAwareSplittingEngine:
                 f"({chunk_size})"
             )
         if window_size >= chunk_size:
-            logger.warning(
-                "Window size is larger than chunk size, checking if this is intentional."
-            )
+            logger.bind(
+                event="text_splitter.invalid_window",
+                window_size=window_size,
+                chunk_size=chunk_size,
+            ).warning("Text splitter window is not smaller than chunk size")
 
         chunks: list[TextChunk] = []
         char_pos = 0  # 当前字符位置

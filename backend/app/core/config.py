@@ -210,9 +210,11 @@ class Settings(BaseSettings):
             )
 
         if self.chunk_window_tokens >= self.chunk_size_tokens:
-            logger.warning(
-                "Window size is larger than chunk size, checking if this is intentional."
-            )
+            logger.bind(
+                event="config.text_splitter.invalid_window",
+                chunk_window_tokens=self.chunk_window_tokens,
+                chunk_size_tokens=self.chunk_size_tokens,
+            ).warning("Text splitter window is not smaller than chunk size")
 
         return self
 

@@ -91,9 +91,12 @@ class SourceItemService:
                 # 删除对应的存储文件
                 file_deleted = await self.file_storage.delete_file(key=storage_key)
             except Exception as exc:
-                logger.warning(
-                    f"Failed to delete storage file for source item {source_item.uid}: {exc}"
-                )
+                logger.bind(
+                    event="source.item.file_cleanup.failed",
+                    source_uid=source.uid,
+                    source_item_uid=source_item.uid,
+                    exception_type=type(exc).__name__,
+                ).opt(exception=exc).warning("Source item file cleanup failed")
 
         return SourceItemDeleteResult(
             deleted_vector_count=len(vector_ids),
