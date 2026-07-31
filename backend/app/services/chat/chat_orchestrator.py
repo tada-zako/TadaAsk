@@ -1,6 +1,8 @@
-from typing import AsyncIterable
 import asyncio
+import time
+import uuid
 from dataclasses import dataclass, field
+from typing import AsyncIterable
 
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -348,7 +350,11 @@ class ChatOrchestratorService:
 
                     return ChatSessionRead.model_validate(updated_session)
         except Exception as exc:
-            logger.warning(f"Failed to generate chat session title: {exc}")
+            logger.bind(
+                event="chat.session_title.failed",
+                chat_session_id=chat_session_id,
+                exception_type=type(exc).__name__,
+            ).opt(exception=exc).warning("Chat session title generation failed")
             return None
 
     def _resolve_system_prompt(
@@ -500,12 +506,27 @@ class ChatOrchestratorService:
         # 1.2.4 预备参数
         generation = None
         stream_response: StreamedResponse | None = None
+        generation_started_at = time.perf_counter()
+        generation_log = logger.bind(
+            chat_session_uid=chat_session.uid,
+            message_uid=assistant_message.uid,
+            requester_type=requester_type.value,
+            provider=provider_name,
+            model=model_name,
+            rag_enabled=rag_plugin is not None,
+        )
         try:
             # 1.3 注册 generation 对象
             # TODO: generation 对象可能需要提升到 session title 创建之前
             generation = self.generation_registry.register(
                 session_uid=chat_session.uid,
                 message_uid=assistant_message.uid,
+            )
+            generation_log = generation_log.bind(
+                generation_uid=generation.generation_uid
+            )
+            generation_log.bind(event="chat.generation.started").info(
+                "Chat generation started"
             )
 
             # 1.4 yield 生成开始事件
@@ -553,6 +574,16 @@ class ChatOrchestratorService:
 
             # generation 在上下文构建/RAG 检索期间也可能被用户取消。
             if generation.cancel_event.is_set():
+                generation_log.bind(
+                    event="chat.generation.cancelled",
+                    cancellation_source="user",
+                    generation_stage="context_preparation",
+                    output_chars=0,
+                    duration_ms=round(
+                        (time.perf_counter() - generation_started_at) * 1000,
+                        3,
+                    ),
+                ).info("Chat generation cancelled by user")
                 yield TextDeltaData(
                     event="cancelled",
                     message_uid=assistant_message.uid,
@@ -589,6 +620,16 @@ class ChatOrchestratorService:
                             new_message=final_message,
                         )
 
+                        generation_log.bind(
+                            event="chat.generation.cancelled",
+                            cancellation_source="user",
+                            generation_stage="provider_stream",
+                            output_chars=len(final_message),
+                            duration_ms=round(
+                                (time.perf_counter() - generation_started_at) * 1000,
+                                3,
+                            ),
+                        ).info("Chat generation cancelled by user")
                         yield TextDeltaData(
                             event="cancelled",
                             message_uid=assistant_message.uid,
@@ -610,40 +651,82 @@ class ChatOrchestratorService:
                 assistant_message_id=assistant_message.id,
                 new_message=final_message,
             )
+            generation_log.bind(
+                event="chat.generation.completed",
+                output_chars=len(final_message),
+                duration_ms=round(
+                    (time.perf_counter() - generation_started_at) * 1000,
+                    3,
+                ),
+            ).info("Chat generation completed")
             if updated_message:
                 yield MessageDoneData(message=updated_message)
 
             # 4.0 TODO: 统计 token 用量，更新数据库中的消息记录
 
         except asyncio.CancelledError:
-            # 4.1 生成过程中被取消
+            # HTTP/SSE Task 取消与用户主动设置 cancel_event 语义不同：
+            # 这里只做必要的部分结果持久化，不再向已经断开的连接 yield 事件。
             final_message = stream_response.text if stream_response else ""
             if final_message:
-                await self._update_assistant_message(
-                    chat_session_id=chat_session.id,
-                    assistant_message_id=assistant_message.id,
-                    new_message=final_message,
-                )
+                try:
+                    await self._update_assistant_message(
+                        chat_session_id=chat_session.id,
+                        assistant_message_id=assistant_message.id,
+                        new_message=final_message,
+                    )
+                except Exception as cleanup_exc:
+                    generation_log.bind(
+                        event="chat.generation.cancel_cleanup_failed",
+                        exception_type=type(cleanup_exc).__name__,
+                    ).opt(exception=cleanup_exc).warning(
+                        "Failed to persist partial chat output after task cancellation"
+                    )
 
-            yield TextDeltaData(
-                event="cancelled",
-                message_uid=assistant_message.uid,
-                delta="",
-            )
-            return
+            generation_log.bind(
+                event="chat.generation.task_cancelled",
+                cancellation_source="task",
+                output_chars=len(final_message),
+                duration_ms=round(
+                    (time.perf_counter() - generation_started_at) * 1000,
+                    3,
+                ),
+            ).info("Chat generation task cancelled")
+            raise
 
         except Exception as e:
             # 4.2 生成过程中发生错误
             final_message = stream_response.text if stream_response else ""
+            error_id = uuid.uuid4().hex
 
             if final_message:
-                await self._update_assistant_message(
-                    chat_session_id=chat_session.id,
-                    assistant_message_id=assistant_message.id,
-                    new_message=final_message,
-                )
+                try:
+                    await self._update_assistant_message(
+                        chat_session_id=chat_session.id,
+                        assistant_message_id=assistant_message.id,
+                        new_message=final_message,
+                    )
+                except Exception as cleanup_exc:
+                    generation_log.bind(
+                        event="chat.generation.error_cleanup_failed",
+                        error_id=error_id,
+                        exception_type=type(cleanup_exc).__name__,
+                    ).opt(exception=cleanup_exc).warning(
+                        "Failed to persist partial chat output after generation error"
+                    )
 
-            yield ErrorData(message=str(e))
+            generation_log.bind(
+                event="chat.generation.failed",
+                error_id=error_id,
+                exception_type=type(e).__name__,
+                output_chars=len(final_message),
+                duration_ms=round(
+                    (time.perf_counter() - generation_started_at) * 1000,
+                    3,
+                ),
+            ).opt(exception=e).error("Chat generation failed")
+
+            yield ErrorData(message=str(e), error_id=error_id)
             return
 
         finally:
