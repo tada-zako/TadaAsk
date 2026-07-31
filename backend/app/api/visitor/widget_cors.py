@@ -196,5 +196,5 @@ class WidgetScopedCORSMiddleware:
     @staticmethod
     def allow_explicit_origin(headers: MutableHeaders, origin: str) -> None:
         headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Expose-Headers"] = "Retry-After"
+        headers["Access-Control-Expose-Headers"] = "Retry-After, X-Request-ID"
         headers.add_vary_header("Origin")
