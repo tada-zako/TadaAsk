@@ -3,6 +3,7 @@ import { computed, ref, type ComputedRef } from "vue";
 import { translate as t } from "@/console/i18n";
 import { getErrorMessage } from "@/console/lib/api-result";
 import { normalizeProgress } from "@/console/lib/normalize";
+import { formatErrorWithReference } from "@/shared/api/error-reference";
 import {
   streamRagJobEvents,
   toSourceItemRow,
@@ -364,7 +365,13 @@ export function useSourceItemsRuntime(options: SourceItemsRuntimeOptions) {
     }
 
     if (event.error) {
-      setRefKey(syncErrorBySourceUid, sourceUid, event.error);
+      setRefKey(
+        syncErrorBySourceUid,
+        sourceUid,
+        formatErrorWithReference(event.error, {
+          errorId: event.errorId ?? undefined,
+        }),
+      );
     }
 
     if (event.ingestStage) {
