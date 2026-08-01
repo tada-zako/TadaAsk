@@ -1,9 +1,14 @@
+import logging
 import re
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import jieba
 import jieba.analyse
+
+
+# jieba 默认在首次初始化时输出多行 INFO；应用只保留其可操作的告警。
+jieba.setLogLevel(logging.WARNING)
 
 
 # 中文正则匹配

@@ -110,9 +110,7 @@ async def sync_admin_credentials(
 
             if not username_changed and not password_changed:
                 # 用户名以及密码未更新
-                logger.bind(event="admin.credentials.unchanged").debug(
-                    "Admin credentials already match startup configuration"
-                )
+                logger.debug("Admin credentials already match startup configuration")
                 return
 
             # 更新 username 或 password
@@ -163,35 +161,28 @@ async def lifespan(
     负责在应用启动时初始化数据库连接
     """
 
-    logger.bind(event="application.starting").info("Application starting")
+    logger.info("Application starting")
 
     if not initialize_runtime:
         # NOTE: 测试环境只挂载显式注入的组件，避免初始化模型、向量库和外部目录。
         # 该分支只服务于 tests 使用，避免全量初始化项目配置。
         for name, value in (state_overrides or {}).items():
             setattr(app.state, name, value)
-        logger.bind(
-            event="application.started",
-            runtime_initialized=False,
-        ).info("Application started")
+        logger.info("Application started without runtime initialization")
         yield
         job_manager = getattr(app.state, "rag_job_manager", None)
         shutdown = getattr(job_manager, "shutdown", None)
         if shutdown:
             await shutdown()
-        logger.bind(event="application.stopping").info("Application stopping")
+        logger.info("Application stopping")
         await complete_logging()
         return
 
     # ======= 系统重要配置挂载 =======
     if app_settings.database_auto_migrate:
-        logger.bind(event="database.migration.started").info(
-            "Database migration started"
-        )
+        logger.info("Database migration started")
         await run_migrations()
-        logger.bind(event="database.migration.completed").info(
-            "Database migration completed"
-        )
+        logger.info("Database migration completed")
 
     await init_db()
     # MVP：管理员凭据以启动配置为准，暂不提供运行时修改 API。
@@ -359,10 +350,7 @@ async def lifespan(
     for name, value in (state_overrides or {}).items():
         setattr(app.state, name, value)
 
-    logger.bind(
-        event="application.started",
-        runtime_initialized=True,
-    ).info("Application started")
+    logger.info("Application started")
     yield  # 运行应用
 
     # await drop_db()  # 应用关闭时清理数据库连接
@@ -371,7 +359,7 @@ async def lifespan(
     shutdown = getattr(job_manager, "shutdown", None)
     if shutdown:
         await shutdown()
-    logger.bind(event="application.stopping").info("Application stopping")
+    logger.info("Application stopping")
     await complete_logging()
 
 

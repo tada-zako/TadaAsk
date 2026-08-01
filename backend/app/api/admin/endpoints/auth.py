@@ -73,8 +73,6 @@ async def authenticate_admin(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Admin | None:
     """验证管理员用户名和密码"""
-    logger.bind(event="auth.login.attempt").info("Admin login attempted")
-
     admin = await admin_crud.get_admin_by_username(form_data.username)
 
     unauthorized_exception = HTTPException(

@@ -203,9 +203,7 @@ class SourceService:
         except Exception as exc:
             message = str(exc).lower()
             if "not found" in message or "does not exist" in message:
-                logger.bind(
-                    event="source.vector_collection.missing",
-                ).info("Source vector collection already missing during deletion")
+                logger.info("Source vector collection already missing during deletion")
                 return False
             raise SourceDeleteStorageError(
                 "Failed to delete vector collection"

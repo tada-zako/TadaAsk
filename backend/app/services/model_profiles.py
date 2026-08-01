@@ -115,10 +115,7 @@ class ModelProfileService:
         try:
             catalog = await self._fetch_model_catalog(models_url=models_url)
         except Exception as exc:
-            logger.bind(
-                event="model_catalog.sync_failed",
-                exception_type=type(exc).__name__,
-            ).opt(exception=exc).warning("Model catalog sync failed; sync skipped")
+            logger.opt(exception=exc).warning("Model catalog sync failed; sync skipped")
             return
 
         # provider 与 model_profile 的批量更新数据
@@ -160,9 +157,7 @@ class ModelProfileService:
             catalog_items.append((provider_create, model_creates))
 
         if not catalog_items:
-            logger.bind(event="model_catalog.sync_skipped").warning(
-                "Model catalog has no supported providers; sync skipped"
-            )
+            logger.warning("Model catalog has no supported providers; sync skipped")
             return
 
         # 一并对 provider-model 进行写库操作
@@ -177,7 +172,6 @@ class ModelProfileService:
             )
         )
         logger.bind(
-            event="model_catalog.synced",
             provider_count=len(catalog_items),
             cleaned_provider_count=deleted_count,
         ).info("Model catalog synchronized")
