@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import sys
 import threading
 from datetime import UTC
@@ -12,12 +13,52 @@ if TYPE_CHECKING:
     from app.core.config import Settings
 
 
+_CONSOLE_LEVEL_NAMES = {
+    "TRACE": "TRCE",
+    "DEBUG": "DEBG",
+    "INFO": "INFO",
+    "SUCCESS": "SUCC",
+    "WARNING": "WARN",
+    "ERROR": "ERRO",
+    "CRITICAL": "CRIT",
+}
 _CONSOLE_FORMAT = (
-    "<green>{time:YYYY-MM-DDTHH:mm:ss.SSS!UTC}Z</green> | "
-    "<level>{level: <8}</level> | "
-    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-    "<level>{message}</level>{extra[context]}\n{exception}"
+    "<green>{local_time}</green> "
+    "<level>[{level}]</level> "
+    "<cyan>[{component}]</cyan> "
+    "<level>{{message}}</level>{context}  "
+    "<dim>{location}</dim>{exception}\n"
 )
+_CONSOLE_CORE_KEYS = (
+    "error_id",
+    "http_method",
+    "http_route",
+    "status_code",
+    "duration_ms",
+    "request_id",
+)
+_CONSOLE_KEY_ALIASES = {
+    "error_id": "err",
+    "request_id": "req",
+    "http_method": "method",
+    "http_route": "route",
+    "status_code": "status",
+    "duration_ms": "duration",
+}
+_CONSOLE_HIGHLIGHT_COLORS = {"http_method": "magenta", "http_route": "cyan"}
+
+# 内部 extra key，由 console LogRecord 中其它部分展示
+_CONSOLE_INTERNAL_KEYS = {"context", "event", "logging_name", "service"}
+# extra 展示显示——数量，长度
+_CONSOLE_EXTRA_LIMIT = 4
+_CONSOLE_VALUE_LIMIT = 64
+
+
+# 推荐的 logger 使用分级策略：
+# 1. 普通运行日志推荐直接 logger.info/debug(...)，不用绑定 event；
+# 2. 只有字段需要在后续日志检索，或者有检查价值时再通过 logger.bind(field=value) 绑定相关字段；
+# 3. HTTP/SSE、安全决策、后台任务和业务生命周期等稳定事件推荐绑定对应的 event。
+
 # 常见的标准 logging 对象
 _STANDARD_LOGGERS = (
     "alembic",
@@ -31,6 +72,14 @@ _STANDARD_LOGGERS = (
     "uvicorn",
     "uvicorn.access",
     "uvicorn.error",
+)
+# 识别为噪音的标准 logging 对象
+_NOISY_CONSOLE_LOGGERS = (
+    "alembic",
+    "fastapi",
+    "openai._base_client",
+    "uvicorn",
+    "watchfiles",
 )
 _configuration_lock = threading.Lock()
 _configuration_signature: tuple[str, str, bool, str] | None = None
@@ -91,9 +140,14 @@ def configure_logging(app_settings: "Settings") -> None:
                         if app_settings.log_format == "console"
                         else False
                     ),
+                    "filter": (
+                        _console_filter
+                        if app_settings.log_format == "console"
+                        else None
+                    ),
                     "serialize": app_settings.log_format == "json",
                     "enqueue": True,
-                    "backtrace": True,
+                    "backtrace": app_settings.log_format != "console",
                     "diagnose": False,
                 }
             ]
@@ -170,17 +224,103 @@ def _standard_level(level: str) -> int:
 
 
 def _console_format(record: dict[str, Any]) -> str:
-    # 将所有的 extra 上下文归一化为 context 进行输出，方便动态追加 extra。
-    extra = record["extra"]
-    context_parts = []
-    for key in sorted(extra):
-        if key == "context":
-            continue
-        value = json.dumps(extra[key], ensure_ascii=False, default=str)
-        context_parts.append(f"{key}={value}")
+    """控制台日志输出渲染为紧凑的开发者可读日志。"""
+    level_name = record["level"].name
+    local_time = record["time"].astimezone().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    exception = (
+        "\n{exception}"
+        if record["exception"] is not None and record["level"].no >= logging.ERROR
+        else ""
+    )
+    return _CONSOLE_FORMAT.format(
+        local_time=local_time,
+        level=_CONSOLE_LEVEL_NAMES.get(level_name, level_name[:4]),
+        component=_escape_format_literal(_console_component(record)),
+        context=_console_context(record["extra"]),
+        location=_escape_format_literal(f"@{record['file'].name}:{record['line']}"),
+        exception=exception,
+    )
 
-    extra["context"] = f" | {' '.join(context_parts)}" if context_parts else ""
-    return _CONSOLE_FORMAT
+
+def _console_filter(record: dict[str, Any]) -> bool:
+    """Console 隐藏第三方 INFO 噪声，文件 sink 仍接收原始记录。"""
+    extra = record["extra"]
+    logging_name = extra.get("logging_name")
+    if not isinstance(logging_name, str) or record["level"].no >= logging.WARNING:
+        return True
+    return not any(
+        logging_name == name or logging_name.startswith(f"{name}.")
+        for name in _NOISY_CONSOLE_LOGGERS
+    )
+
+
+def _console_component(record: dict[str, Any]) -> str:
+    """component 展示 event > logging_name > logger name(默认为 module name)"""
+    extra = record["extra"]
+    event = extra.get("event")
+    if event:
+        return str(event)
+
+    component = str(extra.get("logging_name") or record["name"] or "application")
+    return component.removeprefix("app.")
+
+
+def _console_context(extra: dict[str, Any]) -> str:
+    """核心字段优先，其余 bind 字段按原始顺序补足。"""
+    rendered: list[str] = []
+    candidate_keys = dict.fromkeys((*_CONSOLE_CORE_KEYS, *extra))  # 候选 keys
+    for key in candidate_keys:
+        if key in _CONSOLE_INTERNAL_KEYS or key not in extra or extra[key] is None:
+            continue
+
+        name = _escape_format_literal(_CONSOLE_KEY_ALIASES.get(key, key))
+        value = _escape_format_literal(_console_value(key, extra[key]))
+        item = f"[{name}={value}]"
+        # 部分 extra 字段设置高亮
+        if color := _CONSOLE_HIGHLIGHT_COLORS.get(key):
+            item = f"<bold><{color}>{item}</{color}></bold>"
+        rendered.append(item)
+
+        if len(rendered) == _CONSOLE_EXTRA_LIMIT:
+            break
+
+    return f"  {' '.join(rendered)}" if rendered else ""
+
+
+def _console_value(key: str, value: Any) -> str:
+    # error_id, request_id 显示前 8 位，避免过长
+    if key in {"error_id", "request_id"}:
+        rendered_id = str(value)
+        return rendered_id[:8]
+
+    # duration_ms 转换为更友好展示
+    if key == "duration_ms" and isinstance(value, int | float):
+        if value >= 1000:
+            return f"{value / 1000:.2f}s"
+        return f"{value:g}ms"
+
+    # 简单字符限制最大展示长度
+    if isinstance(value, str) and re.compile(r"^[\w./:@+-]+$").fullmatch(value):
+        rendered = value
+    else:
+        rendered = json.dumps(
+            value, ensure_ascii=False, default=str, separators=(",", ":")
+        )
+    return (
+        rendered
+        if len(rendered) <= _CONSOLE_VALUE_LIMIT
+        else f"{rendered[: _CONSOLE_VALUE_LIMIT - 1]}…"
+    )
+
+
+def _escape_format_literal(value: str) -> str:
+    """转义 Loguru format 占位符和颜色标记。"""
+    return (
+        value.replace("\\", "\\\\")
+        .replace("{", "{{")
+        .replace("}", "}}")
+        .replace("<", "\\<")
+    )
 
 
 def _write_console(message: Any) -> None:
