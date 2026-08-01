@@ -51,10 +51,12 @@ Start the complete Docker deployment from the repository root:
 docker compose up -d --build
 ```
 
-- Run focused tests first, then the default suite when shared behavior may be affected. Tests are regression protection, not a complete specification.
-- Default frontend tests must not use real backends, credentials, providers, or public-network access.
-- Frontend tests should verify observable behavior without freezing unstable page structure, styling, CSS classes, or private implementation details.
-- Documentation-only changes usually do not require the full test suites.
+### Test Maintenance Policy
+
+1. **When to add tests**: Add tests for important new modules, public APIs, complex service flows, security or concurrency behavior, and other changes with clear regression risk. Also add tests when explicitly requested. For other changes, simply run the relevant existing tests instead.
+2. **Do not require TDD**: Implement the feature first. After the feature is complete and its behavior is stable, add the necessary tests. Do not create tests for every intermediate development step.
+3. **Test limits and scope**: For one feature add no more than three unit test cases and one or two integration test cases by default. Cover the main success path and the most important failure or boundary path instead of testing every variation.
+4. **Frontend tests and coverage**: Frontend tests should focus on observable behavior in protocols, services, stores, composables, and critical integrations. Do not add low-value tests only to increase the coverage number.
 
 ## Code Style Guidelines
 
