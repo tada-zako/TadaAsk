@@ -100,3 +100,82 @@ def test_in_app_migration_keeps_application_logging(monkeypatch) -> None:
 
     assert alembic_config.attributes["configure_logger"] is False
     assert upgrade_call == (alembic_config, "head")
+
+
+async def test_console_logging_keeps_core_context_and_accepts_custom_extra(
+    capsys,
+) -> None:
+    app_settings = Settings(
+        _env_file=None,
+        log_level="INFO",
+        log_format="console",
+        log_file_enabled=False,
+    )
+
+    try:
+        configure_logging(app_settings)
+        capsys.readouterr()
+
+        logger.bind(
+            event="http.request.completed",
+            request_id="request-id-not-shown",
+            http_method="GET",
+            http_route="/admin/source/{source_uid}",
+            status_code=200,
+            duration_ms=12.5,
+        ).info("HTTP request finished")
+        logger.bind(
+            event="custom.operation.completed",
+            first=1,
+            second="two",
+            third=False,
+            fourth={"count": 4},
+            fifth="hidden",
+        ).info("Custom operation finished")
+        logging.getLogger("watchfiles.main").info("watchfiles noise")
+        logging.getLogger("watchfiles.main").warning("watchfiles warning")
+        await complete_logging()
+
+        output = capsys.readouterr().err
+        assert "[http.request.completed] HTTP request finished" in output
+        assert "[method=GET]" in output
+        assert '[route="/admin/source/{source_uid}"]' in output
+        assert "[status=200]" in output
+        assert "[duration=12.5ms]" in output
+        assert "[first=1]" in output
+        assert "[second=two]" in output
+        assert "[third=false]" in output
+        assert '[fourth={"count":4}]' in output
+        assert "fifth" not in output
+        assert "watchfiles noise" not in output
+        assert "watchfiles warning" in output
+    finally:
+        configure_logging(settings)
+        await complete_logging()
+
+
+async def test_file_sink_failure_keeps_console_available(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    file_as_parent = tmp_path / "not-a-directory"
+    file_as_parent.write_text("occupied", encoding="utf8")
+    app_settings = Settings(
+        _env_file=None,
+        log_level="INFO",
+        log_format="console",
+        log_file_enabled=True,
+        log_file_path=str(file_as_parent / "test.log"),
+    )
+
+    try:
+        configure_logging(app_settings)
+        logger.info("Console fallback marker")
+        await complete_logging()
+
+        output = capsys.readouterr().err
+        assert "File logging unavailable; console logging remains active" in output
+        assert "Console fallback marker" in output
+    finally:
+        configure_logging(settings)
+        await complete_logging()

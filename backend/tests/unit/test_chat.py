@@ -1,6 +1,8 @@
+import asyncio
 from datetime import datetime, timezone
 
 import pytest
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import ChatMessageRole, ChatSessionType
@@ -18,7 +20,11 @@ from app.services.chat.compaction_service import CompactionService
 from app.services.chat.context_builder import ContextBuilder
 from app.services.chat.generation_registry import GenerationRegistry
 from app.services.chat.session_operations import ChatSessionOpsService
-from app.services.schemas import RAGRetrievalResult
+from app.services.schemas import (
+    ChatStreamEvent,
+    GenerationStartData,
+    RAGRetrievalResult,
+)
 from app.services.utils import TokenBudget
 from tests.helpers import FakeCompleter, FakeTokenCounter
 
@@ -162,17 +168,26 @@ async def test_chat_stream_surfaces_provider_failure_and_handles_empty_output(
         generation_registry=registry,
         compaction_service=CompactionService(session_factory, FakeTokenCounter()),
     )
-    failed_events = await collect_events(
-        service.stream_rag_chat(
-            project=None,
-            chat_input=ChatInput(message="fail", chat_session_uid=None),
-            completer=FakeCompleter(error=RuntimeError("provider failed")),
-            provider_with_model=provider_with_model(),
-            requester_type=ChatSessionType.ADMIN,
-            model_settings=ModelSettings.for_compaction(),
-            rag_plugin=None,
-        )
+    failure_records: list[dict[str, object]] = []
+    handler_id = logger.add(
+        lambda message: failure_records.append(dict(message.record["extra"])),
+        filter=lambda record: record["extra"].get("event") == "chat.generation.failed",
     )
+    try:
+        failed_events = await collect_events(
+            service.stream_rag_chat(
+                project=None,
+                chat_input=ChatInput(message="fail", chat_session_uid=None),
+                completer=FakeCompleter(error=RuntimeError("provider failed")),
+                provider_with_model=provider_with_model(),
+                requester_type=ChatSessionType.ADMIN,
+                model_settings=ModelSettings.for_compaction(),
+                rag_plugin=None,
+            )
+        )
+    finally:
+        logger.remove(handler_id)
+
     empty_completer = FakeCompleter()
     empty_completer.chunks = []
     empty_events = await collect_events(
@@ -189,8 +204,88 @@ async def test_chat_stream_surfaces_provider_failure_and_handles_empty_output(
 
     assert failed_events[-1].event == "error"  # type: ignore[attr-defined]
     assert failed_events[-1].message == "provider failed"  # type: ignore[attr-defined]
+    assert len(failure_records) == 1
+    assert failure_records[0]["error_id"] == failed_events[-1].error_id  # type: ignore[attr-defined]
     assert empty_events[-1].event == "message_done"  # type: ignore[attr-defined]
     assert empty_events[-1].message.message == ""  # type: ignore[attr-defined]
+    assert registry._registry == {}
+
+
+@pytest.mark.asyncio
+async def test_user_cancellation_emits_cancelled_event(session_factory) -> None:
+    registry = GenerationRegistry()
+    service = ChatOrchestratorService(
+        session_factory=session_factory,
+        context_builder=ContextBuilder(token_counter=FakeTokenCounter()),
+        generation_registry=registry,
+        compaction_service=CompactionService(session_factory, FakeTokenCounter()),
+    )
+    events: list[ChatStreamEvent] = []
+
+    async for event in service.stream_rag_chat(
+        project=None,
+        chat_input=ChatInput(message="cancel", chat_session_uid=None),
+        completer=FakeCompleter(chunks=["answer"]),
+        provider_with_model=provider_with_model(),
+        requester_type=ChatSessionType.ADMIN,
+        model_settings=ModelSettings.for_compaction(),
+        rag_plugin=None,
+    ):
+        events.append(event)
+        if isinstance(event, GenerationStartData):
+            assert registry.cancel(event.generation_uid)
+
+    event_names = [event.event for event in events]
+    assert event_names[-1] == "cancelled"
+    assert "error" not in event_names
+    assert registry._registry == {}
+
+
+@pytest.mark.asyncio
+async def test_task_cancellation_is_reraised_without_cancelled_sse(
+    session_factory,
+) -> None:
+    async with session_factory() as session:
+        async with session.begin():
+            chat_session = await ChatSessionCRUD(session).create_chat_session(
+                chat_session_data=ChatSessionInternal(
+                    title="Existing",
+                    owner_type=ChatSessionType.ADMIN,
+                    provider="fake",
+                    model="fake-model",
+                )
+            )
+
+    registry = GenerationRegistry()
+    service = ChatOrchestratorService(
+        session_factory=session_factory,
+        context_builder=ContextBuilder(token_counter=FakeTokenCounter()),
+        generation_registry=registry,
+        compaction_service=CompactionService(session_factory, FakeTokenCounter()),
+    )
+    events: list[ChatStreamEvent] = []
+
+    with pytest.raises(asyncio.CancelledError):
+        async for event in service.stream_rag_chat(
+            project=None,
+            chat_input=ChatInput(
+                message="disconnect",
+                chat_session_uid=chat_session.uid,
+            ),
+            completer=FakeCompleter(
+                chunks=["partial"],
+                error=asyncio.CancelledError(),
+            ),
+            provider_with_model=provider_with_model(),
+            requester_type=ChatSessionType.ADMIN,
+            model_settings=ModelSettings.for_compaction(),
+            rag_plugin=None,
+        ):
+            events.append(event)
+
+    event_names = [event.event for event in events]
+    assert "cancelled" not in event_names
+    assert "error" not in event_names
     assert registry._registry == {}
 
 

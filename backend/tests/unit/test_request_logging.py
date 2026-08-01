@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from loguru import logger
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
+from starlette.types import Message, Receive, Scope, Send
 
 from app.core.request_logging import (
     REQUEST_ID_HEADER,
@@ -237,3 +238,43 @@ async def test_expected_http_error_only_uses_info_access_log(
     assert len(access_records) == 1
     assert access_records[0]["level"] == "INFO"
     assert access_records[0]["extra"]["status_code"] == 404
+
+
+async def test_cancelled_task_is_logged_and_reraised(
+    request_log_records: list[dict[str, Any]],
+) -> None:
+    async def cancelled_app(scope: Scope, receive: Receive, send: Send) -> None:
+        del scope, receive, send
+        raise asyncio.CancelledError
+
+    middleware = RequestLoggingMiddleware(cancelled_app)
+    scope: Scope = {
+        "type": "http",
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/cancel",
+        "raw_path": b"/cancel",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 1234),
+        "server": ("testserver", 80),
+        "state": {},
+    }
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: Message) -> None:
+        del message
+
+    with pytest.raises(asyncio.CancelledError):
+        await middleware(scope, receive, send)
+
+    cancelled_records = [
+        record
+        for record in request_log_records
+        if record["extra"].get("event") == "http.request.cancelled"
+    ]
+    assert len(cancelled_records) == 1
+    assert cancelled_records[0]["extra"]["http_route"] == "/cancel"
