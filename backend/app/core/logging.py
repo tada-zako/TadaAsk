@@ -126,55 +126,41 @@ def configure_logging(app_settings: "Settings") -> None:
                 # 当前只使用同步 sink；complete() 的同步阶段会先排空 enqueue 队列。
                 logger.complete()
 
-            handlers: list[dict[str, Any]] = [
-                {
-                    "sink": _write_console,
-                    "level": app_settings.log_level,
-                    "format": (
-                        _console_format
-                        if app_settings.log_format == "console"
-                        else "{message}"
-                    ),
-                    "colorize": (
-                        sys.stderr.isatty()
-                        if app_settings.log_format == "console"
-                        else False
-                    ),
-                    "filter": (
-                        _console_filter
-                        if app_settings.log_format == "console"
-                        else None
-                    ),
-                    "serialize": app_settings.log_format == "json",
-                    "enqueue": True,
-                    "backtrace": app_settings.log_format != "console",
-                    "diagnose": False,
-                }
-            ]
+            config = {
+                "handlers": [
+                    {
+                        "sink": _write_console,
+                        "level": app_settings.log_level,
+                        "format": (
+                            _console_format
+                            if app_settings.log_format == "console"
+                            else "{message}"
+                        ),
+                        "colorize": (
+                            sys.stderr.isatty()
+                            if app_settings.log_format == "console"
+                            else False
+                        ),
+                        "filter": (
+                            _console_filter
+                            if app_settings.log_format == "console"
+                            else None
+                        ),
+                        "serialize": app_settings.log_format == "json",
+                        "enqueue": True,
+                        "catch": True,
+                        "backtrace": app_settings.log_format != "console",
+                        "diagnose": False,
+                    }
+                ],
+                "extra": {"service": "tadaask-backend"},
+                "patcher": _use_utc_time,
+            }
+
+            logger.configure(**config)
 
             if app_settings.log_file_enabled:
-                log_file_path = Path(app_settings.log_file_path)
-                log_file_path.parent.mkdir(parents=True, exist_ok=True)
-                handlers.append(
-                    {
-                        "sink": log_file_path,
-                        "level": app_settings.log_level,
-                        "serialize": True,
-                        "enqueue": True,
-                        "backtrace": True,
-                        "diagnose": False,
-                        "encoding": "utf8",
-                        "rotation": "15 MB",
-                        "retention": "14 days",
-                        "compression": "zip",
-                    }
-                )
-
-            logger.configure(
-                handlers=handlers,
-                extra={"service": "tadaask-backend"},
-                patcher=_use_utc_time,
-            )
+                _add_file_sink(app_settings)
             _configuration_signature = signature
 
         # Alembic 或测试可能在两次调用之间重配标准 logging。
@@ -185,6 +171,30 @@ def configure_logging(app_settings: "Settings") -> None:
 async def complete_logging() -> None:
     """等待队列和异步 sink 完成，避免应用退出时丢失尾部日志。"""
     await logger.complete()
+
+
+def _add_file_sink(app_settings: "Settings") -> None:
+    """挂载可选文件 sink；文件系统故障不能影响 Console 和业务请求。"""
+    log_file_path = Path(app_settings.log_file_path)
+    try:
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.add(
+            log_file_path,
+            level=app_settings.log_level,
+            serialize=True,
+            enqueue=True,
+            catch=True,
+            backtrace=True,
+            diagnose=False,
+            encoding="utf8",
+            rotation="15 MB",
+            retention="14 days",
+            compression="zip",
+        )
+    except OSError as exc:
+        logger.bind(log_file_path=str(log_file_path)).opt(exception=exc).error(
+            "File logging unavailable; console logging remains active"
+        )
 
 
 def _configure_standard_logging(app_settings: "Settings") -> None:
