@@ -133,6 +133,7 @@ class HybridSearchService:
             *[query_one_source(source) for source in sources],
             return_exceptions=True,
         )
+        logger.debug("HybridSearch finished a vector search")
         # 扁平化结果列表
         return [
             item for sublist in results if isinstance(sublist, list) for item in sublist
@@ -150,12 +151,14 @@ class HybridSearchService:
             return []
 
         async with self.session_factory() as session:
-            return await self.fts_provider.semantic_search(
+            result = await self.fts_provider.semantic_search(
                 session=session,
                 user_query=query,
                 source_item_ids=source_item_ids,
                 limit=limit,
             )
+            logger.debug("HybridSearch finished a semantic FTS search")
+            return result
 
     async def _keywords_fts_search(
         self,
@@ -279,6 +282,13 @@ class HybridSearchService:
             ),
             reverse=True,
         )
+
+        if options.rerank_enabled:
+            logger.bind(
+                candidate_count=len(ranked_hits),
+                passed_filter_count=len(sorted_hits),
+                result_count=min(len(sorted_hits), options.top_k),
+            ).info("RAG candidates reranked")
 
         return sorted_hits[: options.top_k]
 
@@ -496,6 +506,11 @@ class HybridSearchService:
             max_alternative_queries=options.max_alternative_queries,
             completer=completer,
         )
+        logger.bind(
+            keyword_count=len(expanded_query.keywords),
+            alternative_query_count=len(expanded_query.alternative_queries),
+            hyde_generated=bool(expanded_query.hypothetical_document),
+        ).info("RAG search query expansion completed")
 
         # 2. 扩展查询 embedding
         search_texts = [
@@ -640,11 +655,16 @@ class HybridSearchService:
             options=options,
             debug=debug,
         )
+        logger.bind(
+            fts_candidate_count=len(ranked_lists[0].items),
+            vector_candidate_count=len(ranked_lists[1].items),
+            result_count=len(raw_hits),
+        ).info("Raw RAG search completed")
 
         # ======= 2. 基于 option.mode 进行分支判断 =======
         if options.mode == SearchMode.FAST:
             # 2.1 快速模式：直接使用 raw search 结果
-            execution_mode = "raw_fast"
+            execution_mode = "fast"
             results = raw_hits
         else:
             # 2.2.0 计算 confidence；
@@ -659,7 +679,7 @@ class HybridSearchService:
                 raw_confidence, options
             ):
                 # 2.2 自适应模式：据 raw search 结果的质量判断是否直接返回
-                execution_mode = "raw_adaptive"
+                execution_mode = "adaptive"
                 results = raw_hits
             else:
                 # ======= 3. FULL search 阶段 =======
@@ -675,13 +695,9 @@ class HybridSearchService:
                 )
 
         logger.bind(
-            event="rag.search.completed",
-            requested_mode=options.mode.value,
+            raw_mode=options.mode.value,
             execution_mode=execution_mode,
-            source_count=len(sources),
-            source_item_count=sum(len(source.source_item_ids) for source in sources),
             result_count=len(results),
-            rerank_enabled=options.rerank_enabled,
             duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
         ).info("RAG search completed")
         return results

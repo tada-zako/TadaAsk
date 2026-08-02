@@ -47,13 +47,22 @@ class SourceService:
 
     async def create_source(self, source_data: SourceCreate) -> Source:
         """创建数据源，并初始化对应向量集合。"""
-        source_data = self._validate_and_normalize_source_create(source_data)
+        try:
+            source_data = self._validate_and_normalize_source_create(source_data)
+        except SourceCreateValidationError as exc:
+            logger.bind(source_type=source_data.source_type.value).warning(
+                "Source creation rejected due to invalid configuration: {}", str(exc)
+            )
+            raise
 
         # Source 名称是全局唯一的，提前检查能给前端更清晰的错误。
         existing_source = await self.source_crud.get_source_by_name(
             source_name=source_data.source_name
         )
         if existing_source:
+            logger.bind(source_type=source_data.source_type.value).warning(
+                "Source creation rejected because the name already exists"
+            )
             raise SourceCreateConflictError("source with the same name already exists")
 
         source_internal = SourceInternal(**source_data.model_dump())
@@ -74,7 +83,6 @@ class SourceService:
                 source_data=source_internal
             )
             logger.bind(
-                event="source.created",
                 source_uid=new_source.uid,
                 source_type=new_source.source_type.value,
             ).info("Source created")
@@ -101,10 +109,19 @@ class SourceService:
         source_data: SourceUpdate,
     ) -> Source:
         """更新 Source 基础配置；更新 web_crawl_config 后重置状态。"""
-        source_data = self._validate_and_normalize_source_update(
-            source=source,
-            source_data=source_data,
-        )
+        try:
+            source_data = self._validate_and_normalize_source_update(
+                source=source,
+                source_data=source_data,
+            )
+        except SourceUpdateValidationError as exc:
+            logger.bind(
+                source_uid=source.uid,
+                source_type=source.source_type.value,
+            ).warning(
+                "Source update rejected due to invalid configuration: {}", str(exc)
+            )
+            raise
 
         # 如果修改目标 source 为 WEB_CRAWL 类型，
         # 并且涉及到 web_crawl_config 修改，需要重设 source.status
@@ -123,15 +140,23 @@ class SourceService:
                 source_name=source_data.source_name
             )
             if existing_source and existing_source.id != source.id:
+                logger.bind(source_uid=source.uid).warning(
+                    "Source update rejected because the name already exists"
+                )
                 raise SourceUpdateConflictError(
                     "source with the same name already exists"
                 )
 
-        return await self.source_crud.update_source(
+        updated_source = await self.source_crud.update_source(
             source=source,
             source_data=source_data,
             reset_status=reset_status,
         )
+        logger.bind(
+            source_uid=updated_source.uid,
+            status_reset=reset_status is not None,
+        ).info("Source updated")
+        return updated_source
 
     async def delete_source(self, *, source: Source) -> SourceDeleteResult:
         """删除 Source 及其下属数据库、向量集合和本地文件。"""
@@ -172,7 +197,6 @@ class SourceService:
                 logger.bind(
                     event="source.file_cleanup.failed",
                     source_uid=source.uid,
-                    exception_type=type(exc).__name__,
                 ).opt(exception=exc).warning("Source file cleanup failed")
 
         result = SourceDeleteResult(
@@ -183,12 +207,9 @@ class SourceService:
             cleanup_errors=cleanup_errors,
         )
         logger.bind(
-            event="source.deleted",
             source_uid=source.uid,
             deleted_source_item_count=result.deleted_source_item_count,
-            file_deleted_count=result.file_deleted_count,
             file_delete_failed_count=result.file_delete_failed_count,
-            vector_collection_deleted=result.vector_collection_deleted,
         ).info("Source deleted")
         return result
 

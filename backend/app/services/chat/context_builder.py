@@ -1,3 +1,5 @@
+from loguru import logger
+
 from ..utils import TokenBudget
 from app.providers import Message
 from app.db.models import ChatMessage
@@ -166,5 +168,10 @@ class ContextBuilder:
                 content=current_message.message,
             )
         )
+
+        logger.bind(
+            context_message_count=len(context_messages),
+            rag_included=bool(rag_context),
+        ).info("Chat context prepared")
 
         return context_messages

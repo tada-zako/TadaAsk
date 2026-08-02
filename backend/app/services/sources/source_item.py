@@ -60,6 +60,10 @@ class SourceItemService:
         """删除 SourceItem 及其相关数据"""
         if source_item.status in _DELETE_BLOCKED_STATUSES:
             # 目标 source item 状态不支持删除
+            logger.bind(
+                source_item_uid=source_item.uid,
+                source_item_status=source_item.status.value,
+            ).warning("Source item deletion rejected because ingest is active")
             raise SourceItemDeleteConflictError(
                 "Source item is busy, pause it or wait until processing finishes"
             )
@@ -93,11 +97,14 @@ class SourceItemService:
             except Exception as exc:
                 logger.bind(
                     event="source.item.file_cleanup.failed",
-                    source_uid=source.uid,
                     source_item_uid=source_item.uid,
-                    exception_type=type(exc).__name__,
                 ).opt(exception=exc).warning("Source item file cleanup failed")
 
+        if file_deleted:
+            logger.bind(
+                source_item_uid=source_item.uid,
+                file_deleted=file_deleted,
+            ).info("Source item deleted")
         return SourceItemDeleteResult(
             deleted_vector_count=len(vector_ids),
             file_deleted=file_deleted,
@@ -114,11 +121,15 @@ class SourceItemService:
         # local file 类型 source 额外修改 filename 字段
         filename = title if source.source_type == SourceType.LOCAL_FILE else None
 
-        return await self.source_crud.rename_source_item(
+        renamed_item = await self.source_crud.rename_source_item(
             source_item=source_item,
             title=title,
             filename=filename,
         )
+        logger.bind(
+            source_item_uid=renamed_item.uid,
+        ).info("Source item renamed")
+        return renamed_item
 
     async def get_download_info(
         self,
@@ -134,6 +145,9 @@ class SourceItemService:
             )
 
         if not source_item.storage_key:
+            logger.bind(
+                source_item_uid=source_item.uid,
+            ).warning("Source item file is missing")
             raise FileNotFoundError("Source item file not found")
 
         try:
@@ -141,9 +155,16 @@ class SourceItemService:
                 key=source_item.storage_key
             )
         except ValueError as exc:
+            logger.bind(
+                source_item_uid=source_item.uid,
+            ).warning("Source item file is missing")
             raise FileNotFoundError("Source item file not found") from exc
 
-        return SourceItemDownloadInfo(
+        download_info = SourceItemDownloadInfo(
             target=target,
             filename=source_item.filename or source_item.title,
         )
+        logger.bind(
+            source_item_uid=source_item.uid,
+        ).info("Source item download prepared")
+        return download_info

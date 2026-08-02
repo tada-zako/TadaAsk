@@ -70,6 +70,19 @@ from app.api.admin.cors import AdminScopedCORSMiddleware
 from app.api.visitor.widget_cors import WidgetScopedCORSMiddleware
 
 
+tada_ask_logo = """
+ ███████████               █████                █████████           █████
+▒█▒▒▒███▒▒▒█              ▒▒███                ███▒▒▒▒▒███         ▒▒███
+▒   ▒███  ▒   ██████    ███████   ██████      ▒███    ▒███   █████  ▒███ █████
+    ▒███     ▒▒▒▒▒███  ███▒▒███  ▒▒▒▒▒███     ▒███████████  ███▒▒   ▒███▒▒███
+    ▒███      ███████ ▒███ ▒███   ███████     ▒███▒▒▒▒▒███ ▒▒█████  ▒██████▒
+    ▒███     ███▒▒███ ▒███ ▒███  ███▒▒███     ▒███    ▒███  ▒▒▒▒███ ▒███▒▒███
+    █████   ▒▒████████▒▒████████▒▒████████    █████   █████ ██████  ████ █████
+   ▒▒▒▒▒     ▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒  ▒▒▒▒ ▒▒▒▒▒
+
+"""
+
+
 async def sync_admin_credentials(
     *,
     session_factory: async_sessionmaker[AsyncSession] = async_session,
@@ -351,6 +364,7 @@ async def lifespan(
         setattr(app.state, name, value)
 
     logger.info("Application started")
+    logger.info(tada_ask_logo)
     yield  # 运行应用
 
     # await drop_db()  # 应用关闭时清理数据库连接

@@ -1,4 +1,5 @@
 import asyncio
+import time
 import uuid
 from typing import AsyncIterable
 from pathlib import Path
@@ -101,9 +102,13 @@ class SourceItemIndexingService:
             logger.bind(
                 event="rag.ingest.pause_requested",
                 source_uid=source.uid,
-                source_item_uids=processing_uids,
                 source_item_count=len(processing_uids),
             ).info("Document ingest pause requested")
+        elif source_items:
+            logger.bind(
+                source_uid=source.uid,
+                source_item_count=len(source_items),
+            ).warning("No running document ingest found to pause")
 
         # 返回所有请求暂停的 source_items 的状态
         responses = []
@@ -155,6 +160,11 @@ class SourceItemIndexingService:
         allowed_statuses: list[SourceItemProcessStatus] | None = None,
     ) -> AsyncIterable[RAGSyncEvent]:
         """处理文档并存储到数据库中"""
+        ingest_log = logger.bind(source_uid=source_uid)
+        ingest_log.bind(
+            event="rag.ingest.started",
+            source_item_count=len(source_item_uids),
+        ).info("Document ingest run started")
         queue: asyncio.Queue[RAGSyncEvent | WorkerDone] = asyncio.Queue()
         semaphore = asyncio.Semaphore(RAG_INGEST_MAX_CONCURRENCY)
 
@@ -170,15 +180,19 @@ class SourceItemIndexingService:
         async def worker(source_item_uid: str) -> None:
             """单个文档 ingest worker"""
             async with semaphore:
-                try:
-                    async for event in self._process_single_document(
-                        source_uid=source_uid,
-                        source_item_uid=source_item_uid,
-                        allowed_statuses=allowed_statuses,
-                    ):
-                        await queue.put(event)
-                finally:
-                    await queue.put(WorkerDone(source_item_uid=source_item_uid))
+                with logger.contextualize(
+                    source_uid=source_uid,
+                    source_item_uid=source_item_uid,
+                ):
+                    try:
+                        async for event in self._process_single_document(
+                            source_uid=source_uid,
+                            source_item_uid=source_item_uid,
+                            allowed_statuses=allowed_statuses,
+                        ):
+                            await queue.put(event)
+                    finally:
+                        await queue.put(WorkerDone(source_item_uid=source_item_uid))
 
         # 启动 worker 处理文档
         tasks = [asyncio.create_task(worker(uid)) for uid in source_item_uids]
@@ -215,6 +229,12 @@ class SourceItemIndexingService:
                     task.cancel()
 
             await asyncio.gather(*tasks, return_exceptions=True)
+
+        ingest_log.bind(
+            event="rag.ingest.completed",
+            completed_count=counters.completed,
+            failed_count=counters.failed,
+        ).info("Document ingest run completed")
 
         # 发送处理队列结束事件
         yield RAGSyncEvent(
@@ -263,6 +283,11 @@ class SourceItemIndexingService:
                     )
                     return
 
+                item_started_at = time.perf_counter()
+                logger.bind(event="rag.ingest.item.started").info(
+                    "Document ingest started"
+                )
+
                 # 0.1 暂停请求检查
                 await self._pause_checkpoint(source_item_id=source_item.id)
 
@@ -290,11 +315,17 @@ class SourceItemIndexingService:
                     )
 
                 # 1.1 获取解析后的对象
+                content_source = (
+                    "cached" if source_item.document_content is not None else "parsed"
+                )
                 parsed_doc = await self._ensure_parsed_document(
                     source_crud=source_crud,
                     source=source,
                     source_item=source_item,
                 )
+                logger.bind(
+                    content_source=content_source,
+                ).info("Document content prepared")
                 # 解析内容落库后先提交，避免分块/向量化期间长期持有 SQLite 写锁。
                 await session.commit()
 
@@ -323,6 +354,13 @@ class SourceItemIndexingService:
                     source_item=source_item,
                     status=SourceItemProcessStatus.COMPLETED,
                 )
+                logger.bind(
+                    event="rag.ingest.item.completed",
+                    duration_ms=round(
+                        (time.perf_counter() - item_started_at) * 1000,
+                        3,
+                    ),
+                ).info("Document ingest completed")
 
                 # 单个文档完成事件
                 yield RAGSyncEvent(
@@ -352,9 +390,6 @@ class SourceItemIndexingService:
                 logger.bind(
                     event="rag.ingest.item.failed",
                     error_id=error_id,
-                    source_uid=source_uid,
-                    source_item_uid=source_item_uid,
-                    exception_type=type(exc).__name__,
                 ).opt(exception=exc).error("Document ingest failed")
 
                 try:
@@ -417,12 +452,13 @@ class SourceItemIndexingService:
                 )
             source, source_item = result
 
-            logger.bind(
-                event="rag.ingest.item.skipped",
-                source_uid=source.uid,
-                source_item_uid=source_item.uid,
+            skipped_log = logger.bind(
                 source_item_status=source_item.status.value,
-            ).info("Document ingest skipped due to current status")
+            )
+            if allowed_statuses:
+                skipped_log.warning("Document resume skipped due to current status")
+            else:
+                skipped_log.info("Document ingest skipped due to current status")
             return source, source_item, False
 
         # 查询完整数据

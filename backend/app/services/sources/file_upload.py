@@ -74,7 +74,6 @@ class SourceItemUploadService:
             source=source, items_data=source_items
         )
         logger.bind(
-            event="source.files.uploaded",
             source_uid=source.uid,
             file_count=len(created_items),
             uploaded_bytes=uploaded_bytes,

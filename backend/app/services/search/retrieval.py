@@ -1,3 +1,7 @@
+import time
+
+from loguru import logger
+
 from .hybrid_search import HybridSearchService, SearchSourceRef
 from ..schemas import RAGRetrievalResult
 from ..utils import TokenBudget
@@ -102,6 +106,13 @@ class RAGRetrievalService:
         """
         处理 Chat 场景的 RAG 检索请求
         """
+        started_at = time.perf_counter()
+        source_item_count = sum(len(source.source_item_ids) for source in sources)
+        retrieval_log = logger.bind(source_count=len(sources))
+        retrieval_log.bind(
+            source_item_count=source_item_count,
+            standalone_enabled=rag_options.standalone_enabled,
+        ).info("RAG retrieval started")
         retrieval_query = user_query
         standalone_query = None
 
@@ -120,6 +131,10 @@ class RAGRetrievalService:
                 standalone_context=standalone_context,
                 completer=completer,
             )
+            logger.bind(
+                context_message_count=len(standalone_context),
+                recent_message_count=len(recent_messages),
+            ).info("Standalone retrieval query generated")
             retrieval_query = standalone_query
 
         # 调用混合搜索服务进行检索
@@ -145,9 +160,7 @@ class RAGRetrievalService:
             """
             citation_id = index + 1
             title = result.title or result.filename
-            citation_marker = CITATION_MARKER_TEMPLATE.format(
-                citation_id=citation_id
-            )
+            citation_marker = CITATION_MARKER_TEMPLATE.format(citation_id=citation_id)
             header = f"{citation_marker} {title}"
             if result.section_header:
                 header += f" / {result.section_header}"
@@ -186,6 +199,11 @@ class RAGRetrievalService:
         context_content = None
         if blocks:
             context_content = "\n\n".join(blocks)
+
+        retrieval_log.bind(
+            result_count=len(snapshot_items),
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+        ).info("RAG retrieval completed")
 
         return RAGRetrievalResult(
             snapshot=snapshot,

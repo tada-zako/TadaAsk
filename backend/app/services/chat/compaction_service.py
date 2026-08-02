@@ -1,6 +1,8 @@
-from typing import cast
 from dataclasses import dataclass
+import time
+from typing import cast
 
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..utils import TokenBudget
@@ -181,6 +183,11 @@ class CompactionService:
         compactable_messages = [
             msg for msg in recent_messages if msg.sequence <= compact_until_sequence
         ]
+        started_at = time.perf_counter()
+        compaction_log = logger.bind(chat_session_id=chat_session_id)
+        compaction_log.bind(
+            compacted_message_count=len(compactable_messages),
+        ).info("Chat context compaction started")
 
         # 构建 compaction 输入文本
         summary_input = self._build_compaction_input(
@@ -223,4 +230,9 @@ class CompactionService:
                     tail_start_sequence=plan.tail_start_sequence,
                 )
                 await session.refresh(new_message)
-                return new_message
+
+        compaction_log.bind(
+            compacted_message_count=len(compactable_messages),
+            duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+        ).info("Chat context compaction completed")
+        return new_message

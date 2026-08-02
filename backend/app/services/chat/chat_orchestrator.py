@@ -200,6 +200,11 @@ class ChatOrchestratorService:
                         )
 
                     if not chat_session:
+                        logger.bind(
+                            chat_session_uid=chat_session_uid,
+                            requester_type=requester_type.value,
+                            project_uid=project.uid if project else None,
+                        ).warning("Chat session validation failed")
                         raise ValueError("Invalid chat_session_uid")
 
                     return chat_session, False
@@ -314,6 +319,7 @@ class ChatOrchestratorService:
         completer: TextCompleter,
     ) -> ChatSessionRead | None:
         """为新会话生成标题并短事务更新；失败时返回 None，不影响主回答。"""
+        started_at = time.perf_counter()
         try:
             # 非流式对话请求生成 title
             response = await completer.chat(
@@ -333,6 +339,9 @@ class ChatOrchestratorService:
             # 规范化 title
             generated_title = self._normalize_session_title(response.text)
             if not generated_title:
+                logger.bind(chat_session_id=chat_session_id).warning(
+                    "Generated chat session title is empty; fallback retained"
+                )
                 return None
 
             async with self.session_factory() as session:
@@ -348,12 +357,17 @@ class ChatOrchestratorService:
                     if not updated_session:
                         return None
 
-                    return ChatSessionRead.model_validate(updated_session)
+                    result = ChatSessionRead.model_validate(updated_session)
+
+            logger.bind(
+                chat_session_id=chat_session_id,
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            ).info("Chat session title generated")
+            return result
         except Exception as exc:
             logger.bind(
                 event="chat.session_title.failed",
                 chat_session_id=chat_session_id,
-                exception_type=type(exc).__name__,
             ).opt(exception=exc).warning("Chat session title generation failed")
             return None
 
@@ -469,6 +483,10 @@ class ChatOrchestratorService:
             model=model_name,
             requester_type=requester_type,
         )
+        logger.bind(
+            chat_session_uid=chat_session.uid,
+            created=session_created,
+        ).info("Chat session ready")
 
         # 1.1 yield 会话准备就绪事件
         yield SessionReadyData(
@@ -483,6 +501,10 @@ class ChatOrchestratorService:
             provider=provider_name,
             model=model_name,
         )
+        logger.bind(
+            chat_session_uid=chat_session.uid,
+            assistant_message_uid=assistant_message.uid,
+        ).info("Chat messages initialized")
 
         # 1.2.2 预备 system_prompt 以及 token_budget
         system_prompt = self._resolve_system_prompt(
@@ -507,14 +529,7 @@ class ChatOrchestratorService:
         generation = None
         stream_response: StreamedResponse | None = None
         generation_started_at = time.perf_counter()
-        generation_log = logger.bind(
-            chat_session_uid=chat_session.uid,
-            message_uid=assistant_message.uid,
-            requester_type=requester_type.value,
-            provider=provider_name,
-            model=model_name,
-            rag_enabled=rag_plugin is not None,
-        )
+        generation_log = logger.bind(chat_session_uid=chat_session.uid)
         try:
             # 1.3 注册 generation 对象
             # TODO: generation 对象可能需要提升到 session title 创建之前
@@ -576,14 +591,11 @@ class ChatOrchestratorService:
             if generation.cancel_event.is_set():
                 generation_log.bind(
                     event="chat.generation.cancelled",
-                    cancellation_source="user",
-                    generation_stage="context_preparation",
-                    output_chars=0,
                     duration_ms=round(
                         (time.perf_counter() - generation_started_at) * 1000,
                         3,
                     ),
-                ).info("Chat generation cancelled by user")
+                ).info("Chat generation cancelled during context preparation")
                 yield TextDeltaData(
                     event="cancelled",
                     message_uid=assistant_message.uid,
@@ -622,14 +634,11 @@ class ChatOrchestratorService:
 
                         generation_log.bind(
                             event="chat.generation.cancelled",
-                            cancellation_source="user",
-                            generation_stage="provider_stream",
-                            output_chars=len(final_message),
                             duration_ms=round(
                                 (time.perf_counter() - generation_started_at) * 1000,
                                 3,
                             ),
-                        ).info("Chat generation cancelled by user")
+                        ).info("Chat generation cancelled during provider stream")
                         yield TextDeltaData(
                             event="cancelled",
                             message_uid=assistant_message.uid,
@@ -653,7 +662,6 @@ class ChatOrchestratorService:
             )
             generation_log.bind(
                 event="chat.generation.completed",
-                output_chars=len(final_message),
                 duration_ms=round(
                     (time.perf_counter() - generation_started_at) * 1000,
                     3,
@@ -678,15 +686,12 @@ class ChatOrchestratorService:
                 except Exception as cleanup_exc:
                     generation_log.bind(
                         event="chat.generation.cancel_cleanup_failed",
-                        exception_type=type(cleanup_exc).__name__,
                     ).opt(exception=cleanup_exc).warning(
                         "Failed to persist partial chat output after task cancellation"
                     )
 
             generation_log.bind(
                 event="chat.generation.task_cancelled",
-                cancellation_source="task",
-                output_chars=len(final_message),
                 duration_ms=round(
                     (time.perf_counter() - generation_started_at) * 1000,
                     3,
@@ -710,7 +715,6 @@ class ChatOrchestratorService:
                     generation_log.bind(
                         event="chat.generation.error_cleanup_failed",
                         error_id=error_id,
-                        exception_type=type(cleanup_exc).__name__,
                     ).opt(exception=cleanup_exc).warning(
                         "Failed to persist partial chat output after generation error"
                     )
@@ -718,12 +722,6 @@ class ChatOrchestratorService:
             generation_log.bind(
                 event="chat.generation.failed",
                 error_id=error_id,
-                exception_type=type(e).__name__,
-                output_chars=len(final_message),
-                duration_ms=round(
-                    (time.perf_counter() - generation_started_at) * 1000,
-                    3,
-                ),
             ).opt(exception=e).error("Chat generation failed")
 
             yield ErrorData(message=str(e), error_id=error_id)
