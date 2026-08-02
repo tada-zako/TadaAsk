@@ -1,6 +1,5 @@
 <div align="center">
-
-```text
+<pre>
  ███████████               █████                █████████           █████     
 ▒█▒▒▒███▒▒▒█              ▒▒███                ███▒▒▒▒▒███         ▒▒███      
 ▒   ▒███  ▒   ██████    ███████   ██████      ▒███    ▒███   █████  ▒███ █████
@@ -9,18 +8,16 @@
     ▒███     ███▒▒███ ▒███ ▒███  ███▒▒███     ▒███    ▒███  ▒▒▒▒███ ▒███▒▒███ 
     █████   ▒▒████████▒▒████████▒▒████████    █████   █████ ██████  ████ █████
    ▒▒▒▒▒     ▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒  ▒▒▒▒ ▒▒▒▒▒ 
-
-```
-
+</pre>
 </div>
 
 # TadaAsk
 
 <p align="center">
   <a href="https://github.com/tada-zako/TadaAsk/releases/tag/v0.1.1"><img src="https://img.shields.io/badge/release-v0.1.1-FFD700?style=for-the-badge" alt="Release: v0.1.1"></a>
-  <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
   <a href="https://github.com/tada-zako"><img src="https://img.shields.io/badge/Built%20by-tada--zako-blueviolet?style=for-the-badge" alt="Built by tada-zako"></a>
-  <a href="../README.md"><img src="https://img.shields.io/badge/Lang-English-lightgrey?style=for-the-badge" alt="English"></a>
+  <a href="./README.md"><img src="https://img.shields.io/badge/Lang-English-lightgrey?style=for-the-badge" alt="English"></a>
 </p>
 
 **TadaAsk 是一个自托管的 RAG 知识库服务，包含管理控制台以及可嵌入网站的 Visitor Widget。** 它可以从网页和本地文件构建统一的知识库，并基于检索结果提供带引用的回答。
@@ -80,7 +77,7 @@ docker compose up -d --build
 
 默认配置下， docker 容器可以通过 `http://localhost:8080` 访问，并仅允许监听来自宿主机 `127.0.0.1` 的请求。
 
-公网环境下的部署操作，应在外层配置 HTTPS Nginx 或 Caddy 转发请求，并正确设置 `TADAASK_PUBLIC_URL`，相关配置可以参考 [配置文件模板](../deploy/) 。
+公网环境下的部署操作，应在外层配置 HTTPS Nginx 或 Caddy 转发请求，并正确设置 `TADAASK_PUBLIC_URL`，相关配置可以参考 [配置文件模板](./deploy/) 。
 
 运行数据保存在 Docker volume `tadaask-data` 中，包括 SQLite、Chroma、上传文件和模型缓存。升级或迁移前请先备份该 volume。
 
@@ -166,25 +163,25 @@ pnpm dev:widget
 
 项目页将项目资料、Widget 部署和主要配置集中在一个工作区中：
 
-![Project 页面](../assets/admin-console/index-01-project-view.png)
+![Project 页面](./assets/admin-console/index-01-project-view.png)
 
 知识来源可以查看已接入的文件或网页，以及它们的处理状态：
 
-![知识来源管理](../assets/admin-console/index-02-source-panel.png)
+![知识来源管理](./assets/admin-console/index-02-source-panel.png)
 
 全局问答用于在管理端直接测试知识库的回答与引用：
 
-![全局问答](../assets/admin-console/index-03-global-chat.png)
+![全局问答](./assets/admin-console/index-03-global-chat.png)
 
 ### Visitor Widget 展示
 
 访客无需进入管理端，只需在网站上打开 Widget 即可提问：
 
-![Visitor Widget](../assets/visitor-widget/index-01-widget.png)
+![Visitor Widget](./assets/visitor-widget/index-01-widget.png)
 
 Widget 支持按站点风格进行基础外观定制：
 
-![Visitor Widget 自定义主题](../assets/visitor-widget/index-02-widget-custom-theme.png)
+![Visitor Widget 自定义主题](./assets/visitor-widget/index-02-widget-custom-theme.png)
 
 
 ## 项目边界
@@ -220,7 +217,7 @@ TadaAsk 仍处于迭代中，欢迎提交 Issue、修正文档，或发起 Pull 
 
 ## 许可证
 
-TadaAsk 采用 **MIT** — 详见 [LICENSE](../LICENSE)。
+TadaAsk 采用 **MIT** — 详见 [LICENSE](./LICENSE)。
 
 ---
 
