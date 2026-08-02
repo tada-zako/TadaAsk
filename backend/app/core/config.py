@@ -15,6 +15,16 @@ DEFAULT_RERANK_MODEL_NAME = "Xenova/ms-marco-MiniLM-L-6-v2"
 # 类型别名
 type EmbeddingBackend = Literal["fastembed", "llamacpp"]  # 文本嵌入后端
 type RerankBackend = Literal["fastembed", "llamacpp"]  # Rerank 后端
+type LogLevel = Literal[
+    "TRACE",
+    "DEBUG",
+    "INFO",
+    "SUCCESS",
+    "WARNING",
+    "ERROR",
+    "CRITICAL",
+]
+type LogFormat = Literal["console", "json"]
 
 
 class Settings(BaseSettings):
@@ -76,9 +86,7 @@ class Settings(BaseSettings):
     file_storage_backend: str = "local"  # 文件存储后端，默认为本地存储
     max_file_size: int = 5 * 1024 * 1024  # 最大文件上传大小
     max_file_count: int = 8  # 最大文件上传数量
-    upload_folder_path: str = str(
-        PROJECT_ROOT / "storages" / "uploads"
-    )  # 文件上传存储路径
+    upload_folder_path: str = str(PROJECT_ROOT / "data" / "uploads")  # 文件上传存储路径
     vector_store_perf: str = "chromadb"  # 向量库配置
 
     # 模型缓存路径
@@ -87,13 +95,19 @@ class Settings(BaseSettings):
     hf_hub_cache_dir: str | None = None  # HuggingFace Hub 模型缓存目录
 
     chromadb_path: str = str(
-        PROJECT_ROOT / "storages" / "chromadb"
+        PROJECT_ROOT / "data" / "chromadb"
     )  # ChromaDB 数据存储路径
     sqlite_database_path: str = str(
-        PROJECT_ROOT / "storages" / "sqlite.db"
+        PROJECT_ROOT / "data" / "sqlite.db"
     )  # SQLite FTS 数据库路径
     sqlalchemy_echo: bool = False  # 是否输出 SQLAlchemy SQL 日志
     database_auto_migrate: bool = True  # FastAPI 启动时自动执行 Alembic upgrade head
+
+    # 日志配置
+    log_level: LogLevel = "INFO"
+    log_format: LogFormat = "console"
+    log_file_enabled: bool = False
+    log_file_path: str = str(PROJECT_ROOT / "data" / "logs" / "tadaask.log")
 
     # =======================================
     # visitor 侧请求限制
@@ -129,6 +143,18 @@ class Settings(BaseSettings):
     # ================================
     # 验证逻辑
     # ================================
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def normalize_log_level(cls, value: str) -> str:
+        """日志级别统一使用 Loguru 的大写名称。"""
+        return str(value).strip().upper()
+
+    @field_validator("log_format", mode="before")
+    @classmethod
+    def normalize_log_format(cls, value: str) -> str:
+        """日志格式环境变量转换为小写。"""
+        return str(value).strip().lower()
+
     @model_validator(mode="after")
     def normalize_model_defaults(self) -> "Settings":
         """允许 .env 显式留空时继续使用内置默认模型。"""
@@ -185,7 +211,9 @@ class Settings(BaseSettings):
 
         if self.chunk_window_tokens >= self.chunk_size_tokens:
             logger.warning(
-                "Window size is larger than chunk size, checking if this is intentional."
+                "Text splitter window is not smaller than chunk size: window={} size={}",
+                self.chunk_window_tokens,
+                self.chunk_size_tokens,
             )
 
         return self
@@ -255,6 +283,12 @@ class Settings(BaseSettings):
         path = cls._resolve_path(v, info)
         path.parent.mkdir(parents=True, exist_ok=True)
         return str(path)
+
+    @field_validator("log_file_path", mode="before")
+    @classmethod
+    def process_log_file_path(cls, v: str | None, info: ValidationInfo) -> str:
+        """解析日志文件路径；仅在启用文件 sink 时创建父目录。"""
+        return str(cls._resolve_path(v, info))
 
 
 settings = Settings()

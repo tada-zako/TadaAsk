@@ -25,8 +25,8 @@ COPY app ./app
 # 配置非 root 用户
 RUN groupadd --system --gid 10001 tadaask \
     && useradd --system --uid 10001 --gid tadaask --home-dir /app tadaask \
-    && mkdir -p /app/storages /tmp/tadaask \
-    && chown -R tadaask:tadaask /app/storages /tmp/tadaask
+    && mkdir -p /app/data /tmp/tadaask \
+    && chown -R tadaask:tadaask /app/data /tmp/tadaask
 
 USER tadaask
 

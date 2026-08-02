@@ -2,7 +2,6 @@ from typing import Annotated, AsyncIterable
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from fastapi.sse import EventSourceResponse, ServerSentEvent
-from loguru import logger
 
 from ...deps import (
     APIKeyCipherDeps,
@@ -66,9 +65,6 @@ async def get_admin_rag_provider_with_model(
         )
 
     if not provider_with_model:
-        logger.error(
-            f"Invalid provider_uid or model_uid: {chat_request.provider_uid}, {chat_request.model_uid}"
-        )
         raise HTTPException(status_code=400, detail="Invalid provider_uid or model_uid")
 
     return provider_with_model
@@ -127,9 +123,6 @@ async def _resolve_admin_sources_by_uids(
         uid for uid in request_source_uids if uid not in source_uid_map_source
     ]
     if missing_source:
-        logger.error(
-            f"Invalid source_uids for RAG chat, missing source_uids: {missing_source}"
-        )
         raise HTTPException(status_code=400, detail="Invalid source_uids for RAG chat")
 
     return [source_uid_map_source[uid] for uid in request_source_uids]

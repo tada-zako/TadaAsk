@@ -4,6 +4,7 @@ from typing import Callable, Awaitable
 import uuid
 
 import numpy as np
+from loguru import logger
 from numpy.typing import NDArray
 
 from app.rag import (
@@ -83,6 +84,11 @@ class DocumentChunkIndexWriter:
         chunks: list[TextChunk] = await self.text_splitter.split_text(
             text=parsed_doc.text, file_path=source_item.filename or ""
         )
+        logger.bind(
+            chunk_count=len(chunks),
+        ).info("Document split into chunks")
+        if not chunks:
+            logger.warning("Document produced no indexable chunks")
 
         # 2.2 暂停请求检查
         await maybe_checkpoint()
@@ -136,16 +142,21 @@ class DocumentChunkIndexWriter:
             await maybe_checkpoint()
 
             chunk_texts = [chunk.content for chunk in batch_chunks]
+            batch_log = logger.bind(
+                batch=f"{batch_index + 1}/{len(batches)}",
+            )
 
             # 3.2.1 FTS 分词
             chunk_tokens: list[str] = await asyncio.to_thread(
                 self._batch_tokenize_for_fts, chunk_texts
             )
+            batch_log.debug("Chunk FTS tokenization completed")
 
             # 3.2.2 embedding
             embeddings: list[NDArray[np.float32]] = await asyncio.to_thread(
                 self.embedding.embed_documents, chunk_texts
             )
+            batch_log.debug("Chunk embeddings generated")
 
             # 3.2.3 构建 SQL 记录
             rows: list[DocumentChunkInternal] = []
@@ -177,6 +188,7 @@ class DocumentChunkIndexWriter:
                     )
                 )
             await self.source_crud.bulk_insert_document_chunks(rows)
+            batch_log.debug("Document chunks stored")
 
             # 3.2.4 构建 vector 记录
             await asyncio.to_thread(
@@ -189,6 +201,7 @@ class DocumentChunkIndexWriter:
                     for row in rows
                 ],
             )
+            batch_log.debug("Document vectors stored")
 
             # 3.2.5 发送批次完成事件
             yield RAGSyncEvent(
@@ -222,6 +235,10 @@ class DocumentChunkIndexWriter:
         await self.source_crud.delete_document_chunks_by_source_item_id(
             source_item_id=source_item.id
         )
+        if old_vector_ids:
+            logger.bind(
+                old_vector_count=len(old_vector_ids),
+            ).info("Previous document index cleared")
 
     def _resolve_chunk_section(
         self, chunk: TextChunk, parsed_doc: ParsedDocument

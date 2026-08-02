@@ -1,5 +1,7 @@
 import re
 
+from loguru import logger
+
 from .generation_registry import GenerationRegistry
 from app.crud import ChatMessageCRUD, ChatSessionCRUD
 from app.db.models import ChatSession, ChatMessage
@@ -100,6 +102,11 @@ class ChatSessionOpsService:
         if rows:
             await self.chat_message_crud.bulk_add_messages(messages_data=rows)
 
+        logger.bind(
+            source_session_uid=source_session.uid,
+            target_session_uid=new_session.uid,
+            copied_message_count=len(rows),
+        ).info("Chat session forked")
         return new_session
 
     async def revert_session(
@@ -117,6 +124,10 @@ class ChatSessionOpsService:
             chat_session_id=chat_session.id,
             target_sequence=message.sequence,
         )
+        logger.bind(
+            chat_session_uid=chat_session.uid,
+            deleted_message_count=deleted_count,
+        ).info("Chat session reverted")
         return deleted_count
 
     def cancel_generation(

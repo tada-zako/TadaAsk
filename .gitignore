@@ -79,4 +79,5 @@ Thumbs.db
 *.sqlite3
 *.local*
 backend/storages/
+backend/data/
 z.local/

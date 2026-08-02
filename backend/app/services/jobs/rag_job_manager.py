@@ -1,4 +1,5 @@
 import asyncio
+import time
 import uuid
 from collections import deque
 from collections.abc import AsyncIterable, Callable
@@ -87,6 +88,11 @@ class RAGJobManager:
                     RAGJobStatus.RUNNING,
                 ):
                     # 目标 job 已经存在并且处于运行中
+                    logger.bind(
+                        event="rag.job.reused",
+                        job_uid=active_job.job_uid,
+                        source_uid=active_job.source_uid,
+                    ).info("Active RAG job reused")
                     return active_job
 
             # 创建新的 job 对象
@@ -101,7 +107,13 @@ class RAGJobManager:
             if active_group:
                 self._active_by_group[active_group] = job.job_uid
 
-            job.task = asyncio.create_task(self._run_job(job=job, runner=runner))
+            with logger.contextualize(job_uid=job.job_uid, source_uid=job.source_uid):
+                job.task = asyncio.create_task(self._run_job(job=job, runner=runner))
+            logger.bind(
+                event="rag.job.queued",
+                job_uid=job.job_uid,
+                source_uid=job.source_uid,
+            ).info("RAG job queued")
             return job
 
     def get_job(self, job_uid: str) -> RAGJob | None:
@@ -128,6 +140,9 @@ class RAGJobManager:
         async with self._lock:
             job = self._jobs.get(job_uid)
             if not job:
+                logger.bind(job_uid=job_uid).warning(
+                    "RAG job subscription rejected because job was not found"
+                )
                 raise ValueError("RAG job not found")
 
             job.subscribers.add(queue)
@@ -186,8 +201,10 @@ class RAGJobManager:
 
     async def _run_job(self, *, job: RAGJob, runner: RAGJobRunner) -> None:
         """后台消费业务 runner 事件，并广播给 SSE 订阅者。"""
+        started_at = time.perf_counter()
         job.status = RAGJobStatus.RUNNING
         job.started_at = datetime.now(UTC)
+        logger.bind(event="rag.job.started").info("RAG job started")
 
         try:
             async for event in runner(job):
@@ -196,15 +213,27 @@ class RAGJobManager:
 
             # job 执行完成
             job.status = RAGJobStatus.COMPLETED
+            logger.bind(
+                event="rag.job.completed",
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            ).info("RAG job completed")
 
         except asyncio.CancelledError:
             # job 被取消
             job.status = RAGJobStatus.CANCELLED
+            logger.bind(
+                event="rag.job.cancelled",
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 3),
+            ).info("RAG job cancelled")
             raise
 
         except Exception as exc:
             # job 出现异常
-            logger.exception(f"RAG job {job.job_uid} failed: {exc}")
+            error_id = uuid.uuid4().hex
+            logger.bind(
+                event="rag.job.failed",
+                error_id=error_id,
+            ).opt(exception=exc).error("RAG job failed")
             job.status = RAGJobStatus.FAILED
             job.error = str(exc)
             await self._emit(
@@ -214,7 +243,8 @@ class RAGJobManager:
                     source_uid=job.source_uid,
                     ingest_stage=IngestStage.FAILED,
                     message="RAG job failed",
-                    error=str(exc),
+                    error="RAG job failed",
+                    error_id=error_id,
                 ),
             )
 
@@ -240,6 +270,9 @@ class RAGJobManager:
                 # 不进行队列等待，立即插入
                 queue.put_nowait(stored_event)
             except asyncio.QueueFull:
+                logger.bind(
+                    event_sequence=stored_event.sequence,
+                ).warning("RAG job subscriber dropped because queue is full")
                 async with self._lock:
                     # 订阅者队列已满，静默丢弃事件
                     job.subscribers.discard(queue)

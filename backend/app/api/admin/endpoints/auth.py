@@ -73,8 +73,6 @@ async def authenticate_admin(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Admin | None:
     """验证管理员用户名和密码"""
-    logger.info(f"Admin 登录尝试，用户名：{form_data.username}")
-
     admin = await admin_crud.get_admin_by_username(form_data.username)
 
     unauthorized_exception = HTTPException(
@@ -84,10 +82,10 @@ async def authenticate_admin(
     )
 
     if not admin:
-        logger.warning(f"Admin 登录失败，用户名不存在：{form_data.username}")
+        logger.bind(event="auth.login.failed").warning("Admin login failed")
         raise unauthorized_exception
     if not verify_password(form_data.password, admin.password_hash):
-        logger.warning(f"Admin 登录失败，密码错误，用户名：{form_data.username}")
+        logger.bind(event="auth.login.failed").warning("Admin login failed")
         raise unauthorized_exception
 
     return admin
@@ -106,7 +104,10 @@ async def login(
     access_token = create_access_token(
         data={"username": admin.username, "token_version": admin.token_version}
     )
-    logger.info(f"Admin 登录成功，用户名：{admin.username}")
+    logger.bind(
+        event="auth.login.succeeded",
+        admin_uid=admin.uid,
+    ).info("Admin login succeeded")
     return Token(access_token=access_token, token_type="bearer")
 
 

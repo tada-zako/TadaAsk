@@ -23,6 +23,7 @@ import {
   type SearchMode,
   type ThinkingLevel,
 } from "@/console/services/chat";
+import { formatErrorWithReference } from "@/shared/api/error-reference";
 import type { ModelProfileRead } from "@/console/api/provider-model";
 import { translate as t } from "@/console/i18n";
 import { getErrorMessage } from "@/console/lib/api-result";
@@ -753,7 +754,11 @@ export const useGlobalChatStore = defineStore("console-global-chat", () => {
         return sessionKey;
       case "error":
         setActiveMessageSourcesReady(sessionKey);
-        throw new Error(event.message);
+        throw new Error(
+          formatErrorWithReference(event.message, {
+            errorId: event.errorId,
+          }),
+        );
     }
   }
 

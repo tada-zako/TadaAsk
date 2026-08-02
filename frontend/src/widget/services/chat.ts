@@ -1,4 +1,8 @@
 import { createWidgetChatApi } from "../api/widget-chat";
+import {
+  formatErrorWithReference,
+  readBackendErrorReference,
+} from "@/shared/api/error-reference";
 import { parseSseStream } from "@/shared/api/sse";
 import type { components } from "@/shared/api/generated/schema";
 import type {
@@ -33,11 +37,19 @@ export interface WidgetChatService {
 
 export class WidgetChatError extends Error {
   readonly status?: number;
+  readonly errorId?: string;
+  readonly requestId?: string;
 
-  constructor(message: string, status?: number) {
+  constructor(
+    message: string,
+    status?: number,
+    reference: { errorId?: string; requestId?: string } = {},
+  ) {
     super(message);
     this.name = "WidgetChatError";
     this.status = status;
+    this.errorId = reference.errorId;
+    this.requestId = reference.requestId;
   }
 }
 
@@ -157,6 +169,7 @@ function normalizeBaseUrl(value: string): string {
 // HTTP 状态码 → 面向访客的友好错误文案
 function toWidgetChatError(response: Response, payload: unknown): Error {
   const status = response?.status;
+  const reference = readBackendErrorReference(payload, response);
   const messages: Record<number, string> = {
     400: "This assistant is not ready yet. Please try again later.",
     403: "This assistant is not available on this site.",
@@ -167,11 +180,15 @@ function toWidgetChatError(response: Response, payload: unknown): Error {
     500: "The assistant encountered a problem. Please try again.",
   };
 
-  return new WidgetChatError(
+  const message =
     (status ? messages[status] : undefined) ??
-      (payload
-        ? "The assistant could not complete this request. Please try again."
-        : "Unable to reach the assistant. Check your connection and try again."),
+    (payload
+      ? "The assistant could not complete this request. Please try again."
+      : "Unable to reach the assistant. Check your connection and try again.");
+
+  return new WidgetChatError(
+    formatErrorWithReference(message, reference),
     status,
+    reference,
   );
 }

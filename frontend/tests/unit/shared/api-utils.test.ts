@@ -25,6 +25,12 @@ describe("公共 API 工具", () => {
     expect(getApiErrorMessage({ message: "hidden" }, "fallback")).toBe(
       "fallback",
     );
+    expect(
+      getApiErrorMessage(
+        { detail: "Request failed", error_id: "error-123" },
+        "fallback",
+      ),
+    ).toBe("Request failed Reference: error-123");
     expect(getErrorMessage(new Error("local"), "fallback")).toBe("local");
     expect(() => unwrapApiData(undefined, null, "missing")).toThrow("missing");
   });

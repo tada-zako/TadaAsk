@@ -98,12 +98,12 @@ class WidgetScopedCORSMiddleware:
 
         # 文本比较；请求 origin 和允许 origin 是否一致
         is_allowed = configured_origin == normalized_origin
-        logger.debug(
-            "Widget CORS Origin 校验: request_origin={}, configured_origin={}, allowed={}",
-            normalized_origin,
-            configured_origin,
-            is_allowed,
-        )
+        logger.bind(
+            event="security.widget_origin.checked",
+            project_uid=project_uid,
+            widget_uid=widget_uid,
+            origin_allowed=is_allowed,
+        ).debug("Widget origin checked")
         return is_allowed
 
     async def preflight_response(
@@ -196,5 +196,5 @@ class WidgetScopedCORSMiddleware:
     @staticmethod
     def allow_explicit_origin(headers: MutableHeaders, origin: str) -> None:
         headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Expose-Headers"] = "Retry-After"
+        headers["Access-Control-Expose-Headers"] = "Retry-After, X-Request-ID"
         headers.add_vary_header("Origin")

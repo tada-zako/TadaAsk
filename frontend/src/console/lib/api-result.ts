@@ -1,3 +1,8 @@
+import {
+  formatErrorWithReference,
+  readBackendErrorReference,
+} from "@/shared/api/error-reference";
+
 /**
  * openapi-fetch 返回 { data, error } 形态；这里统一解包，避免各业务 service 重复解析。
  */
@@ -26,25 +31,30 @@ export function getApiErrorMessage(
     return fallbackMessage;
   }
 
+  const reference = readBackendErrorReference(error);
+
   if ("detail" in error) {
     const detail = error.detail;
 
     if (typeof detail === "string") {
-      return detail;
+      return formatErrorWithReference(detail, reference);
     }
 
     if (Array.isArray(detail)) {
-      return detail
-        .map((item) =>
-          typeof item === "object" && item && "msg" in item
-            ? String(item.msg)
-            : String(item),
-        )
-        .join(", ");
+      return formatErrorWithReference(
+        detail
+          .map((item) =>
+            typeof item === "object" && item && "msg" in item
+              ? String(item.msg)
+              : String(item),
+          )
+          .join(", "),
+        reference,
+      );
     }
   }
 
-  return fallbackMessage;
+  return formatErrorWithReference(fallbackMessage, reference);
 }
 
 export function getErrorMessage(

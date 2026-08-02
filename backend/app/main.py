@@ -1,3 +1,4 @@
+import uuid
 from contextlib import asynccontextmanager
 from functools import partial
 from typing import Any, Mapping
@@ -10,6 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from loguru import logger
 
 from app.core.config import Settings, settings
+from app.core.logging import complete_logging, configure_logging
+from app.core.request_logging import (
+    RequestLoggingMiddleware,
+    UnhandledExceptionMiddleware,
+    internal_server_error_response,
+)
 from app.core.exceptions import RateLimitExceededError
 from app.core.security import (
     get_password_hash,
@@ -63,6 +70,19 @@ from app.api.admin.cors import AdminScopedCORSMiddleware
 from app.api.visitor.widget_cors import WidgetScopedCORSMiddleware
 
 
+tada_ask_logo = """
+ ███████████               █████                █████████           █████
+▒█▒▒▒███▒▒▒█              ▒▒███                ███▒▒▒▒▒███         ▒▒███
+▒   ▒███  ▒   ██████    ███████   ██████      ▒███    ▒███   █████  ▒███ █████
+    ▒███     ▒▒▒▒▒███  ███▒▒███  ▒▒▒▒▒███     ▒███████████  ███▒▒   ▒███▒▒███
+    ▒███      ███████ ▒███ ▒███   ███████     ▒███▒▒▒▒▒███ ▒▒█████  ▒██████▒
+    ▒███     ███▒▒███ ▒███ ▒███  ███▒▒███     ▒███    ▒███  ▒▒▒▒███ ▒███▒▒███
+    █████   ▒▒████████▒▒████████▒▒████████    █████   █████ ██████  ████ █████
+   ▒▒▒▒▒     ▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒  ▒▒▒▒▒▒▒▒    ▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒▒▒▒  ▒▒▒▒ ▒▒▒▒▒
+
+"""
+
+
 async def sync_admin_credentials(
     *,
     session_factory: async_sessionmaker[AsyncSession] = async_session,
@@ -89,7 +109,10 @@ async def sync_admin_credentials(
                     password_hash=password_hash,
                 )
                 new_admin = await admin_crud.create_admin(default_admin_data)
-                logger.info(f"默认管理员账号已创建，用户名：{new_admin.username}")
+                logger.bind(
+                    event="admin.credentials.created",
+                    admin_uid=new_admin.uid,
+                ).info("Admin credentials created from startup configuration")
                 return
 
             username_changed = existing_admin.username != app_settings.admin_username
@@ -100,9 +123,7 @@ async def sync_admin_credentials(
 
             if not username_changed and not password_changed:
                 # 用户名以及密码未更新
-                logger.info(
-                    f"管理员账号配置已同步，用户名：{app_settings.admin_username}"
-                )
+                logger.debug("Admin credentials already match startup configuration")
                 return
 
             # 更新 username 或 password
@@ -115,10 +136,12 @@ async def sync_admin_credentials(
                     else None
                 ),
             )
-            logger.info(
-                "管理员账号已按启动配置更新，"
-                f"用户名变更：{username_changed}，密码变更：{password_changed}"
-            )
+            logger.bind(
+                event="admin.credentials.updated",
+                admin_uid=existing_admin.uid,
+                username_changed=username_changed,
+                password_changed=password_changed,
+            ).info("Admin credentials updated from startup configuration")
 
 
 async def sync_model_catalog(
@@ -150,26 +173,29 @@ async def lifespan(
     FastAPI 生命周期管理器，
     负责在应用启动时初始化数据库连接
     """
-
-    logger.info("Starting up the application...")
+    logger.info(tada_ask_logo)
+    logger.info("Application starting")
 
     if not initialize_runtime:
         # NOTE: 测试环境只挂载显式注入的组件，避免初始化模型、向量库和外部目录。
         # 该分支只服务于 tests 使用，避免全量初始化项目配置。
         for name, value in (state_overrides or {}).items():
             setattr(app.state, name, value)
+        logger.info("Application started without runtime initialization")
         yield
         job_manager = getattr(app.state, "rag_job_manager", None)
         shutdown = getattr(job_manager, "shutdown", None)
         if shutdown:
             await shutdown()
-        logger.info("Shutting down the application...")
+        logger.info("Application stopping")
+        await complete_logging()
         return
 
     # ======= 系统重要配置挂载 =======
     if app_settings.database_auto_migrate:
-        logger.info("Running database migrations...")
+        logger.info("Database migration started")
         await run_migrations()
+        logger.info("Database migration completed")
 
     await init_db()
     # MVP：管理员凭据以启动配置为准，暂不提供运行时修改 API。
@@ -337,15 +363,18 @@ async def lifespan(
     for name, value in (state_overrides or {}).items():
         setattr(app.state, name, value)
 
+    logger.info("========== SERVICE STARTED SUCCESSFULLY ==========")
     yield  # 运行应用
 
     # await drop_db()  # 应用关闭时清理数据库连接
     # job manager 清理操作
+    logger.info("========== SERVICE STOPPING ==========")
     job_manager = getattr(app.state, "rag_job_manager", None)
     shutdown = getattr(job_manager, "shutdown", None)
     if shutdown:
         await shutdown()
-    logger.info("Shutting down the application...")
+    logger.info("========== TADA BYE-BYE! ==========")
+    await complete_logging()
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -356,7 +385,6 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(ValueError)
     async def value_error_handler(_: Request, exc: ValueError) -> JSONResponse:
-        logger.warning(f"业务异常：{exc}")
         return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     @app.exception_handler(RateLimitExceededError)
@@ -364,9 +392,10 @@ def register_exception_handlers(app: FastAPI) -> None:
         _: Request, exc: RateLimitExceededError
     ) -> JSONResponse:
         """处理请求被限流的异常"""
-        logger.warning(
-            f"请求被限流：{exc.message}，请在 {exc.retry_after_seconds} 秒后重试"
-        )
+        logger.bind(
+            event="http.request.rate_limited",
+            retry_after_seconds=exc.retry_after_seconds,
+        ).warning("HTTP request rate limited")
         return JSONResponse(
             status_code=429,
             content={"detail": exc.message},
@@ -377,20 +406,29 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def http_exception_handler_override(
         request: Request, exc: StarletteHTTPException
     ):
-        logger.warning(f"HTTP异常：{exc.detail}，请求路径：{request.url.path}")
+        if exc.status_code >= 500:
+            return _internal_server_error_response(request=request, exc=exc)
         return await http_exception_handler(request, exc)  # 调用默认的 HTTP 异常处理
 
     @app.exception_handler(Exception)
-    async def generic_error_handler(_: Request, exc: Exception) -> JSONResponse:
-        logger.exception(f"未处理异常：{exc}")
-        return JSONResponse(
-            status_code=500, content={"detail": "Internal Server Error"}
-        )
+    async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        return _internal_server_error_response(request=request, exc=exc)
 
 
 async def root():
-    logger.info("访问根路径 /")
     return {"message": "Hello World"}
+
+
+def _internal_server_error_response(
+    *,
+    request: Request,
+    exc: Exception,
+) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", uuid.uuid4().hex)
+    return internal_server_error_response(
+        request_id=request_id,
+        exc=exc,
+    )
 
 
 def create_app(
@@ -404,6 +442,8 @@ def create_app(
     创建 FastAPI 应用；
     测试可注入隔离 session 和轻量运行时组件。
     """
+    configure_logging(app_settings)
+
     app = FastAPI(
         lifespan=partial(
             lifespan,
@@ -415,6 +455,8 @@ def create_app(
         title="Tada Ask API",
     )
 
+    # 未处理异常边界位于 CORS 内侧，使跨域前端也能读取安全的 500 响应。
+    app.add_middleware(UnhandledExceptionMiddleware)
     # Admin 与 Widget 使用互斥的路径范围，避免响应头和信任策略相互叠加。
     app.add_middleware(
         AdminScopedCORSMiddleware,
@@ -424,6 +466,8 @@ def create_app(
         WidgetScopedCORSMiddleware,
         session_factory=session_factory,
     )
+    # 最后添加以包裹其他用户中间件，确保 CORS 预检和流式响应也具备请求日志。
+    app.add_middleware(RequestLoggingMiddleware)
 
     # 注册自定义异常处理函数
     register_exception_handlers(app)

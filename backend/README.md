@@ -2,6 +2,24 @@
 
 FastAPI backend for TadaAsk. See the [root README](../README.md) for setup and deployment instructions.
 
+## Logging
+
+Console output supports two format options:
+- `LOG_FORMAT=console` provides a format suitable for everyday reading by developers;
+- `LOG_FORMAT=json` emits JSON Lines format suitable for container log collectors, making it easier to pinpoint detailed exception locations;
+
+Backend logging is controlled by the following configuration:
+
+```env
+LOG_LEVEL=INFO
+LOG_FORMAT=console
+LOG_FILE_ENABLED=false  # file logging is disabled by default
+LOG_FILE_PATH=./data/logs/tadaask.log
+```
+
+The file sink does not replace console output. It rotates at 15 MB, keeps archives for 14 days, compresses rotated files, and does not propagate sink write failures into requests.
+
+
 ## Tests
 
 The backend includes a focused pytest suite for its core unit and integration

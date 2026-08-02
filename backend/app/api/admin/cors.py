@@ -16,7 +16,7 @@ class AdminScopedCORSMiddleware:
             allow_credentials=False,
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["Accept", "Authorization", "Content-Type"],
-            expose_headers=["Content-Disposition", "Retry-After"],
+            expose_headers=["Content-Disposition", "Retry-After", "X-Request-ID"],
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status, Body
-from loguru import logger
 from sqlalchemy.exc import IntegrityError
 
 from ...deps import APIKeyCipherDeps, ModelProfileCRUDeps, ModelProfileServiceDeps
@@ -72,7 +71,6 @@ async def create_provider(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:
-        logger.warning(f"创建 provider 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="provider with the same name already exists",
@@ -131,7 +129,6 @@ async def update_provider(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:
-        logger.warning(f"更新 provider 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="provider with the same name already exists",
@@ -174,7 +171,6 @@ async def create_model_profile(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:
-        logger.warning(f"创建 model profile 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="model profile with the same model already exists for this provider",
@@ -215,7 +211,6 @@ async def update_model_profile(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except IntegrityError as exc:
-        logger.warning(f"更新 model profile 失败，存在唯一约束冲突：{exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="model profile with the same model already exists for this provider",

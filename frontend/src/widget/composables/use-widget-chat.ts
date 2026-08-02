@@ -7,6 +7,7 @@ import {
 } from "vue";
 
 import type { ChatStreamEvent } from "@/shared/types/chat-stream";
+import { formatErrorWithReference } from "@/shared/api/error-reference";
 import {
   createWidgetChatService,
   refreshMessageCitations,
@@ -231,7 +232,10 @@ export function useWidgetChat(options: UseWidgetChatOptions) {
         break;
       }
       case "error":
-        errorMessage.value = "The assistant could not finish this response.";
+        errorMessage.value = formatErrorWithReference(
+          "The assistant could not finish this response.",
+          { errorId: event.errorId },
+        );
         phase.value = "error";
         patchActiveAssistant((message) =>
           refreshMessageCitations({ ...message, status: "error" }),

@@ -121,6 +121,7 @@ class MessageDoneData(BaseModel):
 class ErrorData(BaseModel):
     event: Literal["error"] = Field(default="error")
     message: str
+    error_id: str
 
     model_config = ConfigDict(
         alias_generator=to_camel,

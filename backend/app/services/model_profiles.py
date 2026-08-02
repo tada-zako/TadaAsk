@@ -3,7 +3,14 @@ from typing import cast
 
 import httpx
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, TypeAdapter, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    TypeAdapter,
+    field_validator,
+)
 
 from app.crud import ModelProfileCRUD
 from app.db.models import ModelProfile, Provider
@@ -105,10 +112,11 @@ class ModelProfileService:
 
     async def sync_model_catalog(self, *, models_url: str) -> None:
         """拉取模型目录并缓存到本地数据库。"""
+        logger.info("Model catalog synchronization started")
         try:
             catalog = await self._fetch_model_catalog(models_url=models_url)
         except Exception as exc:
-            logger.warning(f"拉取模型目录失败，跳过本次同步：{exc}")
+            logger.opt(exception=exc).warning("Model catalog sync failed; sync skipped")
             return
 
         # provider 与 model_profile 的批量更新数据
@@ -150,7 +158,7 @@ class ModelProfileService:
             catalog_items.append((provider_create, model_creates))
 
         if not catalog_items:
-            logger.warning("模型目录中没有可同步的目标 provider，跳过本次同步")
+            logger.warning("Model catalog has no supported providers; sync skipped")
             return
 
         # 一并对 provider-model 进行写库操作
@@ -164,11 +172,10 @@ class ModelProfileService:
                 provider_names=[provider.name for provider, _ in catalog_items],
             )
         )
-        logger.info(
-            "模型目录同步完成："
-            f"providers={len(catalog_items)}, "
-            f"cleaned_providers={deleted_count}"
-        )
+        logger.bind(
+            provider_count=len(catalog_items),
+            cleaned_provider_count=deleted_count,
+        ).info("Model catalog synchronized")
 
     async def create_custom_provider(
         self,
@@ -183,6 +190,8 @@ class ModelProfileService:
             name=provider_name
         )
         if existing_provider:
+            # TODO: infra/exception 阶段，将该异常 raise 为 CustomException
+            logger.warning("Provider {} with same name already exists", provider_name)
             raise ValueError("provider with the same name already exists")
 
         if provider_data.is_enabled:
@@ -216,6 +225,10 @@ class ModelProfileService:
                 provider.uid
             )
         )
+
+        logger.bind(
+            provider_name=provider.name,
+        ).info("Custom provider created")
         return provider_with_models or provider
 
     async def update_provider(
@@ -229,24 +242,37 @@ class ModelProfileService:
         self._validate_provider_update_nulls(provider_data)
         if provider.is_custom:
             # 更新自定义 provider 配置
-            return await self._update_custom_provider(
+            provider = await self._update_custom_provider(
                 provider=provider,
                 provider_data=provider_data,
                 api_key_cipher=api_key_cipher,
             )
-        return await self._update_catalog_provider(
+            logger.bind(
+                provider_name=provider.name,
+            ).info("Custom provider updated")
+            return provider
+        provider = await self._update_catalog_provider(
             provider=provider,
             provider_data=provider_data,
             api_key_cipher=api_key_cipher,
         )
+        logger.bind(
+            provider_name=provider.name,
+        ).info("Catalog provider updated")
+        return provider
 
     async def delete_provider(self, *, provider: Provider) -> bool:
         """仅允许删除用户自定义 provider。"""
         if not provider.is_custom:
             raise ValueError("catalog provider cannot be deleted; disable it instead")
-        return await self.model_profile_crud.delete_provider_by_id(
+        result = await self.model_profile_crud.delete_provider_by_id(
             provider_id=provider.id
         )
+        if result:
+            logger.bind(
+                provider_name=provider.name,
+            ).info("Custom provider deleted")
+        return result
 
     async def create_model_profile(
         self,
@@ -266,6 +292,11 @@ class ModelProfileService:
         )
         # 存在同名 model
         if existing_model:
+            logger.warning(
+                "Model {model_name} already exists for provider {provider_name}",
+                model_name=profile_data.model,
+                provider_name=provider.name,
+            )
             raise ValueError(
                 "model profile with the same model already exists for this provider"
             )
@@ -274,7 +305,11 @@ class ModelProfileService:
             **profile_data.model_dump(),
             provider_id=provider.id,
         )
-        return await self.model_profile_crud.create_model_profile(internal_data)
+        model_profile = await self.model_profile_crud.create_model_profile(
+            internal_data
+        )
+        logger.bind(model_name=model_profile.model).info("Custom model profile created")
+        return model_profile
 
     async def update_model_profile(
         self,
@@ -287,10 +322,12 @@ class ModelProfileService:
         self._validate_model_profile_update_nulls(profile_data)
         if not provider.is_custom:
             # 后端初始化模型更新
-            return await self._update_catalog_model_profile(
+            model = await self._update_catalog_model_profile(
                 model_profile=model_profile,
                 profile_data=profile_data,
             )
+            logger.bind(model_name=model.model).info("Catalog model profile updated")
+            return model
 
         if profile_data.model is not None:
             existing_model = (
@@ -305,10 +342,12 @@ class ModelProfileService:
                     "model profile with the same model already exists for this provider"
                 )
 
-        return await self.model_profile_crud.update_model_profile(
+        model = await self.model_profile_crud.update_model_profile(
             model_profile=model_profile,
             profile_data=profile_data,
         )
+        logger.bind(model_name=model.model).info("Custom model profile updated")
+        return model
 
     async def delete_model_profile(
         self,
@@ -319,9 +358,14 @@ class ModelProfileService:
         """仅允许删除用户自定义 provider 下的模型配置。"""
         if not provider.is_custom:
             raise ValueError("catalog provider models cannot be deleted")
-        return await self.model_profile_crud.delete_model_profile_by_id(
+        result = await self.model_profile_crud.delete_model_profile_by_id(
             model_profile_id=model_profile.id
         )
+        if result:
+            logger.bind(model_name=model_profile.model).info(
+                "Custom model profile deleted"
+            )
+        return result
 
     async def _fetch_model_catalog(self, *, models_url: str) -> TargetCatalog:
         """拉取并解析目标模型目录。"""
@@ -515,9 +559,13 @@ class ModelProfileService:
         is_enabled: bool = True,
     ) -> None:
         """自定义 provider 启用时必须满足运行时调用所需配置。"""
-        if not is_enabled:
-            return
-        if not api_key:
-            raise ValueError("API key is required to enable custom provider")
-        if not base_url or not base_url.strip():
-            raise ValueError("Base URL is required to enable custom provider")
+        try:
+            if not is_enabled:
+                return
+            if not api_key:
+                raise ValueError("API key is required to enable custom provider")
+            if not base_url or not base_url.strip():
+                raise ValueError("Base URL is required to enable custom provider")
+        except ValueError as exc:
+            logger.warning("Custom provider cannot be enabled due to {}", str(exc))
+            raise

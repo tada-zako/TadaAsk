@@ -93,6 +93,7 @@ export interface RAGJobEvent {
   counters?: RAGJobCounters | null;
   message?: string | null;
   error?: string | null;
+  errorId?: string | null;
 }
 
 type RAGJobEventWirePayload = Partial<RAGJobEvent> & {
@@ -104,6 +105,7 @@ type RAGJobEventWirePayload = Partial<RAGJobEvent> & {
   ingest_stage?: RAGJobIngestStage | null;
   item_progress?: number | null;
   sync_progress?: number | null;
+  error_id?: string | null;
 };
 
 export type StreamRAGJobEventsOptions = {
@@ -291,5 +293,6 @@ function normalizeRagJobEvent(event: RAGJobEventWirePayload): RAGJobEvent {
     counters: event.counters ?? null,
     message: event.message ?? null,
     error: event.error ?? null,
+    errorId: event.errorId ?? event.error_id ?? null,
   };
 }
