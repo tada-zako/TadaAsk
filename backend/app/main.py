@@ -173,7 +173,7 @@ async def lifespan(
     FastAPI 生命周期管理器，
     负责在应用启动时初始化数据库连接
     """
-
+    logger.info(tada_ask_logo)
     logger.info("Application starting")
 
     if not initialize_runtime:
@@ -363,17 +363,17 @@ async def lifespan(
     for name, value in (state_overrides or {}).items():
         setattr(app.state, name, value)
 
-    logger.info("Application started")
-    logger.info(tada_ask_logo)
+    logger.info("========== SERVICE STARTED SUCCESSFULLY ==========")
     yield  # 运行应用
 
     # await drop_db()  # 应用关闭时清理数据库连接
     # job manager 清理操作
+    logger.info("========== SERVICE STOPPING ==========")
     job_manager = getattr(app.state, "rag_job_manager", None)
     shutdown = getattr(job_manager, "shutdown", None)
     if shutdown:
         await shutdown()
-    logger.info("Application stopping")
+    logger.info("========== TADA BYE-BYE! ==========")
     await complete_logging()
 
 
