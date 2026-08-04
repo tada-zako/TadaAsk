@@ -1,17 +1,11 @@
-"""Contracts and tooling for the TadaAsk RAG benchmark."""
-
-from .schemas import (
+from .models import (
     BenchmarkCase,
+    BenchmarkDatasetConfig,
     BenchmarkDocument,
-    BenchmarkRunConfig,
-    BenchmarkRunResult,
-    JudgeResult,
 )
 
 __all__ = [
     "BenchmarkCase",
+    "BenchmarkDatasetConfig",
     "BenchmarkDocument",
-    "BenchmarkRunConfig",
-    "BenchmarkRunResult",
-    "JudgeResult",
 ]

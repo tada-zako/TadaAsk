@@ -1,0 +1,8 @@
+{"id":"doc.tadaask.overview","dataset":"tadaask_snapshot","title":"TadaAsk Overview","language":"mixed","document_format":"markdown","relative_path":"corpus/tadaask-overview.md"}
+{"id":"doc.tadaask.indexing","dataset":"tadaask_snapshot","title":"TadaAsk Indexing Lifecycle","language":"mixed","document_format":"markdown","relative_path":"corpus/tadaask-indexing.md"}
+{"id":"doc.tadaask.search_modes","dataset":"tadaask_snapshot","title":"TadaAsk Search Modes","language":"mixed","document_format":"markdown","relative_path":"corpus/tadaask-search-modes.md"}
+{"id":"doc.lunarcache.config","dataset":"synthetic_tech_docs","title":"LunarCache Configuration","language":"en","document_format":"markdown","relative_path":"corpus/lunarcache-config.md"}
+{"id":"doc.lunarcache.release","dataset":"synthetic_tech_docs","title":"LunarCache 2.4.1 Release Notes","language":"en","document_format":"markdown","relative_path":"corpus/lunarcache-release.md"}
+{"id":"doc.lunarcache.migration","dataset":"synthetic_tech_docs","title":"LunarCache Upgrade Guide","language":"mixed","document_format":"markdown","relative_path":"corpus/lunarcache-migration.md"}
+{"id":"doc.cedarui.theme","dataset":"synthetic_tech_docs","title":"Cedar UI Theme Tokens","language":"mixed","document_format":"markdown","relative_path":"corpus/cedar-ui-theme.md"}
+{"id":"doc.winterlog.retention","dataset":"synthetic_tech_docs","title":"WinterLog Retention Notes","language":"en","document_format":"markdown","relative_path":"corpus/winterlog-retention.md","is_distractor":true}
