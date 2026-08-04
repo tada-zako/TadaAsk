@@ -1,0 +1,36 @@
+{
+  "expectations": {
+    "case_count": 80,
+    "document_count": 109,
+    "distractor_document_count": 48,
+    "cases_by_dataset": {
+      "cmrc2018": 16,
+      "squad_v2": 12,
+      "techqa_rag_eval": 16,
+      "tadaask_custom": 36
+    },
+    "cases_by_language": {
+      "zh": 40,
+      "en": 34,
+      "mixed": 6
+    },
+    "cases_by_question_type": {
+      "direct": 50,
+      "paraphrase": 10,
+      "exact": 6,
+      "unanswerable": 6,
+      "multi_turn": 4,
+      "multi_document": 4
+    },
+    "documents_by_format": {
+      "markdown": 77,
+      "pdf": 16,
+      "html": 16
+    },
+    "documents_by_language": {
+      "zh": 44,
+      "en": 61,
+      "mixed": 4
+    }
+  }
+}
