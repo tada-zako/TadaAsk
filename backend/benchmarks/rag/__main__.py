@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import json
 from pathlib import Path
 
@@ -64,7 +65,7 @@ def main() -> int:
     )
     build_parser.add_argument("--overwrite", action="store_true")
 
-    # ----- 训练集下载命令 -----
+    # ----- 训练集粗验证命令；验证选中测试集是否符合需求 -----
     validate_parser = commands.add_parser(
         "validate", help="Validate a materialized bundle."
     )
@@ -77,6 +78,16 @@ def main() -> int:
         "--config",
         type=Path,
         default=RESOURCE_ROOT / "configs" / "smoke.json",
+    )
+
+    # ----- 召回率测试命令 -----
+    recall_parser = commands.add_parser(
+        "recall", help="Run the in-process retrieval recall benchmark."
+    )
+    recall_parser.add_argument(
+        "--config",
+        type=Path,
+        default=PACKAGE_ROOT / "recall.toml",
     )
 
     args = parser.parse_args()
@@ -92,9 +103,14 @@ def main() -> int:
             output_dir=args.output_dir,
             overwrite=args.overwrite,
         )
-    else:
+    elif args.command == "validate":
         result = audit_bundle(args.bundle, args.config)
-    print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+    else:
+        # recall 模块内部会先设置隔离数据路径，再延迟导入 app 运行时。
+        from .recall import run_recall
+
+        result = asyncio.run(run_recall(args.config))
+    print(json.dumps(result, ensure_ascii=True, sort_keys=True, indent=2))
     return 0
 
 

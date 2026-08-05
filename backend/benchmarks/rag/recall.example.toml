@@ -1,0 +1,31 @@
+[benchmark]
+bundle_dir = "data/benchmarks/rag/bundles/v1"
+workspace_dir = "data/benchmarks/rag/workspaces/baseline-v1"
+run_dir = "data/benchmarks/rag/runs/baseline-v1-recall"
+modes = ["fast"]
+rebuild_workspace = false
+resume = true
+
+[app]
+embedding_backend = "fastembed"
+embedding_model_name = "BAAI/bge-small-en-v1.5"
+rerank_backend = "fastembed"
+rerank_model_name = "Xenova/ms-marco-MiniLM-L-6-v2"
+chunk_size_tokens = 1000
+chunk_overlap_tokens = 150
+chunk_window_tokens = 200
+
+[search]
+top_k = 8
+rerank_enabled = true
+fts_k = 30
+vector_k = 20
+rerank_k = 12
+
+# Adaptive and Full modes require this section. The API key itself stays in
+# the environment variable named by api_key_env.
+[query_expansion]
+provider = "google"
+model = "gemini-3.6-flash"
+base_url = "http://127.0.0.1:PORT"
+api_key_env = "TADAASK_BENCHMARK_API_KEY"
