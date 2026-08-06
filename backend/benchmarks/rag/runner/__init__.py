@@ -8,7 +8,6 @@ from .schemas import (
     RetrievalRecord,
     RetrievalOutcome,
     RetrievedChunk,
-    RunManifest,
 )
 from .tadaask import TadaAskRuntime
 
@@ -23,7 +22,6 @@ __all__ = [
     "RetrievalOutcome",
     "RetrievalRuntime",
     "RetrievedChunk",
-    "RunManifest",
     "TadaAskRuntime",
     "load_recall_config",
     "run_recall",

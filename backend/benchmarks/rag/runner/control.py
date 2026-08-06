@@ -27,19 +27,16 @@ class ModelCallController:
         *,
         ledger_path: Path,
         requests_per_minute: int,
-        max_calls_per_batch: int | None,
         max_calls_total: int | None,
         max_attempts: int,
         retry_base_seconds: float,
     ) -> None:
         self._ledger_path = ledger_path
         self._minimum_interval = 60 / requests_per_minute
-        self._max_calls_per_batch = max_calls_per_batch
         self._max_calls_total = max_calls_total
         self._max_attempts = max_attempts
         self._retry_base_seconds = retry_base_seconds
         self._last_call_started_at: float | None = None
-        self._batch_attempts = 0
         self._total_attempts = 0
         self._attempts_by_request: dict[str, int] = {}
         self._responses: dict[str, dict[str, JsonValue]] = {}
@@ -120,7 +117,6 @@ class ModelCallController:
 
             attempt = self._attempts_by_request.get(request_key, 0) + 1
             self._attempts_by_request[request_key] = attempt
-            self._batch_attempts += 1
             self._total_attempts += 1
             self._case_attempts += 1
             call_id = f"{request_key}:{attempt}"
@@ -178,11 +174,6 @@ class ModelCallController:
         raise RuntimeError("model call retry loop exited unexpectedly")
 
     def _check_limits(self) -> None:
-        if (
-            self._max_calls_per_batch is not None
-            and self._batch_attempts >= self._max_calls_per_batch
-        ):
-            raise ModelCallLimitReached("model-call batch limit reached")
         if (
             self._max_calls_total is not None
             and self._total_attempts >= self._max_calls_total
