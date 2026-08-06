@@ -26,10 +26,10 @@ fts_k = 30
 vector_k = 20
 rerank_k = 12
 
-# Adaptive and Full modes require this section. The API key itself stays in
-# the environment variable named by api_key_env.
+# Adaptive and Full modes require this section. Keep the populated local
+# recall.toml ignored by Git because it contains the API key in plain text.
 [query_expansion]
 provider = "google"
 model = "gemini-3.6-flash"
 base_url = "http://127.0.0.1:PORT"
-api_key_env = "TADAASK_BENCHMARK_API_KEY"
+api_key = ""

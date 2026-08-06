@@ -3,7 +3,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import BaseModel, Field, JsonValue, SecretStr
 
 from ..models import QuestionType
 
@@ -12,6 +12,15 @@ class BenchmarkSearchMode(StrEnum):
     FAST = "fast"
     ADAPTIVE = "adaptive"
     FULL = "full"
+
+
+class QueryExpansionConfig(BaseModel):
+    """Model connection used by Adaptive and Full retrieval."""
+
+    provider: str
+    model: str
+    base_url: str | None = None
+    api_key: SecretStr | None = Field(default=None, exclude=True)
 
 
 class RecallRunConfig(BaseModel):
@@ -31,7 +40,7 @@ class RecallRunConfig(BaseModel):
 
     app_settings: dict[str, JsonValue] = Field(default_factory=dict)
     search_options: dict[str, JsonValue] = Field(default_factory=dict)
-    query_expansion: dict[str, str] = Field(default_factory=dict)
+    query_expansion: QueryExpansionConfig | None = None
 
 
 class RetrievedChunk(BaseModel):
@@ -50,7 +59,6 @@ class RetrievalOutcome(BaseModel):
 
     chunks: list[RetrievedChunk]
     model_call_attempts: int = 0
-    model_cache_hits: int = 0
 
 
 class RetrievalRecord(BaseModel):
@@ -66,19 +74,14 @@ class RetrievalRecord(BaseModel):
     evidence_recall: dict[str, float]
     retrieved: list[RetrievedChunk]
     model_call_attempts: int = 0
-    model_cache_hits: int = 0
 
 
 class ModelCallRecord(BaseModel):
     """One persistent event in the controlled structured-model call ledger."""
 
-    call_id: str
     case_id: str
     mode: BenchmarkSearchMode
-    request_key: str
     attempt: int
     status: Literal["started", "succeeded", "failed"]
     timestamp: datetime
-    schema_name: str
-    response: dict[str, JsonValue] | None = None
     error: str | None = None

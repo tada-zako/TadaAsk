@@ -1,25 +1,38 @@
+from __future__ import annotations
+
 import json
 import os
 import shutil
-from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence, TypeVar, cast
 
-from pydantic import JsonValue, SecretStr
+from pydantic import BaseModel, JsonValue
 
 from ..models import BenchmarkDocument
 from .control import ModelCallController, ModelCallLimitReached
 from .schemas import (
     BenchmarkSearchMode,
+    QueryExpansionConfig,
     RecallRunConfig,
     RetrievalOutcome,
     RetrievedChunk,
 )
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+
+    from app.providers.base import Message, ModelSettings
+    from app.providers.factory import FullCompleter
+    from app.rag import VectorDatabase
+    from app.services.indexing import SourceItemIndexingService
+    from app.services.search import HybridSearchService, SearchSourceRef
+    from app.storage import FileStorage
+
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = BACKEND_ROOT / "data" / "benchmarks" / "rag"
+ResultModel = TypeVar("ResultModel", bound=BaseModel)
 
 
 class RetrievalLimitReached(RuntimeError):
@@ -29,9 +42,18 @@ class RetrievalLimitReached(RuntimeError):
 class _ControlledCompleter:
     """Route App structured completions through benchmark call controls."""
 
-    def __init__(self, delegate: Any, controller: ModelCallController) -> None:
+    def __init__(
+        self,
+        delegate: FullCompleter,
+        controller: ModelCallController,
+        *,
+        case_id: str,
+        mode: BenchmarkSearchMode,
+    ) -> None:
         self._delegate = delegate
         self._controller = controller
+        self._case_id = case_id
+        self._mode = mode
 
     @property
     def model_name(self) -> str:
@@ -44,19 +66,11 @@ class _ControlledCompleter:
     async def complete_structured(
         self,
         *,
-        messages: list[Any],
-        model_settings: Any,
-        schema: type[Any],
-    ) -> Any:
-        request: dict[str, JsonValue] = {
-            "provider": self.provider_name,
-            "model": self.model_name,
-            "messages": [asdict(message) for message in messages],
-            "model_settings": asdict(model_settings),
-            "schema": schema.model_json_schema(),
-        }
-
-        async def invoke() -> Any:
+        messages: list[Message],
+        model_settings: ModelSettings,
+        schema: type[ResultModel],
+    ) -> ResultModel:
+        async def invoke() -> ResultModel:
             return await self._delegate.complete_structured(
                 messages=messages,
                 model_settings=model_settings,
@@ -64,32 +78,33 @@ class _ControlledCompleter:
             )
 
         return await self._controller.execute(
-            request=request,
-            schema=schema,
+            case_id=self._case_id,
+            mode=self._mode,
             invoke=invoke,
         )
 
 
 class TadaAskRuntime:
-    """TadaAsk implementation of the application-neutral retrieval protocol."""
+    """TadaAsk adapter consumed by the recall execution layer."""
 
     def __init__(
         self,
         *,
-        config: RecallRunConfig,
-        session_factory: Any,
-        engine: Any,
-        vector_db: Any,
-        file_storage: Any,
-        indexing_service: Any,
-        search_service: Any,
-        completer: Any,
-        app_search_mode: Any,
-        search_options_type: Any,
-        search_source_ref_type: Any,
+        workspace_dir: Path,
+        mode: BenchmarkSearchMode,
+        search_options: dict[str, JsonValue],
+        session_factory: async_sessionmaker[AsyncSession],
+        engine: AsyncEngine,
+        vector_db: VectorDatabase,
+        file_storage: FileStorage,
+        indexing_service: SourceItemIndexingService,
+        search_service: HybridSearchService,
+        completer: FullCompleter | None,
         model_calls: ModelCallController | None,
     ) -> None:
-        self._config = config
+        self._workspace_dir = workspace_dir
+        self._mode = mode
+        self._search_options = search_options
         self._session_factory = session_factory
         self._engine = engine
         self._vector_db = vector_db
@@ -97,11 +112,8 @@ class TadaAskRuntime:
         self._indexing_service = indexing_service
         self._search_service = search_service
         self._completer = completer
-        self._app_search_mode = app_search_mode
-        self._search_options_type = search_options_type
-        self._search_source_ref_type = search_source_ref_type
         self._model_calls = model_calls
-        self._source_ref: Any | None = None
+        self._source_ref: SearchSourceRef | None = None
         self._document_id_by_source_item_uid: dict[str, str] = {}
 
     @classmethod
@@ -122,14 +134,12 @@ class TadaAskRuntime:
             if config.workspace_dir == DATA_ROOT:
                 raise ValueError("benchmark workspace must be below the RAG data root")
             shutil.rmtree(config.workspace_dir)
-        cls._prepare_environment(config)
+        cls._prepare_environment(config.app_settings, config.workspace_dir)
 
         # App settings, SQLAlchemy and ChromaDB bind global state at import time.
         from app.core.config import settings
-        from app.core.constants import SearchMode
         from app.db import async_session, init_db, run_migrations
         from app.db.config import engine
-        from app.db.schemas import HybridSearchOptions
         from app.ingestion.parser import create_default_file_parser_factory
         from app.rag import (
             QueryExpander,
@@ -141,7 +151,7 @@ class TadaAskRuntime:
         )
         from app.rag.utils.fts_tokenizer import JiebaFTSTokenizer
         from app.services.indexing import SourceItemIndexingService
-        from app.services.search import HybridSearchService, SearchSourceRef
+        from app.services.search import HybridSearchService
         from app.storage import file_storage_factory
         from app.utils import embedding_tokenizer_factory
 
@@ -206,11 +216,13 @@ class TadaAskRuntime:
                 max_attempts=config.max_attempts,
                 retry_base_seconds=config.retry_base_seconds,
             )
-            completer = _ControlledCompleter(
-                cls._create_completer(config.query_expansion), model_calls
+            completer = cls._create_completer(
+                cast(QueryExpansionConfig, config.query_expansion)
             )
         return cls(
-            config=config,
+            workspace_dir=config.workspace_dir,
+            mode=config.mode,
+            search_options=config.search_options,
             session_factory=async_session,
             engine=engine,
             vector_db=vector_db,
@@ -218,9 +230,6 @@ class TadaAskRuntime:
             indexing_service=indexing_service,
             search_service=search_service,
             completer=completer,
-            app_search_mode=SearchMode,
-            search_options_type=HybridSearchOptions,
-            search_source_ref_type=SearchSourceRef,
             model_calls=model_calls,
         )
 
@@ -230,9 +239,11 @@ class TadaAskRuntime:
         return self._model_calls.total_attempts if self._model_calls is not None else 0
 
     @staticmethod
-    def _prepare_environment(config: RecallRunConfig) -> None:
+    def _prepare_environment(
+        app_settings: dict[str, JsonValue], workspace_dir: Path
+    ) -> None:
         """Bind import-time App settings to benchmark-owned storage."""
-        for name, value in config.app_settings.items():
+        for name, value in app_settings.items():
             if isinstance(value, bool):
                 environment_value = str(value).lower()
             elif isinstance(value, (dict, list)):
@@ -242,30 +253,28 @@ class TadaAskRuntime:
             os.environ[name.upper()] = environment_value
 
         os.environ["SQLITE_DATABASE_PATH"] = str(
-            config.workspace_dir / "database" / "sqlite.db"
+            workspace_dir / "database" / "sqlite.db"
         )
-        os.environ["UPLOAD_FOLDER_PATH"] = str(config.workspace_dir / "storage")
-        os.environ["CHROMADB_PATH"] = str(config.workspace_dir / "vector")
+        os.environ["UPLOAD_FOLDER_PATH"] = str(workspace_dir / "storage")
+        os.environ["CHROMADB_PATH"] = str(workspace_dir / "vector")
 
     @staticmethod
-    def _create_completer(config: dict[str, str]) -> Any:
+    def _create_completer(config: QueryExpansionConfig) -> FullCompleter:
         """Create an App FullCompleter from operator-managed model settings."""
         from app.db.schemas import ModelProfileRead, ProviderWithModelInternalRead
         from app.providers.factory import completer_factory
 
-        api_key_env = config.get("api_key_env")
-        api_key = os.environ.get(api_key_env) if api_key_env else None
         now = datetime.now(UTC)
         provider_with_model = ProviderWithModelInternalRead(
             uid="rag-benchmark-provider",
-            name=config["provider"],
-            base_url=config.get("base_url") or None,
-            api_key=SecretStr(api_key) if api_key else None,
+            name=config.provider,
+            base_url=config.base_url,
+            api_key=config.api_key,
             created_at=now,
             updated_at=now,
             model_profile=ModelProfileRead(
                 uid="rag-benchmark-query-expansion-model",
-                model=config["model"],
+                model=config.model,
                 created_at=now,
                 updated_at=now,
             ),
@@ -279,7 +288,9 @@ class TadaAskRuntime:
         documents: Sequence[BenchmarkDocument],
     ) -> None:
         """Reuse a prepared App index or materialize the controlled corpus."""
-        index_path = self._config.workspace_dir / "index.json"
+        from app.services.search import SearchSourceRef
+
+        index_path = self._workspace_dir / "index.json"
         if index_path.is_file():
             index = json.loads(index_path.read_text(encoding="utf-8"))
         else:
@@ -292,7 +303,7 @@ class TadaAskRuntime:
             str(item["uid"]): document_id
             for document_id, item in index["documents"].items()
         }
-        self._source_ref = self._search_source_ref_type(
+        self._source_ref = SearchSourceRef(
             id=index["source"]["id"],
             uid=index["source"]["uid"],
             collection_name=index["source"]["collection_name"],
@@ -375,7 +386,7 @@ class TadaAskRuntime:
             )
 
         index = {"source": source_ref, "documents": item_by_document}
-        (self._config.workspace_dir / "index.json").write_text(
+        (self._workspace_dir / "index.json").write_text(
             json.dumps(index, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
@@ -386,34 +397,38 @@ class TadaAskRuntime:
         *,
         case_id: str,
         query: str,
-        mode: BenchmarkSearchMode,
-        search_options: dict[str, JsonValue],
     ) -> RetrievalOutcome:
         """Run App Hybrid Search and map results to the benchmark protocol."""
         if self._source_ref is None:
             raise RuntimeError("benchmark corpus has not been prepared")
 
-        if self._model_calls is not None:
-            self._model_calls.begin_case(case_id, mode)
+        from app.core.constants import SearchMode
+        from app.db.schemas import HybridSearchOptions
+
+        attempts_before = self.model_call_attempts
+        completer = (
+            _ControlledCompleter(
+                self._completer,
+                self._model_calls,
+                case_id=case_id,
+                mode=self._mode,
+            )
+            if self._completer is not None and self._model_calls is not None
+            else None
+        )
         try:
             results = await self._search_service.search(
                 query=query,
                 sources=[self._source_ref],
-                options=self._search_options_type(
-                    **search_options,
-                    mode=self._app_search_mode(mode.value),
+                options=HybridSearchOptions(
+                    **self._search_options,
+                    mode=SearchMode(self._mode.value),
                 ),
                 # The App Fast branch never dereferences its completer argument.
-                completer=self._completer,
+                completer=completer,
             )
         except ModelCallLimitReached as exc:
-            if self._model_calls is not None:
-                self._model_calls.finish_case()
             raise RetrievalLimitReached from exc
-        except Exception:
-            if self._model_calls is not None:
-                self._model_calls.finish_case()
-            raise
 
         chunks = [
             RetrievedChunk(
@@ -428,13 +443,9 @@ class TadaAskRuntime:
             )
             for rank, result in enumerate(results, start=1)
         ]
-        attempts, cache_hits = (
-            self._model_calls.finish_case() if self._model_calls is not None else (0, 0)
-        )
         return RetrievalOutcome(
             chunks=chunks,
-            model_call_attempts=attempts,
-            model_cache_hits=cache_hits,
+            model_call_attempts=self.model_call_attempts - attempts_before,
         )
 
     async def close(self) -> None:

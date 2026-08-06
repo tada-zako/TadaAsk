@@ -42,14 +42,6 @@ class RecallRunner:
     async def run(self) -> dict[str, Any]:
         """Execute one recoverable batch and write aggregate run state."""
         self.config.run_dir.mkdir(parents=True, exist_ok=True)
-        if not self.config.resume:
-            for path in (
-                self.results_path,
-                self.config.run_dir / "model-calls.jsonl",
-                self.summary_path,
-            ):
-                path.unlink(missing_ok=True)
-
         target_cases = self._select_cases()
         records = load_checkpoints(self.results_path, resume=self.config.resume)
         completed_ids = {
@@ -90,7 +82,6 @@ class RecallRunner:
                 evidence_recall=evidence_recall,
                 retrieved=outcome.chunks,
                 model_call_attempts=outcome.model_call_attempts,
-                model_cache_hits=outcome.model_cache_hits,
             )
             append_checkpoint(self.results_path, record)
             records.append(record)
@@ -138,6 +129,15 @@ async def run_recall(config_path: Path) -> dict[str, Any]:
     logger.remove()
     logger.add(sys.stderr, level="WARNING")
     config = load_recall_config(config_path)
+
+    # A fresh run must clear its call ledger before the adapter restores counters.
+    if not config.resume:
+        for path in (
+            config.run_dir / "recall.jsonl",
+            config.run_dir / "model-calls.jsonl",
+            config.run_dir / "recall-summary.json",
+        ):
+            path.unlink(missing_ok=True)
 
     from .tadaask import TadaAskRuntime
 

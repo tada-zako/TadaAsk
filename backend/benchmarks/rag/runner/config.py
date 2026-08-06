@@ -1,5 +1,3 @@
-import os
-import re
 import tomllib
 from pathlib import Path
 
@@ -39,7 +37,7 @@ def load_recall_config(path: Path) -> RecallRunConfig:
             "run_dir": resolve(benchmark["run_dir"]),
             "app_settings": raw.get("app", {}),
             "search_options": raw.get("search", {}),
-            "query_expansion": raw.get("query_expansion", {}),
+            "query_expansion": raw.get("query_expansion"),
         }
     )
     if int(config.search_options.get("top_k", 8)) < 5:
@@ -47,24 +45,17 @@ def load_recall_config(path: Path) -> RecallRunConfig:
     if config.mode == BenchmarkSearchMode.FAST:
         return config
 
-    missing = {"provider", "model"}.difference(config.query_expansion)
-    if missing:
+    query_expansion = config.query_expansion
+    if query_expansion is None:
         raise ValueError(
             "query_expansion.provider and query_expansion.model are required "
             "for adaptive/full recall"
         )
-    base_url = config.query_expansion.get("base_url", "")
-    if "PORT" in base_url.upper():
+    if query_expansion.base_url and "PORT" in query_expansion.base_url.upper():
         raise ValueError("query_expansion.base_url still contains a placeholder")
-    if config.query_expansion["provider"] != "ollama":
-        api_key_env = config.query_expansion.get("api_key_env")
-        if not api_key_env or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", api_key_env):
-            raise ValueError(
-                "query_expansion.api_key_env must name an environment variable"
-            )
-        if not os.environ.get(api_key_env):
-            raise ValueError(
-                "the API key environment variable configured by "
-                "query_expansion.api_key_env is not available"
-            )
+    if query_expansion.provider != "ollama" and (
+        query_expansion.api_key is None
+        or not query_expansion.api_key.get_secret_value()
+    ):
+        raise ValueError("query_expansion.api_key is required by this provider")
     return config

@@ -1,13 +1,11 @@
 import asyncio
-import hashlib
-import json
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeVar
 
-from pydantic import BaseModel, JsonValue
+from pydantic import BaseModel
 
 from .schemas import BenchmarkSearchMode, ModelCallRecord
 
@@ -38,23 +36,11 @@ class ModelCallController:
         self._retry_base_seconds = retry_base_seconds
         self._last_call_started_at: float | None = None
         self._total_attempts = 0
-        self._attempts_by_request: dict[str, int] = {}
-        self._responses: dict[str, dict[str, JsonValue]] = {}
-        self._case_id: str | None = None
-        self._mode: BenchmarkSearchMode | None = None
-        self._case_attempts = 0
-        self._case_cache_hits = 0
 
         if ledger_path.is_file():
             for record in self._read_ledger(ledger_path):
                 if record.status == "started":
                     self._total_attempts += 1
-                    self._attempts_by_request[record.request_key] = max(
-                        self._attempts_by_request.get(record.request_key, 0),
-                        record.attempt,
-                    )
-                elif record.status == "succeeded" and record.response is not None:
-                    self._responses[record.request_key] = record.response
 
     @staticmethod
     def _read_ledger(path: Path) -> list[ModelCallRecord]:
@@ -67,69 +53,38 @@ class ModelCallController:
         """Return all outbound attempts recorded for this run directory."""
         return self._total_attempts
 
-    def begin_case(self, case_id: str, mode: BenchmarkSearchMode) -> None:
-        """Bind subsequent calls to one sequential retrieval case."""
-        self._case_id = case_id
-        self._mode = mode
-        self._case_attempts = 0
-        self._case_cache_hits = 0
-
-    def finish_case(self) -> tuple[int, int]:
-        """Return model usage observed since the current case began."""
-        usage = (self._case_attempts, self._case_cache_hits)
-        self._case_id = None
-        self._mode = None
-        return usage
-
     async def execute(
         self,
         *,
-        request: dict[str, JsonValue],
-        schema: type[ResultModel],
+        case_id: str,
+        mode: BenchmarkSearchMode,
         invoke: Callable[[], Awaitable[ResultModel]],
     ) -> ResultModel:
-        """Return a persistent cached response or perform a controlled call.
+        """Perform one rate-limited structured call with bounded retries.
 
         Args:
-            request: Application-neutral request identity for persistent caching.
-            schema: Pydantic response schema expected by the App call site.
+            case_id: Benchmark case responsible for the outbound call.
+            mode: Retrieval mode used by the case.
             invoke: Existing provider operation supplied by the App adapter.
 
         Returns:
             A response validated through the original App schema.
 
         Raises:
-            ModelCallLimitReached: The per-invocation or total attempt cap is met.
+            ModelCallLimitReached: The total attempt cap is met.
         """
-        if self._case_id is None or self._mode is None:
-            raise RuntimeError("model call is not bound to a benchmark case")
-
-        request_key = hashlib.sha256(
-            json.dumps(request, ensure_ascii=True, sort_keys=True).encode("utf-8")
-        ).hexdigest()
-        if request_key in self._responses:
-            self._case_cache_hits += 1
-            return schema.model_validate(self._responses[request_key])
-
-        for retry_index in range(self._max_attempts):
+        for attempt in range(1, self._max_attempts + 1):
             self._check_limits()
             await self._pace()
 
-            attempt = self._attempts_by_request.get(request_key, 0) + 1
-            self._attempts_by_request[request_key] = attempt
             self._total_attempts += 1
-            self._case_attempts += 1
-            call_id = f"{request_key}:{attempt}"
             self._append(
                 ModelCallRecord(
-                    call_id=call_id,
-                    case_id=self._case_id,
-                    mode=self._mode,
-                    request_key=request_key,
+                    case_id=case_id,
+                    mode=mode,
                     attempt=attempt,
                     status="started",
                     timestamp=datetime.now(UTC),
-                    schema_name=schema.__name__,
                 )
             )
 
@@ -138,35 +93,26 @@ class ModelCallController:
             except Exception as exc:
                 self._append(
                     ModelCallRecord(
-                        call_id=call_id,
-                        case_id=self._case_id,
-                        mode=self._mode,
-                        request_key=request_key,
+                        case_id=case_id,
+                        mode=mode,
                         attempt=attempt,
                         status="failed",
                         timestamp=datetime.now(UTC),
-                        schema_name=schema.__name__,
                         error=self._error_label(exc),
                     )
                 )
-                if retry_index + 1 == self._max_attempts or not self._is_retryable(exc):
+                if attempt == self._max_attempts or not self._is_retryable(exc):
                     raise
-                await asyncio.sleep(self._retry_base_seconds * (2**retry_index))
+                await asyncio.sleep(self._retry_base_seconds * (2 ** (attempt - 1)))
                 continue
 
-            response = result.model_dump(mode="json")
-            self._responses[request_key] = response
             self._append(
                 ModelCallRecord(
-                    call_id=call_id,
-                    case_id=self._case_id,
-                    mode=self._mode,
-                    request_key=request_key,
+                    case_id=case_id,
+                    mode=mode,
                     attempt=attempt,
                     status="succeeded",
                     timestamp=datetime.now(UTC),
-                    schema_name=schema.__name__,
-                    response=response,
                 )
             )
             return result
