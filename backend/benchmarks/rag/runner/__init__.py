@@ -7,6 +7,7 @@ from .schemas import (
     RetrievedChunk,
     RunManifest,
 )
+from .tadaask import TadaAskRuntime
 
 __all__ = [
     "BenchmarkSearchMode",
@@ -16,4 +17,5 @@ __all__ = [
     "RetrievalRuntime",
     "RetrievedChunk",
     "RunManifest",
+    "TadaAskRuntime",
 ]

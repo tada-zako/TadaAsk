@@ -15,7 +15,6 @@ class RetrievalRuntime(Protocol):
         *,
         bundle_dir: Path,
         documents: Sequence[BenchmarkDocument],
-        rebuild: bool,
     ) -> None:
         """Prepare or reuse the application-owned corpus index."""
         ...
