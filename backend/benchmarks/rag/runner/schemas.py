@@ -20,7 +20,7 @@ class RecallRunConfig(BaseModel):
     bundle_dir: Path
     workspace_dir: Path
     run_dir: Path
-    mode: BenchmarkSearchMode = BenchmarkSearchMode.FAST
+    mode: BenchmarkSearchMode
     rebuild_workspace: bool = False
     resume: bool = True
     case_ids: list[str] = Field(default_factory=list)

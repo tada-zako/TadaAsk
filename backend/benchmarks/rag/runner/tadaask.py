@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Sequence
@@ -46,8 +47,8 @@ class _ControlledCompleter:
         request: dict[str, JsonValue] = {
             "provider": self.provider_name,
             "model": self.model_name,
-            "messages": [message.model_dump(mode="json") for message in messages],
-            "model_settings": model_settings.model_dump(mode="json"),
+            "messages": [asdict(message) for message in messages],
+            "model_settings": asdict(model_settings),
             "schema": schema.model_json_schema(),
         }
 

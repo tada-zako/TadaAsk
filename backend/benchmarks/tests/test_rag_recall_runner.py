@@ -19,7 +19,7 @@ from benchmarks.rag.runner import (
     RetrievalOutcome,
     RetrievedChunk,
 )
-from benchmarks.rag.runner.recall import RecallRunner
+from benchmarks.rag.runner.recall import RecallRunner, run_recall
 
 
 class FakeRuntime:
@@ -197,3 +197,31 @@ async def test_model_call_controller_retries_caches_and_enforces_total_limit(
         await resumed.execute(
             request={"query": "two"}, schema=StructuredResult, invoke=invoke
         )
+
+
+@pytest.mark.asyncio
+async def test_adaptive_preflight_rejects_invalid_api_key_environment_name(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "recall.toml"
+    config_path.write_text(
+        """[benchmark]
+bundle_dir = "missing-bundle"
+workspace_dir = "workspace"
+run_dir = "run"
+mode = "adaptive"
+
+[search]
+top_k = 5
+
+[query_expansion]
+provider = "custom"
+model = "model"
+base_url = "http://127.0.0.1:8000"
+api_key_env = "not-an-env-name"
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="must name an environment variable"):
+        await run_recall(config_path)

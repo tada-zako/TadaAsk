@@ -1,5 +1,7 @@
 import hashlib
 import json
+import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -371,6 +373,9 @@ class RecallRunner:
             for name, value in self.config.query_expansion.items()
             if name != "api_key"
         }
+        api_key_env = query_expansion.get("api_key_env")
+        if api_key_env and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", api_key_env):
+            query_expansion["api_key_env"] = "<invalid>"
         return self.config.model_copy(
             deep=True,
             update={"query_expansion": query_expansion},
@@ -439,6 +444,22 @@ async def run_recall(config_path: Path) -> dict[str, Any]:
                 "query_expansion.provider and query_expansion.model are required "
                 "for adaptive/full recall"
             )
+        base_url = config.query_expansion.get("base_url", "")
+        if "PORT" in base_url.upper():
+            raise ValueError("query_expansion.base_url still contains a placeholder")
+        if config.query_expansion["provider"] != "ollama":
+            api_key_env = config.query_expansion.get("api_key_env")
+            if not api_key_env or not re.fullmatch(
+                r"[A-Za-z_][A-Za-z0-9_]*", api_key_env
+            ):
+                raise ValueError(
+                    "query_expansion.api_key_env must name an environment variable"
+                )
+            if not os.environ.get(api_key_env):
+                raise ValueError(
+                    "the API key environment variable configured by "
+                    "query_expansion.api_key_env is not available"
+                )
 
     from .tadaask import TadaAskRuntime
 
