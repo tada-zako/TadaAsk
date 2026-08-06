@@ -1,4 +1,5 @@
-from .recall import RecallRunner, load_recall_config, run_recall
+from .config import load_recall_config
+from .recall import RecallRunner, run_recall
 from .schemas import (
     BenchmarkSearchMode,
     ModelCallRecord,
