@@ -20,9 +20,16 @@ class RecallRunConfig(BaseModel):
     bundle_dir: Path
     workspace_dir: Path
     run_dir: Path
-    modes: tuple[BenchmarkSearchMode, ...] = (BenchmarkSearchMode.FAST,)
+    mode: BenchmarkSearchMode = BenchmarkSearchMode.FAST
     rebuild_workspace: bool = False
     resume: bool = True
+    case_ids: list[str] = Field(default_factory=list)
+    batch_size: int | None = 20
+    requests_per_minute: int = 20
+    max_model_calls_per_batch: int | None = 20
+    max_model_calls_total: int | None = 100
+    max_attempts: int = 3
+    retry_base_seconds: float = 2.0
 
     app_settings: dict[str, JsonValue] = Field(default_factory=dict)
     search_options: dict[str, JsonValue] = Field(default_factory=dict)
@@ -38,6 +45,14 @@ class RetrievedChunk(BaseModel):
     content: str
     rrf_score: float | None = None
     rerank_score: float | None = None
+
+
+class RetrievalOutcome(BaseModel):
+    """Application-neutral result of one retrieval request."""
+
+    chunks: list[RetrievedChunk]
+    model_call_attempts: int = 0
+    model_cache_hits: int = 0
 
 
 class RetrievalRecord(BaseModel):
@@ -62,8 +77,10 @@ class RunManifest(BaseModel):
     fingerprint: str
     git_commit: str
     created_at: datetime
+    updated_at: datetime
     status: Literal["running", "partial", "completed"]
     config: RecallRunConfig
+    target_case_count: int = 0
     completed_case_count: int = 0
     pending_case_count: int = 0
     model_call_attempts: int = 0

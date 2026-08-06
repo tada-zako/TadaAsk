@@ -4,7 +4,7 @@ from typing import Protocol, Sequence
 from pydantic import JsonValue
 
 from ..models import BenchmarkDocument
-from .schemas import BenchmarkSearchMode, RetrievedChunk
+from .schemas import BenchmarkSearchMode, RetrievalOutcome
 
 
 class RetrievalRuntime(Protocol):
@@ -22,10 +22,11 @@ class RetrievalRuntime(Protocol):
     async def retrieve(
         self,
         *,
+        case_id: str,
         query: str,
         mode: BenchmarkSearchMode,
         search_options: dict[str, JsonValue],
-    ) -> list[RetrievedChunk]:
+    ) -> RetrievalOutcome:
         """Run one retrieval request and return application-neutral chunks."""
         ...
 

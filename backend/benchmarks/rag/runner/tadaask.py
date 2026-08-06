@@ -8,11 +8,61 @@ from typing import Any, Sequence
 from pydantic import JsonValue, SecretStr
 
 from ..models import BenchmarkDocument
-from .schemas import BenchmarkSearchMode, RecallRunConfig, RetrievedChunk
+from .control import ModelCallController
+from .schemas import (
+    BenchmarkSearchMode,
+    RecallRunConfig,
+    RetrievalOutcome,
+    RetrievedChunk,
+)
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = BACKEND_ROOT / "data" / "benchmarks" / "rag"
+
+
+class _ControlledCompleter:
+    """Route App structured completions through benchmark call controls."""
+
+    def __init__(self, delegate: Any, controller: ModelCallController) -> None:
+        self._delegate = delegate
+        self._controller = controller
+
+    @property
+    def model_name(self) -> str:
+        return self._delegate.model_name
+
+    @property
+    def provider_name(self) -> str:
+        return self._delegate.provider_name
+
+    async def complete_structured(
+        self,
+        *,
+        messages: list[Any],
+        model_settings: Any,
+        schema: type[Any],
+    ) -> Any:
+        request: dict[str, JsonValue] = {
+            "provider": self.provider_name,
+            "model": self.model_name,
+            "messages": [message.model_dump(mode="json") for message in messages],
+            "model_settings": model_settings.model_dump(mode="json"),
+            "schema": schema.model_json_schema(),
+        }
+
+        async def invoke() -> Any:
+            return await self._delegate.complete_structured(
+                messages=messages,
+                model_settings=model_settings,
+                schema=schema,
+            )
+
+        return await self._controller.execute(
+            request=request,
+            schema=schema,
+            invoke=invoke,
+        )
 
 
 class TadaAskRuntime:
@@ -32,6 +82,7 @@ class TadaAskRuntime:
         app_search_mode: Any,
         search_options_type: Any,
         search_source_ref_type: Any,
+        model_calls: ModelCallController | None,
     ) -> None:
         self._config = config
         self._session_factory = session_factory
@@ -44,11 +95,16 @@ class TadaAskRuntime:
         self._app_search_mode = app_search_mode
         self._search_options_type = search_options_type
         self._search_source_ref_type = search_source_ref_type
+        self._model_calls = model_calls
         self._source_ref: Any | None = None
         self._document_id_by_source_item_uid: dict[str, str] = {}
 
     @classmethod
-    async def create(cls, config: RecallRunConfig) -> "TadaAskRuntime":
+    async def create(
+        cls,
+        config: RecallRunConfig,
+        model_calls: ModelCallController | None = None,
+    ) -> "TadaAskRuntime":
         """Bootstrap isolated App storage and assemble the TadaAsk RAG runtime.
 
         Args:
@@ -135,11 +191,14 @@ class TadaAskRuntime:
             fts_provider=fts_provider,
             rerank_provider=rerank,
         )
-        completer = (
-            cls._create_completer(config.query_expansion)
-            if any(mode != BenchmarkSearchMode.FAST for mode in config.modes)
-            else None
-        )
+        if config.mode == BenchmarkSearchMode.FAST:
+            completer = None
+        else:
+            if model_calls is None:
+                raise ValueError("model call controls are required for adaptive/full")
+            completer = _ControlledCompleter(
+                cls._create_completer(config.query_expansion), model_calls
+            )
         return cls(
             config=config,
             session_factory=async_session,
@@ -152,6 +211,7 @@ class TadaAskRuntime:
             app_search_mode=SearchMode,
             search_options_type=HybridSearchOptions,
             search_source_ref_type=SearchSourceRef,
+            model_calls=model_calls,
         )
 
     @staticmethod
@@ -309,25 +369,34 @@ class TadaAskRuntime:
     async def retrieve(
         self,
         *,
+        case_id: str,
         query: str,
         mode: BenchmarkSearchMode,
         search_options: dict[str, JsonValue],
-    ) -> list[RetrievedChunk]:
+    ) -> RetrievalOutcome:
         """Run App Hybrid Search and map results to the benchmark protocol."""
         if self._source_ref is None:
             raise RuntimeError("benchmark corpus has not been prepared")
 
-        results = await self._search_service.search(
-            query=query,
-            sources=[self._source_ref],
-            options=self._search_options_type(
-                **search_options,
-                mode=self._app_search_mode(mode.value),
-            ),
-            # The App Fast branch never dereferences its completer argument.
-            completer=self._completer,
-        )
-        return [
+        if self._model_calls is not None:
+            self._model_calls.begin_case(case_id, mode)
+        try:
+            results = await self._search_service.search(
+                query=query,
+                sources=[self._source_ref],
+                options=self._search_options_type(
+                    **search_options,
+                    mode=self._app_search_mode(mode.value),
+                ),
+                # The App Fast branch never dereferences its completer argument.
+                completer=self._completer,
+            )
+        except Exception:
+            if self._model_calls is not None:
+                self._model_calls.finish_case()
+            raise
+
+        chunks = [
             RetrievedChunk(
                 rank=rank,
                 document_id=self._document_id_by_source_item_uid.get(
@@ -340,6 +409,14 @@ class TadaAskRuntime:
             )
             for rank, result in enumerate(results, start=1)
         ]
+        attempts, cache_hits = (
+            self._model_calls.finish_case() if self._model_calls is not None else (0, 0)
+        )
+        return RetrievalOutcome(
+            chunks=chunks,
+            model_call_attempts=attempts,
+            model_cache_hits=cache_hits,
+        )
 
     async def close(self) -> None:
         """Dispose the isolated App database engine."""

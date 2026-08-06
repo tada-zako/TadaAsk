@@ -1,10 +1,16 @@
 [benchmark]
 bundle_dir = "data/benchmarks/rag/bundles/v1"
 workspace_dir = "data/benchmarks/rag/workspaces/baseline-v1"
-run_dir = "data/benchmarks/rag/runs/baseline-v1-recall"
-modes = ["fast"]
+run_dir = "data/benchmarks/rag/runs/baseline-v1-fast"
+mode = "fast"
 rebuild_workspace = false
 resume = true
+batch_size = 20
+requests_per_minute = 20
+max_model_calls_per_batch = 20
+max_model_calls_total = 100
+max_attempts = 3
+retry_base_seconds = 2.0
 
 [app]
 embedding_backend = "fastembed"

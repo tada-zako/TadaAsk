@@ -106,8 +106,8 @@ def main() -> int:
     elif args.command == "validate":
         result = audit_bundle(args.bundle, args.config)
     else:
-        # recall 模块内部会先设置隔离数据路径，再延迟导入 app 运行时。
-        from .recall import run_recall
+        # Runner 会先设置隔离数据路径，再由 TadaAsk adapter 延迟导入 app。
+        from .runner.recall import run_recall
 
         result = asyncio.run(run_recall(args.config))
     print(json.dumps(result, ensure_ascii=True, sort_keys=True, indent=2))
