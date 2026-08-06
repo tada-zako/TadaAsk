@@ -3,7 +3,6 @@ import os
 import sys
 import shutil
 import tomllib
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -13,6 +12,7 @@ from loguru import logger
 
 from .bundle import load_jsonl
 from .models import BenchmarkCase, BenchmarkDocument, QuestionType
+from .runner.schemas import RecallRunConfig
 
 if TYPE_CHECKING:
     from app.core.config import Settings
@@ -31,22 +31,7 @@ DATA_ROOT = BACKEND_ROOT / "data" / "benchmarks" / "rag"
 RECALL_K = (1, 3, 5)
 
 
-@dataclass(frozen=True)
-class RecallConfig:
-    """Resolved configuration for one retrieval recall run."""
-
-    bundle_dir: Path
-    workspace_dir: Path
-    run_dir: Path
-    modes: tuple[str, ...]
-    rebuild_workspace: bool
-    resume: bool
-    app_settings: dict[str, Any]
-    search_options: dict[str, Any]
-    query_expansion: dict[str, str]
-
-
-def load_recall_config(path: Path) -> RecallConfig:
+def load_recall_config(path: Path) -> RecallRunConfig:
     """Load a benchmark TOML file and resolve its runtime paths.
 
     Args:
@@ -68,20 +53,20 @@ def load_recall_config(path: Path) -> RecallConfig:
             else (BACKEND_ROOT / candidate).resolve()
         )
 
-    return RecallConfig(
-        bundle_dir=resolve(benchmark["bundle_dir"]),
-        workspace_dir=resolve(benchmark["workspace_dir"]),
-        run_dir=resolve(benchmark["run_dir"]),
-        modes=tuple(benchmark.get("modes", ["fast"])),
-        rebuild_workspace=benchmark.get("rebuild_workspace", False),
-        resume=benchmark.get("resume", True),
-        app_settings=raw.get("app", {}),
-        search_options=raw.get("search", {}),
-        query_expansion=raw.get("query_expansion", {}),
+    return RecallRunConfig.model_validate(
+        {
+            **benchmark,
+            "bundle_dir": resolve(benchmark["bundle_dir"]),
+            "workspace_dir": resolve(benchmark["workspace_dir"]),
+            "run_dir": resolve(benchmark["run_dir"]),
+            "app_settings": raw.get("app", {}),
+            "search_options": raw.get("search", {}),
+            "query_expansion": raw.get("query_expansion", {}),
+        }
     )
 
 
-def _prepare_app_environment(config: RecallConfig) -> None:
+def _prepare_app_environment(config: RecallRunConfig) -> None:
     """Bind app globals to benchmark-owned storage before importing app modules."""
     for name, value in config.app_settings.items():
         if isinstance(value, bool):
@@ -102,7 +87,7 @@ def _prepare_app_environment(config: RecallConfig) -> None:
 
 async def _materialize_index(
     *,
-    config: RecallConfig,
+    config: RecallRunConfig,
     documents: list[BenchmarkDocument],
     session_factory: async_sessionmaker[AsyncSession],
     vector_db: "VectorDatabase",
@@ -375,7 +360,7 @@ def _create_app_services(
 
 async def _run_retrieval_cases(
     *,
-    config: RecallConfig,
+    config: RecallRunConfig,
     cases: list[BenchmarkCase],
     modes: tuple["SearchMode", ...],
     source_ref: "SearchSourceRef",
