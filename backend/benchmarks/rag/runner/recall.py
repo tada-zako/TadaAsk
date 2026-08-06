@@ -3,30 +3,29 @@ import os
 import re
 import sys
 import tomllib
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from ..bundle import load_jsonl
 from ..models import BenchmarkCase, BenchmarkDocument, QuestionType
-from .control import ModelCallController, ModelCallLimitReached
-from .protocols import RetrievalRuntime
 from .schemas import (
     BenchmarkSearchMode,
     RecallRunConfig,
     RetrievalRecord,
     RetrievedChunk,
 )
+from .tadaask import RetrievalLimitReached
+
+if TYPE_CHECKING:
+    from .tadaask import TadaAskRuntime
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = PACKAGE_ROOT.parents[1]
 RECALL_K = (1, 3, 5)
-RuntimeFactory = Callable[
-    [RecallRunConfig, ModelCallController | None], Awaitable[RetrievalRuntime]
-]
 
 
 def load_recall_config(path: Path) -> RecallRunConfig:
@@ -126,14 +125,13 @@ class RecallRunner:
         config: RecallRunConfig,
         cases: list[BenchmarkCase],
         documents: list[BenchmarkDocument],
-        runtime_factory: RuntimeFactory,
+        runtime: "TadaAskRuntime",
     ) -> None:
         self.config = config
         self.cases = cases
         self.documents = documents
-        self.runtime_factory = runtime_factory
+        self.runtime = runtime
         self.results_path = config.run_dir / "recall.jsonl"
-        self.ledger_path = config.run_dir / "model-calls.jsonl"
         self.summary_path = config.run_dir / "recall-summary.json"
 
     async def run(self) -> dict[str, Any]:
@@ -142,7 +140,7 @@ class RecallRunner:
         if not self.config.resume:
             for path in (
                 self.results_path,
-                self.ledger_path,
+                self.config.run_dir / "model-calls.jsonl",
                 self.summary_path,
             ):
                 path.unlink(missing_ok=True)
@@ -153,57 +151,47 @@ class RecallRunner:
             record.case_id for record in records if record.mode == self.config.mode
         }
         pending_cases = [case for case in target_cases if case.id not in completed_ids]
-        controller = self._create_model_controller()
-
         stopped_by_limit = False
-        runtime: RetrievalRuntime | None = None
-        try:
-            if pending_cases:
-                runtime = await self.runtime_factory(self.config, controller)
-                await runtime.prepare_corpus(
-                    bundle_dir=self.config.bundle_dir,
-                    documents=self.documents,
-                )
+        if pending_cases:
+            await self.runtime.prepare_corpus(
+                bundle_dir=self.config.bundle_dir,
+                documents=self.documents,
+            )
 
-            with self.results_path.open("a", encoding="utf-8", newline="\n") as output:
-                for case in pending_cases:
-                    try:
-                        outcome = await runtime.retrieve(
-                            case_id=case.id,
-                            query=case.expected_standalone_query or case.question,
-                            mode=self.config.mode,
-                            search_options=self.config.search_options,
-                        )
-                    except ModelCallLimitReached:
-                        stopped_by_limit = True
-                        break
-
-                    document_recall, evidence_recall = _score_results(
-                        case=case,
-                        results=outcome.chunks,
-                    )
-                    record = RetrievalRecord(
+        with self.results_path.open("a", encoding="utf-8", newline="\n") as output:
+            for case in pending_cases:
+                try:
+                    outcome = await self.runtime.retrieve(
                         case_id=case.id,
-                        dataset=case.dataset,
-                        question_type=case.question_type,
-                        mode=self.config.mode,
                         query=case.expected_standalone_query or case.question,
-                        gold_document_ids=sorted(
-                            {evidence.document_id for evidence in case.gold_evidence}
-                        ),
-                        document_recall=document_recall,
-                        evidence_recall=evidence_recall,
-                        retrieved=outcome.chunks,
-                        model_call_attempts=outcome.model_call_attempts,
-                        model_cache_hits=outcome.model_cache_hits,
                     )
-                    output.write(record.model_dump_json(exclude_defaults=True) + "\n")
-                    output.flush()
-                    records.append(record)
-                    completed_ids.add(case.id)
-        finally:
-            if runtime is not None:
-                await runtime.close()
+                except RetrievalLimitReached:
+                    stopped_by_limit = True
+                    break
+
+                document_recall, evidence_recall = _score_results(
+                    case=case,
+                    results=outcome.chunks,
+                )
+                record = RetrievalRecord(
+                    case_id=case.id,
+                    dataset=case.dataset,
+                    question_type=case.question_type,
+                    mode=self.config.mode,
+                    query=case.expected_standalone_query or case.question,
+                    gold_document_ids=sorted(
+                        {evidence.document_id for evidence in case.gold_evidence}
+                    ),
+                    document_recall=document_recall,
+                    evidence_recall=evidence_recall,
+                    retrieved=outcome.chunks,
+                    model_call_attempts=outcome.model_call_attempts,
+                    model_cache_hits=outcome.model_cache_hits,
+                )
+                output.write(record.model_dump_json(exclude_defaults=True) + "\n")
+                output.flush()
+                records.append(record)
+                completed_ids.add(case.id)
 
         pending_count = len(target_cases) - len(completed_ids)
         status = "completed" if pending_count == 0 else "partial"
@@ -219,7 +207,7 @@ class RecallRunner:
                     case.question_type == QuestionType.UNANSWERABLE
                     for case in self.cases
                 ),
-                "model_call_attempts": controller.total_attempts if controller else 0,
+                "model_call_attempts": self.runtime.model_call_attempts,
                 "stopped_by_model_call_limit": stopped_by_limit,
                 "results_path": str(self.results_path),
                 "workspace_dir": str(self.config.workspace_dir),
@@ -249,17 +237,6 @@ class RecallRunner:
             return []
         with self.results_path.open("r", encoding="utf-8") as handle:
             return [RetrievalRecord.model_validate_json(line) for line in handle]
-
-    def _create_model_controller(self) -> ModelCallController | None:
-        if self.config.mode == BenchmarkSearchMode.FAST:
-            return None
-        return ModelCallController(
-            ledger_path=self.ledger_path,
-            requests_per_minute=self.config.requests_per_minute,
-            max_calls_total=self.config.max_model_calls_total,
-            max_attempts=self.config.max_attempts,
-            retry_base_seconds=self.config.retry_base_seconds,
-        )
 
 
 async def run_recall(config_path: Path) -> dict[str, Any]:
@@ -297,10 +274,13 @@ async def run_recall(config_path: Path) -> dict[str, Any]:
 
     cases = load_jsonl(config.bundle_dir / "cases.jsonl", BenchmarkCase)
     documents = load_jsonl(config.bundle_dir / "documents.jsonl", BenchmarkDocument)
-    runner = RecallRunner(
-        config=config,
-        cases=cases,
-        documents=documents,
-        runtime_factory=TadaAskRuntime.create,
-    )
-    return await runner.run()
+    runtime = await TadaAskRuntime.create(config)
+    try:
+        return await RecallRunner(
+            config=config,
+            cases=cases,
+            documents=documents,
+            runtime=runtime,
+        ).run()
+    finally:
+        await runtime.close()

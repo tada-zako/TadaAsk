@@ -9,7 +9,7 @@ from typing import Any, Sequence
 from pydantic import JsonValue, SecretStr
 
 from ..models import BenchmarkDocument
-from .control import ModelCallController
+from .control import ModelCallController, ModelCallLimitReached
 from .schemas import (
     BenchmarkSearchMode,
     RecallRunConfig,
@@ -20,6 +20,10 @@ from .schemas import (
 
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = BACKEND_ROOT / "data" / "benchmarks" / "rag"
+
+
+class RetrievalLimitReached(RuntimeError):
+    """Signal that the adapter exhausted its configured model-call budget."""
 
 
 class _ControlledCompleter:
@@ -104,7 +108,6 @@ class TadaAskRuntime:
     async def create(
         cls,
         config: RecallRunConfig,
-        model_calls: ModelCallController | None = None,
     ) -> "TadaAskRuntime":
         """Bootstrap isolated App storage and assemble the TadaAsk RAG runtime.
 
@@ -193,10 +196,16 @@ class TadaAskRuntime:
             rerank_provider=rerank,
         )
         if config.mode == BenchmarkSearchMode.FAST:
+            model_calls = None
             completer = None
         else:
-            if model_calls is None:
-                raise ValueError("model call controls are required for adaptive/full")
+            model_calls = ModelCallController(
+                ledger_path=config.run_dir / "model-calls.jsonl",
+                requests_per_minute=config.requests_per_minute,
+                max_calls_total=config.max_model_calls_total,
+                max_attempts=config.max_attempts,
+                retry_base_seconds=config.retry_base_seconds,
+            )
             completer = _ControlledCompleter(
                 cls._create_completer(config.query_expansion), model_calls
             )
@@ -214,6 +223,11 @@ class TadaAskRuntime:
             search_source_ref_type=SearchSourceRef,
             model_calls=model_calls,
         )
+
+    @property
+    def model_call_attempts(self) -> int:
+        """Return persisted model attempts for the current run directory."""
+        return self._model_calls.total_attempts if self._model_calls is not None else 0
 
     @staticmethod
     def _prepare_environment(config: RecallRunConfig) -> None:
@@ -392,6 +406,10 @@ class TadaAskRuntime:
                 # The App Fast branch never dereferences its completer argument.
                 completer=self._completer,
             )
+        except ModelCallLimitReached as exc:
+            if self._model_calls is not None:
+                self._model_calls.finish_case()
+            raise RetrievalLimitReached from exc
         except Exception:
             if self._model_calls is not None:
                 self._model_calls.finish_case()
